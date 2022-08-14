@@ -48,7 +48,7 @@ namespace graphene { namespace net {
     }
   }
 
-  void simulated_network::message_sender(std::shared_ptr<node_info> destination_node)
+  void simulated_network::message_sender(std::shared_ptr<node_info> destination_node) const
   {
     while (!destination_node->messages_to_deliver.empty())
     {
@@ -74,7 +74,7 @@ namespace graphene { namespace net {
     }
   }
 
-  void simulated_network::broadcast( const message& item_to_broadcast  )
+  void simulated_network::broadcast( const message& item_to_broadcast  ) const
   {
     for (auto network_node_info : network_nodes)
     {

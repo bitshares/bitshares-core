@@ -198,8 +198,7 @@ namespace graphene { namespace net { namespace detail {
    class list_address_builder : public generic_list_address_builder
    {
    public:
-      explicit list_address_builder(const std::vector<std::string>& address_list)
-      : generic_list_address_builder( address_list ) { /* Nothing to do */ }
+      using generic_list_address_builder::generic_list_address_builder;
 
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
@@ -213,8 +212,7 @@ namespace graphene { namespace net { namespace detail {
    class exclude_address_builder : public generic_list_address_builder
    {
    public:
-      explicit exclude_address_builder(const std::vector<std::string>& address_list)
-      : generic_list_address_builder( address_list ) { /* Nothing to do */ }
+      using generic_list_address_builder::generic_list_address_builder;
 
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
@@ -361,7 +359,7 @@ namespace graphene { namespace net { namespace detail {
               fc::microseconds delay_until_retry = fc::seconds( (iter->number_of_failed_connection_attempts + 1)
                                                                 * _peer_connection_retry_timeout );
 
-              if (!is_connection_to_endpoint_in_progress(iter->endpoint) &&
+              if (!is_connected_to_endpoint(iter->endpoint) &&
                   ((iter->last_connection_disposition != last_connection_failed &&
                     iter->last_connection_disposition != last_connection_rejected &&
                     iter->last_connection_disposition != last_connection_handshaking_failed) ||
@@ -1627,15 +1625,13 @@ namespace graphene { namespace net { namespace detail {
           // If they match the IP and port we see, we assume that they're actually on the internet.
           fc::ip::endpoint peers_actual_outbound_endpoint = originating_peer->get_socket().remote_endpoint();
           if( peers_actual_outbound_endpoint.get_address() == originating_peer->inbound_address &&
-              peers_actual_outbound_endpoint.port() == originating_peer->outbound_port )
+              peers_actual_outbound_endpoint.port() == originating_peer->outbound_port &&
+              originating_peer->inbound_port != 0 )
           {
-            if( originating_peer->inbound_port != 0 )
-            {
                // add to the peer database
               fc::ip::endpoint peers_inbound_endpoint(originating_peer->inbound_address, originating_peer->inbound_port);
               potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(peers_inbound_endpoint);
               _potential_peer_db.update_entry(updated_peer_record);
-            }
           }
 
           if (!is_accepting_new_connections())
@@ -1767,10 +1763,10 @@ namespace graphene { namespace net { namespace detail {
       std::vector<graphene::net::address_info> updated_addresses = address_message_received.addresses;
       for (address_info& address : updated_addresses)
         address.last_seen_time = fc::time_point_sec(fc::time_point::now());
-      if ( _node_configuration.connect_to_new_peers )
+      if ( _node_configuration.connect_to_new_peers
+           && merge_address_info_with_potential_peer_database(updated_addresses) )
       {
-         if ( merge_address_info_with_potential_peer_database(updated_addresses) )
-            trigger_p2p_network_connect_loop();
+         trigger_p2p_network_connect_loop();
       }
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
@@ -4186,7 +4182,7 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::connect_to_endpoint(const fc::ip::endpoint& remote_endpoint)
     {
       VERIFY_CORRECT_THREAD();
-      if (is_connection_to_endpoint_in_progress(remote_endpoint))
+      if( is_connected_to_endpoint(remote_endpoint) )
         FC_THROW_EXCEPTION(already_connected_to_requested_peer, "already connected to requested endpoint ${endpoint}",
                            ("endpoint", remote_endpoint));
 
@@ -4196,7 +4192,7 @@ namespace graphene { namespace net { namespace detail {
       initiate_connect_to(new_peer);
     }
 
-   peer_connection_ptr node_impl::get_active_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint)
+   peer_connection_ptr node_impl::get_active_conn_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
    {
       VERIFY_CORRECT_THREAD();
       fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
@@ -4209,10 +4205,10 @@ namespace graphene { namespace net { namespace detail {
       return peer_connection_ptr();
    }
 
-    peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint )
+    peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
     {
       VERIFY_CORRECT_THREAD();
-      peer_connection_ptr active_ptr = get_active_connection_for_endpoint( remote_endpoint );
+      peer_connection_ptr active_ptr = get_active_conn_for_endpoint( remote_endpoint );
       if ( active_ptr != peer_connection_ptr() )
          return active_ptr;
       fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
@@ -4225,7 +4221,7 @@ namespace graphene { namespace net { namespace detail {
       return peer_connection_ptr();
     }
 
-    bool node_impl::is_connection_to_endpoint_in_progress( const fc::ip::endpoint& remote_endpoint )
+    bool node_impl::is_connected_to_endpoint( const fc::ip::endpoint& remote_endpoint ) const
     {
       VERIFY_CORRECT_THREAD();
       return get_connection_for_endpoint( remote_endpoint ) != peer_connection_ptr();
@@ -4710,47 +4706,47 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(set_node_delegate, del, delegate_thread);
   }
 
-  void node::load_configuration( const fc::path& configuration_directory )
+  void node::load_configuration( const fc::path& configuration_directory ) const
   {
     INVOKE_IN_IMPL(load_configuration, configuration_directory);
   }
 
-  void node::listen_to_p2p_network()
+  void node::listen_to_p2p_network() const
   {
     INVOKE_IN_IMPL(listen_to_p2p_network);
   }
 
-  void node::connect_to_p2p_network()
+  void node::connect_to_p2p_network() const
   {
     INVOKE_IN_IMPL(connect_to_p2p_network, my);
   }
 
-  void node::add_node( const fc::ip::endpoint& ep )
+  void node::add_node( const fc::ip::endpoint& ep ) const
   {
     INVOKE_IN_IMPL(add_node, ep);
   }
 
-  void node::connect_to_endpoint( const fc::ip::endpoint& remote_endpoint )
+  void node::connect_to_endpoint( const fc::ip::endpoint& remote_endpoint ) const
   {
     INVOKE_IN_IMPL(connect_to_endpoint, remote_endpoint);
   }
 
-  void node::set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available)
+  void node::set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available) const
   {
     INVOKE_IN_IMPL(set_listen_endpoint, ep, wait_if_not_available);
   }
 
-  void node::set_accept_incoming_connections(bool accept)
+  void node::set_accept_incoming_connections(bool accept) const
   {
     INVOKE_IN_IMPL(set_accept_incoming_connections, accept);
   }
 
-  void node::set_connect_to_new_peers( bool connect )
+  void node::set_connect_to_new_peers( bool connect ) const
   {
      INVOKE_IN_IMPL( set_connect_to_new_peers, connect );
   }
 
-  void node::set_listen_port( uint16_t port, bool wait_if_not_available )
+  void node::set_listen_port( uint16_t port, bool wait_if_not_available ) const
   {
     INVOKE_IN_IMPL(set_listen_port, port, wait_if_not_available);
   }
@@ -4770,12 +4766,12 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_connection_count);
   }
 
-  void node::broadcast( const message& msg )
+  void node::broadcast( const message& msg ) const
   {
     INVOKE_IN_IMPL(broadcast, msg);
   }
 
-  void node::sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers)
+  void node::sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) const
   {
     INVOKE_IN_IMPL(sync_from, current_head_block, hard_fork_block_numbers);
   }
@@ -4790,22 +4786,23 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_potential_peers);
   }
 
-  void node::set_advanced_node_parameters( const fc::variant_object& params )
+  void node::set_advanced_node_parameters( const fc::variant_object& params ) const
   {
     INVOKE_IN_IMPL(set_advanced_node_parameters, params);
   }
 
-  fc::variant_object node::get_advanced_node_parameters()
+  fc::variant_object node::get_advanced_node_parameters() const
   {
     INVOKE_IN_IMPL(get_advanced_node_parameters);
   }
 
-  message_propagation_data node::get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id )
+  message_propagation_data node::get_transaction_propagation_data(
+        const graphene::net::transaction_id_type& transaction_id ) const
   {
     INVOKE_IN_IMPL(get_transaction_propagation_data, transaction_id);
   }
 
-  message_propagation_data node::get_block_propagation_data( const graphene::net::block_id_type& block_id )
+  message_propagation_data node::get_block_propagation_data( const graphene::net::block_id_type& block_id ) const
   {
     INVOKE_IN_IMPL(get_block_propagation_data, block_id);
   }
@@ -4815,23 +4812,23 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_node_id);
   }
 
-  void node::set_allowed_peers( const std::vector<node_id_t>& allowed_peers )
+  void node::set_allowed_peers( const std::vector<node_id_t>& allowed_peers ) const
   {
     INVOKE_IN_IMPL(set_allowed_peers, allowed_peers);
   }
 
-  void node::clear_peer_database()
+  void node::clear_peer_database() const
   {
     INVOKE_IN_IMPL(clear_peer_database);
   }
 
   void node::set_total_bandwidth_limit(uint32_t upload_bytes_per_second,
-                                       uint32_t download_bytes_per_second)
+                                       uint32_t download_bytes_per_second) const
   {
     INVOKE_IN_IMPL(set_total_bandwidth_limit, upload_bytes_per_second, download_bytes_per_second);
   }
 
-  void node::disable_peer_advertising()
+  void node::disable_peer_advertising() const
   {
     INVOKE_IN_IMPL(disable_peer_advertising);
   }
@@ -4851,7 +4848,7 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(network_get_usage_stats);
   }
 
-  void node::close()
+  void node::close() const
   {
     INVOKE_IN_IMPL(close);
   }
@@ -5048,7 +5045,7 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
-   void node::add_seed_nodes(std::vector<std::string> seeds)
+   void node::add_seed_nodes(std::vector<std::string> seeds) const
    {
       for(const std::string& endpoint_string : seeds )
       {
@@ -5061,13 +5058,13 @@ namespace graphene { namespace net { namespace detail {
       }
    }
 
-   void node::add_seed_node(const std::string& in)
+   void node::add_seed_node(const std::string& in) const
    {
       INVOKE_IN_IMPL(add_seed_node, in);
    }
 
    void node::set_advertise_algorithm( const std::string& algo,
-         const std::vector<std::string>& advertise_or_exclude_list )
+         const std::vector<std::string>& advertise_or_exclude_list ) const
    {
       INVOKE_IN_IMPL( set_advertise_algorithm, algo, advertise_or_exclude_list );
    }

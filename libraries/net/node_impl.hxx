@@ -420,7 +420,7 @@ public:
 
 #ifdef P2P_IN_DEDICATED_THREAD
       std::shared_ptr<fc::thread> _thread = std::make_shared<fc::thread>("p2p");
-      std::shared_ptr<fc::thread> get_thread() { return _thread; }
+      std::shared_ptr<fc::thread> get_thread() const { return _thread; }
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;
@@ -748,7 +748,7 @@ public:
       void accept_loop();
       void send_hello_message(const peer_connection_ptr& peer);
       void connect_to_task(peer_connection_ptr new_peer, const fc::ip::endpoint& remote_endpoint);
-      bool is_connection_to_endpoint_in_progress(const fc::ip::endpoint& remote_endpoint);
+      bool is_connected_to_endpoint(const fc::ip::endpoint& remote_endpoint) const;
 
       void move_peer_to_active_list(const peer_connection_ptr& peer);
       void move_peer_to_closing_list(const peer_connection_ptr& peer);
@@ -759,13 +759,13 @@ public:
        * @param remote_endpoint the address we are interested in
        * @returns the connection, or peer_connection_ptr() if not found
        */
-      peer_connection_ptr get_active_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint );
+      peer_connection_ptr get_active_conn_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const;
       /***
        * Look for a connection that is either active or currently in the handshaking process
        * @param remote_endpoint the address we are interested in
        * @returns the connection, or peer_connection_ptr() if not found
        */
-      peer_connection_ptr get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint );
+      peer_connection_ptr get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const;
 
       void dump_node_status();
 
