@@ -245,6 +245,12 @@ int main(int argc, char** argv)
                 // Set it to unknown here, we will check later
                 address_info_by_node_id[info.node_id].firewalled = graphene::net::firewalled_state::unknown;
              }
+             else if ( !address_info_by_node_id[info.node_id].remote_endpoint.get_address().is_public_address()
+                       && info.remote_endpoint.get_address().is_public_address() )
+             {
+                // Replace private or local addresses with public addresses when possible
+                address_info_by_node_id[info.node_id].remote_endpoint = info.remote_endpoint;
+             }
           }
   };
 
