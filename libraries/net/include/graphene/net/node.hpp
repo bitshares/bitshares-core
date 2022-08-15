@@ -212,7 +212,7 @@ namespace graphene { namespace net {
          * @brief add a list of nodes to seed the p2p network
          * @param seeds a vector of url strings
          */
-        void add_seed_nodes( std::vector<std::string> seeds ) const;
+        void add_seed_nodes( const std::vector<std::string>& seeds ) const;
 
         /****
          * @brief add a node to seed the p2p network
@@ -300,9 +300,10 @@ namespace graphene { namespace net {
 
         void set_advanced_node_parameters(const fc::variant_object& params) const;
         fc::variant_object get_advanced_node_parameters() const;
-        message_propagation_data get_transaction_propagation_data(
+        message_propagation_data get_tx_propagation_data(
               const graphene::protocol::transaction_id_type& transaction_id) const;
-        message_propagation_data get_block_propagation_data(const graphene::protocol::block_id_type& block_id) const;
+        message_propagation_data get_block_propagation_data(
+              const graphene::protocol::block_id_type& block_id) const;
         node_id_t get_node_id() const;
         void set_allowed_peers(const std::vector<node_id_t>& allowed_peers) const;
 

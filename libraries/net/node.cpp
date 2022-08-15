@@ -1673,7 +1673,7 @@ namespace graphene { namespace net { namespace detail {
     }
 
     void node_impl::on_connection_accepted_message( peer_connection* originating_peer,
-                                                    const connection_accepted_message& )
+                                                    const connection_accepted_message& ) const
     {
       VERIFY_CORRECT_THREAD();
       dlog("Received a connection_accepted in response to my \"hello\" from ${peer}",
@@ -4563,13 +4563,15 @@ namespace graphene { namespace net { namespace detail {
       return result;
     }
 
-    message_propagation_data node_impl::get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id )
+    message_propagation_data node_impl::get_tx_propagation_data(
+          const graphene::net::transaction_id_type& transaction_id ) const
     {
       VERIFY_CORRECT_THREAD();
       return _message_cache.get_message_propagation_data( transaction_id );
     }
 
-    message_propagation_data node_impl::get_block_propagation_data( const graphene::net::block_id_type& block_id )
+    message_propagation_data node_impl::get_block_propagation_data(
+          const graphene::net::block_id_type& block_id ) const
     {
       VERIFY_CORRECT_THREAD();
       return _message_cache.get_message_propagation_data( block_id );
@@ -4796,10 +4798,10 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_advanced_node_parameters);
   }
 
-  message_propagation_data node::get_transaction_propagation_data(
+  message_propagation_data node::get_tx_propagation_data(
         const graphene::net::transaction_id_type& transaction_id ) const
   {
-    INVOKE_IN_IMPL(get_transaction_propagation_data, transaction_id);
+    INVOKE_IN_IMPL(get_tx_propagation_data, transaction_id);
   }
 
   message_propagation_data node::get_block_propagation_data( const graphene::net::block_id_type& block_id ) const
@@ -5045,7 +5047,7 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
-   void node::add_seed_nodes(std::vector<std::string> seeds) const
+   void node::add_seed_nodes(const std::vector<std::string>& seeds) const
    {
       for(const std::string& endpoint_string : seeds )
       {

@@ -679,7 +679,8 @@ public:
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
 
-      void on_connection_accepted_message( peer_connection* originating_peer, const connection_accepted_message& );
+      void on_connection_accepted_message( peer_connection* originating_peer,
+                                           const connection_accepted_message& ) const;
 
       void on_connection_rejected_message( peer_connection* originating_peer,
                                            const connection_rejected_message& connection_rejected_message_received );
@@ -806,13 +807,15 @@ public:
       void set_advanced_node_parameters( const fc::variant_object& params );
 
       fc::variant_object         get_advanced_node_parameters();
-      message_propagation_data   get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id );
-      message_propagation_data   get_block_propagation_data( const graphene::net::block_id_type& block_id );
+      message_propagation_data   get_tx_propagation_data(
+                                       const graphene::net::transaction_id_type& transaction_id ) const;
+      message_propagation_data   get_block_propagation_data( const graphene::net::block_id_type& block_id ) const;
 
       node_id_t                  get_node_id() const;
       void                       set_allowed_peers( const std::vector<node_id_t>& allowed_peers );
       void                       clear_peer_database();
-      void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second );
+      void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second,
+                                                            uint32_t download_bytes_per_second );
       void                       disable_peer_advertising();
       fc::variant_object         get_call_statistics() const;
       graphene::net::message     get_message_for_item(const item_id& item) override;
