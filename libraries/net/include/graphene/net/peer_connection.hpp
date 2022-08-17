@@ -171,6 +171,7 @@ namespace graphene { namespace net
       fc::time_point connection_closed_time;
       fc::time_point connection_terminated_time;
       peer_connection_direction direction = peer_connection_direction::unknown;
+      firewalled_state is_firewalled = firewalled_state::unknown;
       fc::microseconds clock_offset;
       fc::microseconds round_trip_delay;
 

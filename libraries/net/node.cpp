@@ -163,8 +163,8 @@ namespace graphene { namespace net { namespace detail {
          impl->_potential_peer_db.update_entry(*updated_peer_record);
       }
 
-      return address_info(*active_peer->get_remote_endpoint(), fc::time_point::now(), active_peer->round_trip_delay,
-         active_peer->node_id, active_peer->direction, firewalled_state::unknown);
+      return address_info( *active_peer->get_remote_endpoint(), fc::time_point::now(), active_peer->round_trip_delay,
+         active_peer->node_id, active_peer->direction, active_peer->is_firewalled );
    }
 
    /// Base class for list address builder and exclude_list address builder
@@ -359,11 +359,13 @@ namespace graphene { namespace net { namespace detail {
               fc::microseconds delay_until_retry = fc::seconds( (iter->number_of_failed_connection_attempts + 1)
                                                                 * _peer_connection_retry_timeout );
 
-              if (!is_connected_to_endpoint(iter->endpoint) &&
-                  ((iter->last_connection_disposition != last_connection_failed &&
-                    iter->last_connection_disposition != last_connection_rejected &&
-                    iter->last_connection_disposition != last_connection_handshaking_failed) ||
-                   (fc::time_point::now() - iter->last_connection_attempt_time) > delay_until_retry))
+              bool last_connection_not_ok = ( iter->last_connection_disposition == last_connection_failed ||
+                         iter->last_connection_disposition == last_connection_rejected ||
+                         iter->last_connection_disposition == last_connection_handshaking_failed );
+
+              if( !is_connected_to_endpoint( iter->endpoint )
+                  && ( !last_connection_not_ok
+                       || ( fc::time_point::now() - iter->last_connection_attempt_time ) > delay_until_retry ) )
               {
                 connect_to_endpoint(iter->endpoint);
                 initiated_connection_this_pass = true;
@@ -1298,6 +1300,8 @@ namespace graphene { namespace net { namespace detail {
          // Note:
          // 1. node_id of that peer may have changed, but we don't check or update
          // 2. we don't check by node_id either, in case when a peer's IP address has changed, we don't handle it
+         // 3. no matter if the address is reported as firewalled or not,
+         //    we add it to our database and check by ourselves later
          if (address.last_seen_time > updated_peer_record.last_seen_time)
          {
             new_information_received = true;
@@ -1624,14 +1628,30 @@ namespace graphene { namespace net { namespace detail {
           // in the hello message, the peer sent us the IP address and port it thought it was connecting from.
           // If they match the IP and port we see, we assume that they're actually on the internet.
           fc::ip::endpoint peers_actual_outbound_endpoint = originating_peer->get_socket().remote_endpoint();
-          if( peers_actual_outbound_endpoint.get_address() == originating_peer->inbound_address &&
-              peers_actual_outbound_endpoint.port() == originating_peer->outbound_port &&
-              originating_peer->inbound_port != 0 )
+          if( 0 == originating_peer->inbound_port )
+          {
+              dlog( "peer did not give an inbound port so I'm treating them as if they are firewalled." );
+              originating_peer->is_firewalled = firewalled_state::firewalled;
+          }
+          else if( peers_actual_outbound_endpoint.get_address() == originating_peer->inbound_address &&
+              peers_actual_outbound_endpoint.port() == originating_peer->outbound_port )
           {
                // add to the peer database
-              fc::ip::endpoint peers_inbound_endpoint(originating_peer->inbound_address, originating_peer->inbound_port);
-              potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(peers_inbound_endpoint);
-              _potential_peer_db.update_entry(updated_peer_record);
+              fc::ip::endpoint peers_inbound_endpoint( originating_peer->inbound_address,
+                                                       originating_peer->inbound_port );
+              auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(
+                                                       peers_inbound_endpoint );
+              _potential_peer_db.update_entry( updated_peer_record );
+              originating_peer->is_firewalled = firewalled_state::not_firewalled;
+          }
+          else
+          {
+            dlog("peer is firewalled: they think their outbound endpoint is ${reported_endpoint}, "
+                 "but I see it as ${actual_endpoint}",
+                 ("reported_endpoint", fc::ip::endpoint( originating_peer->inbound_address,
+                                                         originating_peer->outbound_port ))
+                 ("actual_endpoint", peers_actual_outbound_endpoint));
+            originating_peer->is_firewalled = firewalled_state::firewalled;
           }
 
           if (!is_accepting_new_connections())
@@ -1787,6 +1807,9 @@ namespace graphene { namespace net { namespace detail {
             if (updated_peer_record)
             {
               updated_peer_record->last_connection_disposition = last_connection_succeeded;
+              // halve number_of_failed_connection_attempts
+              constexpr uint16_t two = 2;
+              updated_peer_record->number_of_failed_connection_attempts /= two;
               _potential_peer_db.update_entry(*updated_peer_record);
             }
           }
@@ -1900,14 +1923,18 @@ namespace graphene { namespace net { namespace detail {
           _handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
         // handshaking is done, move the connection to fully active status and start synchronizing
-        dlog("peer ${endpoint} which was handshaking with us has started synchronizing with us, start syncing with it",
+        dlog("peer ${endpoint} which was handshaking with us has started synchronizing with us, "
+             "start syncing with it",
              ("endpoint", originating_peer->get_remote_endpoint()));
         fc::optional<fc::ip::endpoint> inbound_endpoint = originating_peer->get_endpoint_for_connecting();
         if (inbound_endpoint)
         {
           // mark the connection as successful in the database
-          potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(*inbound_endpoint);
+          auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(*inbound_endpoint);
           updated_peer_record.last_connection_disposition = last_connection_succeeded;
+          // halve number_of_failed_connection_attempts
+          constexpr uint16_t two = 2;
+          updated_peer_record.number_of_failed_connection_attempts /= two;
           _potential_peer_db.update_entry(updated_peer_record);
         }
 
@@ -3736,8 +3763,8 @@ namespace graphene { namespace net { namespace detail {
       // The peer we're connecting to will assume we're firewalled if the
       // ip address and outbound port we send don't match the values it sees on its remote endpoint
       //
-      // if we know that we're behind a NAT that will allow incoming connections because our firewall
-      // detection figured it out, send those values instead.
+      // Note: we no longer perform remote firewall check, thus we don't know if we're behind a NAT that
+      //       will allow incoming connections.
 
       fc::ip::endpoint local_endpoint(peer->get_socket().local_endpoint());
       uint16_t listening_port = _node_configuration.accept_incoming_connections ?
@@ -3761,21 +3788,12 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
 
-      // TODO: Review code below. Since we no longer perform firewall check, code can be simplified
-      if (!new_peer->performing_firewall_check())
-      {
-        // create or find the database entry for the new peer
-        // if we're connecting to them, we believe they're not firewalled
-        potential_peer_record updated_peer_record
+      // create or find the database entry for the new peer
+      potential_peer_record updated_peer_record
               = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
-        updated_peer_record.last_connection_disposition = last_connection_failed;
-        updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
-        _potential_peer_db.update_entry(updated_peer_record);
-      }
-      else
-      {
-        ilog("connecting to peer ${peer} for firewall check", ("peer", new_peer->get_remote_endpoint()));
-      }
+      updated_peer_record.last_connection_disposition = last_connection_failed;
+      updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
+      _potential_peer_db.update_entry(updated_peer_record);
 
       fc::oexception connect_failed_exception;
 
@@ -3783,6 +3801,9 @@ namespace graphene { namespace net { namespace detail {
       {
         // blocks until the connection is established and secure connection is negotiated
         new_peer->connect_to(remote_endpoint, _actual_listening_endpoint);
+
+        // we connected to the peer.  guess they're not firewalled....
+        new_peer->is_firewalled = firewalled_state::not_firewalled;
 
         // connection succeeded, we've started handshaking.  record that in our database
         potential_peer_record updated_peer_record
@@ -3797,7 +3818,7 @@ namespace graphene { namespace net { namespace detail {
         connect_failed_exception = except;
       }
 
-      if (connect_failed_exception && !new_peer->performing_firewall_check())
+      if( connect_failed_exception )
       {
         // connection failed.  record that in our database
         potential_peer_record updated_peer_record
@@ -3809,34 +3830,8 @@ namespace graphene { namespace net { namespace detail {
         else
           updated_peer_record.last_error = *connect_failed_exception;
         _potential_peer_db.update_entry(updated_peer_record);
-      }
 
-      if (new_peer->performing_firewall_check())
-      {
-        // we were connecting to test whether the node is firewalled, and we now know the result.
-        // send a message back to the requester
-        peer_connection_ptr requesting_peer = get_peer_by_node_id(new_peer->firewall_check_state->requesting_peer);
-        if (requesting_peer)
-        {
-          check_firewall_reply_message reply;
-          reply.endpoint_checked = new_peer->firewall_check_state->endpoint_to_test;
-          reply.node_id = new_peer->firewall_check_state->expected_node_id;
-          reply.result = connect_failed_exception ?
-                           firewall_check_result::unable_to_connect :
-                           firewall_check_result::connection_successful;
-          ilog("firewall check of ${peer_checked} ${success_or_failure}, sending reply to ${requester}",
-                ("peer_checked", new_peer->get_remote_endpoint())
-                ("success_or_failure", connect_failed_exception ? "failed" : "succeeded" )
-                ("requester", requesting_peer->get_remote_endpoint()));
-
-          requesting_peer->send_message(reply);
-        }
-      }
-
-      if (connect_failed_exception || new_peer->performing_firewall_check())
-      {
-        // if the connection failed or if this connection was just intended to check
-        // whether the peer is firewalled, we want to disconnect now.
+        // if the connection failed, we want to disconnect now.
         _handshaking_connections.erase(new_peer);
         _terminating_connections.erase(new_peer);
         assert(_active_connections.find(new_peer) == _active_connections.end());
@@ -3848,15 +3843,15 @@ namespace graphene { namespace net { namespace detail {
         trigger_p2p_network_connect_loop();
         schedule_peer_for_deletion(new_peer);
 
-        if (connect_failed_exception)
-          throw *connect_failed_exception;
+        throw *connect_failed_exception;
       }
       else
       {
         // connection was successful and we want to stay connected
         fc::ip::endpoint local_endpoint = new_peer->get_local_endpoint();
         new_peer->inbound_address = local_endpoint.get_address();
-        new_peer->inbound_port = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint.port() : 0;
+        new_peer->inbound_port = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint.port()
+                                                                                 : 0;
         new_peer->outbound_port = local_endpoint.port();
 
         new_peer->our_state = peer_connection::our_connection_state::just_connected;
@@ -4417,7 +4412,7 @@ namespace graphene { namespace net { namespace detail {
         peer_details["version"] = "";
         peer_details["subver"] = peer->user_agent;
         peer_details["inbound"] = peer->direction == peer_connection_direction::inbound;
-        peer_details["firewall_status"] = (fc::enum_type<uint8_t, firewalled_state>)firewalled_state::unknown;
+        peer_details["firewall_status"] = fc::variant( peer->is_firewalled, 1 );
         peer_details["startingheight"] = "";
         peer_details["banscore"] = "";
         peer_details["syncnode"] = "";
