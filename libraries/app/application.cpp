@@ -167,6 +167,10 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                                          true );
    // else try to listen on the default port first, if failed, use a random port
 
+   if( _options->count("p2p-inbound-endpoint") > 0 )
+      _p2p_network->set_inbound_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-inbound-endpoint")
+                                              .as<string>()) );
+
    if ( _options->count("accept-incoming-connections") > 0 )
       _p2p_network->set_accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
 
@@ -1175,7 +1179,12 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
           "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
           "this option will be ignored and P2P network will always be disabled.")
-         ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
+         ("p2p-endpoint", bpo::value<string>(),
+          "Endpoint (local IP address:port) for P2P node to listen on. "
+          "Specify 0.0.0.0 as address to listen on all IP addresses")
+         ("p2p-inbound-endpoint", bpo::value<string>(),
+          "Endpoint (external IP address:port) that other peers should connect to. "
+          "If the address is unknown or dynamic, specify 0.0.0.0")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
           "Whether to accept incoming connections")
          ("connect-to-new-peers", bpo::value<bool>()->implicit_value(true),

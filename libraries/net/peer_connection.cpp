@@ -218,7 +218,8 @@ namespace graphene { namespace net
 
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
-        ilog( "established inbound connection from ${remote_endpoint}, sending hello", ("remote_endpoint", _message_connection.get_socket().remote_endpoint() ) );
+        ilog( "established inbound connection from ${remote_endpoint}, sending hello",
+              ("remote_endpoint", _message_connection.get_socket().remote_endpoint() ) );
       }
       catch ( const fc::exception& e )
       {
@@ -227,7 +228,8 @@ namespace graphene { namespace net
       }
     }
 
-    void peer_connection::connect_to( const fc::ip::endpoint& remote_endpoint, fc::optional<fc::ip::endpoint> local_endpoint )
+    void peer_connection::connect_to( const fc::ip::endpoint& remote_endpoint,
+                                      const fc::optional<fc::ip::endpoint>& local_endpoint )
     {
       VERIFY_CORRECT_THREAD();
       try
@@ -261,6 +263,7 @@ namespace graphene { namespace net
         negotiation_status = connection_negotiation_status::connected;
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
+        remote_inbound_endpoint = remote_endpoint;
         ilog( "established outbound connection to ${remote_endpoint}", ("remote_endpoint", remote_endpoint ) );
       }
       catch ( fc::exception& e )
@@ -528,9 +531,7 @@ namespace graphene { namespace net
 
     fc::optional<fc::ip::endpoint> peer_connection::get_endpoint_for_connecting() const
     {
-      if (inbound_port)
-        return fc::ip::endpoint(inbound_address, inbound_port);
-      return fc::optional<fc::ip::endpoint>();
+      return remote_inbound_endpoint;
     }
 
 } } // end namespace graphene::net

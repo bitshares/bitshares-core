@@ -225,23 +225,20 @@ namespace graphene { namespace net {
          */
         virtual void connect_to_endpoint( const fc::ip::endpoint& ep ) const;
 
-        /**
-         * Specifies the network interface and port upon which incoming
-         *  connections should be accepted.
-         * @param ep the endpoint (network interface and port)
-         * @param wait_if_not_available keep retrying if port is not available
-         */
-        void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available ) const;
+         /**
+          * Specifies the IP address and port on the "local machine" that should accept incoming connections.
+          * @note To listen on all IPv4 addresses on the local machine, specify 0.0.0.0 as the address.
+          * @param ep the endpoint (IP address and port)
+          * @param wait_if_not_available keep retrying if port is not available
+          */
+         void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available ) const;
 
-        /**
-         *  Specifies the port upon which incoming connections should be accepted.
-         *  @param port the port to listen on
-         *  @param wait_if_not_available if true and the port is not available, enter a
-         *                               sleep and retry loop to wait for it to become
-         *                               available.  If false and the port is not available,
-         *                               just choose a random available port
-         */
-        void set_listen_port( uint16_t port, bool wait_if_not_available ) const;
+         /**
+          * Specifies the IP address and port on the "external network" which other peers should connect to.
+          * @note If the address is unknown (E.G. dynamically allocated), specify 0.0.0.0 as the address.
+          * @param ep the endpoint (IP address and port)
+          */
+         void set_inbound_endpoint( const fc::ip::endpoint& ep ) const;
 
          /**
           * Enable or disable listening for incoming connections

@@ -204,12 +204,14 @@ namespace graphene { namespace net
       fc::optional<std::string> platform;
       fc::optional<uint32_t> bitness;
 
-      // for inbound connections, these fields record what the peer sent us in
-      // its hello message.  For outbound, they record what we sent the peer
-      // in our hello message
+      // Initially, these fields record info about our local socket,
+      // they are useless (except the remote_inbound_endpoint field for outbound connections).
+      // After we receive a hello message, they are replaced with the info in the hello message.
       fc::ip::address inbound_address;
       uint16_t inbound_port = 0;
       uint16_t outbound_port = 0;
+      /// The inbound endpoint of the remote peer
+      fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
       /// @}
 
       typedef std::unordered_map<item_id, fc::time_point> item_to_time_map_type;
@@ -277,7 +279,8 @@ namespace graphene { namespace net
 
       fc::tcp_socket& get_socket();
       void accept_connection();
-      void connect_to(const fc::ip::endpoint& remote_endpoint, fc::optional<fc::ip::endpoint> local_endpoint = fc::optional<fc::ip::endpoint>());
+      void connect_to(const fc::ip::endpoint& remote_endpoint,
+                      const fc::optional<fc::ip::endpoint>& local_endpoint = fc::optional<fc::ip::endpoint>());
 
       void on_message(message_oriented_connection* originating_connection, const message& received_message) override;
       void on_connection_closed(message_oriented_connection* originating_connection) override;

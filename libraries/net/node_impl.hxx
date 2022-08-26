@@ -394,6 +394,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
 struct node_configuration
 {
    fc::ip::endpoint listen_endpoint;
+   fc::optional<fc::ip::endpoint> inbound_endpoint;
    bool accept_incoming_connections = true;
    bool connect_to_new_peers = true;
    bool wait_if_endpoint_is_busy = false;
@@ -791,9 +792,9 @@ public:
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
+      void set_inbound_endpoint( const fc::ip::endpoint& ep );
       void set_accept_incoming_connections(bool accept);
       void set_connect_to_new_peers( bool connect );
-      void set_listen_port( uint16_t port, bool wait_if_not_available );
 
       fc::ip::endpoint         get_actual_listening_endpoint() const;
       std::vector<peer_status> get_connected_peers() const;
@@ -836,6 +837,7 @@ public:
 
 FC_REFLECT( graphene::net::detail::node_configuration,
             (listen_endpoint)
+            (inbound_endpoint)
             (accept_incoming_connections)
             (connect_to_new_peers)
             (wait_if_endpoint_is_busy)
