@@ -87,7 +87,6 @@ namespace graphene { namespace net
       inhibit_fetching_sync_blocks(false),
       transaction_fetching_inhibited_until(fc::time_point::min()),
       last_known_fork_block_number(0),
-      firewall_check_state(nullptr),
 #ifndef NDEBUG
       _thread(&fc::thread::current()),
       _send_message_queue_tasks_running(0),
@@ -522,11 +521,6 @@ namespace graphene { namespace net
       return inventory_peer_advertised_to_us.size() >
         GRAPHENE_NET_MAX_INVENTORY_SIZE_IN_MINUTES * GRAPHENE_NET_MAX_TRX_PER_SECOND * 60 +
         (GRAPHENE_NET_MAX_INVENTORY_SIZE_IN_MINUTES + 1) * 60 / GRAPHENE_MIN_BLOCK_INTERVAL;
-    }
-
-    bool peer_connection::performing_firewall_check() const
-    {
-      return firewall_check_state && firewall_check_state->requesting_peer != node_id_t();
     }
 
     fc::optional<fc::ip::endpoint> peer_connection::get_endpoint_for_connecting() const

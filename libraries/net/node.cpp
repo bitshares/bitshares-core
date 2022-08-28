@@ -1069,6 +1069,7 @@ namespace graphene { namespace net { namespace detail {
          {
             try
             {
+               active_peer->expecting_address_message = true;
                active_peer->send_message(address_request_message());
             }
             catch ( const fc::canceled_exception& )
@@ -1306,7 +1307,8 @@ namespace graphene { namespace net { namespace detail {
       bool new_information_received = false;
       for (const address_info& address : addresses)
       {
-         // If the peer's inbound port is 0, we don't add it to our peer database
+         // If the peer's inbound port is 0, we don't add it to our peer database.
+         // Although it should have been handled by the caller, be defensive here.
          if( 0 == address.remote_endpoint.port() )
             continue;
          // Note: if found, a copy is returned
@@ -1324,6 +1326,7 @@ namespace graphene { namespace net { namespace detail {
             _potential_peer_db.update_entry(updated_peer_record);
          }
       }
+      // TODO maybe delete too old info by the way
       return new_information_received;
     }
 
@@ -1526,9 +1529,12 @@ namespace graphene { namespace net { namespace detail {
       parse_hello_user_data_for_peer(originating_peer, hello_message_received.user_data);
 
       // For an outbound connection, we know the remote_inbound_endpoint already, so keep it unchanged.
-      // For an inbound connection, we initialize it here. // TODO or init later, after verified?
+      // For an inbound connection, we initialize it here.
       if( !originating_peer->remote_inbound_endpoint )
       {
+         // Note: the data is not yet verified, so we need to use it with caution.
+         // On the one hand, we want to advertise as accurate data as possible to other peers,
+         // on the other hand, we still want to advertise it to other peers if we didn't have a chance to verify it.
          originating_peer->remote_inbound_endpoint = fc::ip::endpoint( originating_peer->inbound_address,
                                                                        originating_peer->inbound_port );
       }
@@ -1643,11 +1649,14 @@ namespace graphene { namespace net { namespace detail {
                                                               originating_peer->get_socket().remote_endpoint(),
                                                               rejection_reason_code::already_connected,
                                                               "I'm already connected to you");
+
           originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
           originating_peer->send_message(message(connection_rejected));
           dlog("Received a hello_message from peer ${peer} that I'm already connected to (with id ${id}), rejection",
                ("peer", originating_peer->get_remote_endpoint())
                ("id", originating_peer->node_id));
+          // If already connected, we disconnect
+          disconnect_from_peer(originating_peer, connection_rejected.reason_string);
         }
 #ifdef ENABLE_P2P_DEBUGGING_API
         else if(!_allowed_peers.empty() &&
@@ -1727,10 +1736,21 @@ namespace graphene { namespace net { namespace detail {
                                                     const connection_accepted_message& ) const
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      // We only send one address request message shortly after connected
+      if( originating_peer->our_state != peer_connection::our_connection_state::just_connected )
+      {
+         // Log and ignore
+         dlog( "Received an unexpected connection_accepted message from ${peer}",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
+
       dlog("Received a connection_accepted in response to my \"hello\" from ${peer}",
            ("peer", originating_peer->get_remote_endpoint()));
       originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_accepted;
       originating_peer->our_state = peer_connection::our_connection_state::connection_accepted;
+      originating_peer->expecting_address_message = true;
       originating_peer->send_message(address_request_message());
     }
 
@@ -1747,6 +1767,7 @@ namespace graphene { namespace net { namespace detail {
                                                               ::peer_connection_rejected;
         originating_peer->our_state = peer_connection::our_connection_state::connection_rejected;
 
+        // TODO the data is not verified, be careful
         if( connection_rejected_message_received.reason_code == rejection_reason_code::connected_to_self
             || connection_rejected_message_received.reason_code == rejection_reason_code::different_chain )
         {
@@ -1775,22 +1796,49 @@ namespace graphene { namespace net { namespace detail {
             // Note: we do not increase number_of_failed_connection_attempts here, this is probably OK
             _potential_peer_db.update_entry(*updated_peer_record);
           }
+          originating_peer->expecting_address_message = true;
           originating_peer->send_message(address_request_message());
         }
       }
       else
-        FC_THROW( "unexpected connection_rejected_message from peer" );
+      {
+        // Note: in older versions, FC_THROW() was called here,
+        //       which would cause on_connection_closed() to be called,
+        //       which would then close the connection when the peer_connection object was destroyed.
+        //       Explicitly closing the connection here is more intuitive.
+        dlog( "Unexpected connection_rejected_message from peer ${peer}, disconnecting",
+              ("peer", originating_peer->get_remote_endpoint()) );
+        disconnect_from_peer( originating_peer, "Received an unexpected connection_rejected_message" );
+      }
     }
 
     void node_impl::on_address_request_message(peer_connection* originating_peer, const address_request_message&)
     {
       VERIFY_CORRECT_THREAD();
-      dlog("Received an address request message");
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted
+          && originating_peer->their_state != peer_connection::their_connection_state::connection_rejected )
+      {
+         dlog( "Unexpected address_request_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected address_request_message" );
+         return;
+      }
+
+      dlog( "Received an address request message from peer ${peer}",
+            ("peer", originating_peer->get_remote_endpoint()) );
 
       address_message reply;
       if (_address_builder != nullptr )
          _address_builder->build( this, reply );
       originating_peer->send_message(reply);
+
+      // If we rejected their connection, disconnect now
+      if( originating_peer->their_state == peer_connection::their_connection_state::connection_rejected )
+      {
+         disconnect_from_peer( originating_peer,
+                               "I rejected your connection request (hello message) so I'm disconnecting" );
+      }
     }
 
    void node_impl::set_advertise_algorithm( const std::string& algo,
@@ -1817,18 +1865,53 @@ namespace graphene { namespace net { namespace detail {
                                        const address_message& address_message_received)
     {
       VERIFY_CORRECT_THREAD();
-      dlog("Received an address message containing ${size} addresses",
-           ("size", address_message_received.addresses.size()));
+      // Do some gatekeeping here.
+      // Malious peers can easily bypass our checks in on_hello_message(), and we will then request addresses anyway,
+      //   so checking connection_state here is useless.
+      // The size can be large, so we only handle the first N addresses.
+      // The peer might send us lots of address messages even if we didn't request,
+      //   so we'd better know whether we have sent an address request message recently.
+      if( !originating_peer->expecting_address_message )
+      {
+         // Log and ignore
+         dlog( "Received an unexpected address message containing ${size} addresses for peer ${peer}",
+               ("size", address_message_received.addresses.size())
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
+      originating_peer->expecting_address_message = false;
+
+      dlog( "Received an address message containing ${size} addresses for peer ${peer}",
+            ("size", address_message_received.addresses.size())
+            ("peer", originating_peer->get_remote_endpoint()) );
+      size_t count = 0;
       for (const address_info& address : address_message_received.addresses)
       {
-        dlog("    ${endpoint} last seen ${time}",
-             ("endpoint", address.remote_endpoint)("time", address.last_seen_time));
+         dlog( "    ${endpoint} last seen ${time}, firewalled status ${fw}",
+               ("endpoint", address.remote_endpoint)("time", address.last_seen_time)
+               ("fw", address.firewalled) );
+         ++count;
+         if( count >= _max_addresses_to_handle_at_once )
+            break;
       }
-      std::vector<graphene::net::address_info> updated_addresses = address_message_received.addresses;
+      std::vector<graphene::net::address_info> updated_addresses;
+      updated_addresses.reserve( count );
       auto now = fc::time_point_sec(fc::time_point::now());
-      for (address_info& address : updated_addresses)
-        address.last_seen_time = now;
-      // TODO add some gatekeeping code here
+      count = 0;
+      for( const address_info& address : address_message_received.addresses )
+      {
+         if( 0 == address.remote_endpoint.port() )
+            continue;
+         updated_addresses.emplace_back( address.remote_endpoint,
+                                         now,
+                                         address.latency,
+                                         address.node_id,
+                                         address.direction,
+                                         address.firewalled );
+         ++count;
+         if( count >= _max_addresses_to_handle_at_once )
+            break;
+      }
       if ( _node_configuration.connect_to_new_peers
            && merge_address_info_with_potential_peer_database(updated_addresses) )
       {
@@ -1879,6 +1962,15 @@ namespace graphene { namespace net { namespace detail {
                                                          const fetch_blockchain_item_ids_message& fetch_blockchain_item_ids_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         dlog( "Unexpected fetch_blockchain_item_ids_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected fetch_blockchain_item_ids_message" );
+         return;
+      }
+
       item_id peers_last_item_seen = item_id(fetch_blockchain_item_ids_message_received.item_type, item_hash_t());
       if (fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty())
       {
@@ -2409,9 +2501,18 @@ namespace graphene { namespace net { namespace detail {
     }
 
     void node_impl::on_fetch_items_message(peer_connection* originating_peer,
-                                           const fetch_items_message& fetch_items_message_received) const
+                                           const fetch_items_message& fetch_items_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         dlog( "Unexpected fetch_items_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected fetch_items_message" );
+         return;
+      }
+
       dlog("received items request for ids ${ids} of type ${type} from peer ${endpoint}",
            ("ids", fetch_items_message_received.items_to_fetch)
            ("type", fetch_items_message_received.item_type)
@@ -2518,6 +2619,14 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::on_item_ids_inventory_message(peer_connection* originating_peer, const item_ids_inventory_message& item_ids_inventory_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         dlog( "Unexpected item_ids_inventory_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected item_ids_inventory_message" );
+         return;
+      }
 
       // expire old inventory
       // so we'll be making our decisions about whether to fetch blocks below based only on recent inventory
@@ -4593,6 +4702,8 @@ namespace graphene { namespace net { namespace detail {
         _desired_number_of_connections = params["desired_number_of_connections"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_connections"))
         _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>(1);
+      if (params.contains("max_addresses_to_handle_at_once"))
+        _max_addresses_to_handle_at_once = params["max_addresses_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_blocks_to_handle_at_once"))
         _max_blocks_to_handle_at_once = params["max_blocks_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_sync_blocks_to_prefetch"))
@@ -4615,6 +4726,7 @@ namespace graphene { namespace net { namespace detail {
       result["peer_connection_retry_timeout"] = _peer_connection_retry_timeout;
       result["desired_number_of_connections"] = _desired_number_of_connections;
       result["maximum_number_of_connections"] = _maximum_number_of_connections;
+      result["max_addresses_to_handle_at_once"] = _max_addresses_to_handle_at_once;
       result["max_blocks_to_handle_at_once"] = _max_blocks_to_handle_at_once;
       result["max_sync_blocks_to_prefetch"] = _max_sync_blocks_to_prefetch;
       result["max_sync_blocks_per_peer"] = _max_sync_blocks_per_peer;

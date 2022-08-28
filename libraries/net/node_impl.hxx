@@ -614,6 +614,8 @@ public:
       /// used to prevent us from starting new tasks while we're shutting down
       bool _node_is_shutting_down = false;
 
+      /// Maximum number of addresses to handle at one time
+      size_t _max_addresses_to_handle_at_once = MAX_ADDRESSES_TO_HANDLE_AT_ONCE;
       /// Maximum number of blocks to handle at one time
       size_t _max_blocks_to_handle_at_once = MAX_BLOCKS_TO_HANDLE_AT_ONCE;
       /// Maximum number of sync blocks to prefetch
@@ -698,7 +700,7 @@ public:
                                                      const blockchain_item_ids_inventory_message& blockchain_item_ids_inventory_message_received );
 
       void on_fetch_items_message( peer_connection* originating_peer,
-                                   const fetch_items_message& fetch_items_message_received ) const;
+                                   const fetch_items_message& fetch_items_message_received );
 
       void on_item_not_available_message( peer_connection* originating_peer,
                                           const item_not_available_message& item_not_available_message_received );
