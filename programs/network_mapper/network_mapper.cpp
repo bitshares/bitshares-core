@@ -99,8 +99,10 @@ public:
           const graphene::net::hello_message& hello_message_received)
   {
     _node_id = hello_message_received.node_public_key;
-    if (hello_message_received.user_data.contains("node_id"))
-      originating_peer->node_id = hello_message_received.user_data["node_id"].as<graphene::net::node_id_t>( 1 );
+    try {
+      if (hello_message_received.user_data.contains("node_id"))
+        _node_id = hello_message_received.user_data["node_id"].as<graphene::net::node_id_t>( 1 );
+    } catch( fc::exception& ) { /* do nothing */ }
     originating_peer->send_message(graphene::net::connection_rejected_message());
   }
 
@@ -202,11 +204,10 @@ int main(int argc, char** argv)
   std::map<graphene::net::node_id_t, graphene::net::address_info> address_info_by_node_id;
   std::map<graphene::net::node_id_t, std::vector<graphene::net::address_info> > connections_by_node_id;
   std::map<fc::ip::endpoint, graphene::net::node_id_t> node_id_by_endpoint;
-  std::map<graphene::net::node_id_t, graphene::net::node_id_t> outdated_nodes;
   std::vector<std::shared_ptr<peer_probe>> probes;
 
   const auto& update_info_by_probe = [ &connections_by_node_id, &address_info_by_node_id,
-                                       &node_id_by_endpoint, &outdated_nodes, &my_node_id,
+                                       &node_id_by_endpoint, &my_node_id,
                                        &nodes_already_visited, &nodes_to_visit_set, &nodes_to_visit ]
                                      ( const std::shared_ptr<peer_probe>& probe )
   {
@@ -218,23 +219,15 @@ int main(int argc, char** argv)
           this_node_info.remote_endpoint = probe->_remote;
           this_node_info.node_id = probe->_node_id;
 
-          // Note: Update if already exists.
-          //       Some nodes may have the same node_id, E.G. created by copying the whole data directory of
-          //            another node. In this case data here could be overwritten.
+          // Note: Update if it already exists (usually unlikely).
           connections_by_node_id[this_node_info.node_id] = probe->_peers;
           address_info_by_node_id[this_node_info.node_id] = this_node_info;
 
           node_id_by_endpoint[probe->_remote] = probe->_node_id;
 
-          for( const auto& info: address_info_by_node_id )
-          {
-             if( info.second.remote_endpoint == probe->_remote && info.first != probe->_node_id )
-                outdated_nodes[info.first] = probe->_node_id;
-          }
-
           for (const graphene::net::address_info& info : probe->_peers)
           {
-             if (info.node_id == my_node_id)
+             if (info.node_id == my_node_id) // We should not be in the list, just be defensive here
                 continue;
              if (nodes_already_visited.find(info.remote_endpoint) == nodes_already_visited.end() &&
                  nodes_to_visit_set.find(info.remote_endpoint) == nodes_to_visit_set.end())
@@ -298,28 +291,14 @@ int main(int argc, char** argv)
     else
        probes = std::move( running );
 
-    ilog( "${total} nodes detected, ${outdated} outdated, ${tried} endpoints tried, "
+    ilog( "${total} nodes detected, ${tried} endpoints tried, "
           "${reachable} reachable, ${trying} trying, ${todo} to do",
           ( "total",     address_info_by_node_id.size() )
-          ( "outdated",  outdated_nodes.size() )
           ( "tried",     nodes_already_visited.size() )
           ( "reachable", node_id_by_endpoint.size() )
           ( "trying",    probes.size() )
           ( "todo",      nodes_to_visit.size() ) );
 
-  }
-
-  // Remove outdated nodes
-  for( const auto& node_pair : outdated_nodes )
-    address_info_by_node_id.erase(node_pair.first);
-  // Update connection info, replace outdated node_id with new node_id
-  for( auto& connection_by_id : connections_by_node_id )
-  {
-    for( auto& connection : connection_by_id.second )
-    {
-       if( outdated_nodes.find( connection.node_id ) != outdated_nodes.end() )
-          connection.node_id = outdated_nodes[connection.node_id];
-    }
   }
 
   ilog( "${total} nodes, ${reachable} reachable",
@@ -380,8 +359,9 @@ int main(int argc, char** argv)
   constexpr uint16_t pair_depth = 2;
   for (auto& node_and_connections : connections_by_node_id)
     for (const graphene::net::address_info& this_connection : node_and_connections.second)
-      dot_stream << "  \"" << fc::variant( node_and_connections.first, pair_depth ).as_string()
-                 << "\" -- \"" << fc::variant( this_connection.node_id, 1 ).as_string() << "\";\n";
+      if( this_connection.node_id != my_node_id ) // We should not be in the list, just be defensive here
+        dot_stream << "  \"" << fc::variant( node_and_connections.first, pair_depth ).as_string()
+                   << "\" -- \"" << fc::variant( this_connection.node_id, 1 ).as_string() << "\";\n";
 
   dot_stream << "}\n";
 
