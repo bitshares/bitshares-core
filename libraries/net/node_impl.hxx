@@ -664,9 +664,8 @@ public:
       bool is_accepting_new_connections();
       bool is_wanting_new_connections();
       uint32_t get_number_of_connections();
-      peer_connection_ptr get_peer_by_node_id(const node_id_t& id);
+      peer_connection_ptr get_peer_by_node_id(const node_id_t& id) const;
 
-      bool is_already_connected_to_id(const node_id_t& node_id);
       bool merge_address_info_with_potential_peer_database( const std::vector<address_info> addresses );
       void display_current_connections();
       uint32_t calculate_unsynced_block_count_from_all_peers();

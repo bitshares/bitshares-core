@@ -197,6 +197,8 @@ namespace graphene { namespace net
       uint16_t outbound_port = 0;
       /// The inbound endpoint of the remote peer
       fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
+      /// Whether the inbound endpoint of the remote peer is verified
+      bool inbound_endpoint_verified = false;
       /// @}
 
       using item_to_time_map_type = std::unordered_map<item_id, fc::time_point>;

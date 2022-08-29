@@ -263,6 +263,7 @@ namespace graphene { namespace net
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
         remote_inbound_endpoint = remote_endpoint;
+        inbound_endpoint_verified = true;
         ilog( "established outbound connection to ${remote_endpoint}", ("remote_endpoint", remote_endpoint ) );
       }
       catch ( fc::exception& e )
