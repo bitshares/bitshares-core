@@ -1483,7 +1483,7 @@ namespace graphene { namespace net { namespace detail {
          //  can't really guard against is if we do a simulatenous open, we
          // probably need to think through that case.  We're not attempting that
          // yet, though, so it's ok to just disconnect here.
-         dlog( "Unexpected hello_message from peer ${peer}, disconnecting",
+         wlog( "Unexpected hello_message from peer ${peer}, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Received an unexpected hello_message" );
          return;
@@ -1492,7 +1492,8 @@ namespace graphene { namespace net { namespace detail {
       // Check chain_id
       if( hello_message_received.chain_id != _chain_id )
       {
-         dlog( "Received hello message from peer on a different chain: ${message}",
+         wlog( "Received hello message from peer ${peer} on a different chain: ${message}",
+               ("peer", originating_peer->get_remote_endpoint())
                ("message", hello_message_received) );
          std::ostringstream rejection_message;
          rejection_message << "You're on a different chain than I am.  I'm on " << _chain_id.str() <<
@@ -1546,7 +1547,7 @@ namespace graphene { namespace net { namespace detail {
       static const node_id_t null_node_id;
       if( null_node_id == peer_node_id )
       {
-         dlog( "The node_id in the hello_message from peer ${peer} is null, disconnecting",
+         wlog( "The node_id in the hello_message from peer ${peer} is null, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Your node_id in the hello_message is null" );
          return;
@@ -1744,7 +1745,7 @@ namespace graphene { namespace net { namespace detail {
       if( originating_peer->our_state != peer_connection::our_connection_state::just_connected )
       {
          // Log and ignore
-         dlog( "Received an unexpected connection_accepted message from ${peer}",
+         wlog( "Received an unexpected connection_accepted message from ${peer}",
                ("peer", originating_peer->get_remote_endpoint()) );
          return;
       }
@@ -1814,7 +1815,7 @@ namespace graphene { namespace net { namespace detail {
         //       which would cause on_connection_closed() to be called,
         //       which would then close the connection when the peer_connection object was destroyed.
         //       Explicitly closing the connection here is more intuitive.
-        dlog( "Unexpected connection_rejected_message from peer ${peer}, disconnecting",
+        wlog( "Unexpected connection_rejected_message from peer ${peer}, disconnecting",
               ("peer", originating_peer->get_remote_endpoint()) );
         disconnect_from_peer( originating_peer, "Received an unexpected connection_rejected_message" );
       }
@@ -1827,7 +1828,7 @@ namespace graphene { namespace net { namespace detail {
       if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted
           && originating_peer->their_state != peer_connection::their_connection_state::connection_rejected )
       {
-         dlog( "Unexpected address_request_message from peer ${peer}, disconnecting",
+         wlog( "Unexpected address_request_message from peer ${peer}, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Received an unexpected address_request_message" );
          return;
@@ -1882,7 +1883,7 @@ namespace graphene { namespace net { namespace detail {
       if( !originating_peer->expecting_address_message )
       {
          // Log and ignore
-         dlog( "Received an unexpected address message containing ${size} addresses for peer ${peer}",
+         wlog( "Received an unexpected address message containing ${size} addresses for peer ${peer}",
                ("size", address_message_received.addresses.size())
                ("peer", originating_peer->get_remote_endpoint()) );
          return;
@@ -1973,7 +1974,7 @@ namespace graphene { namespace net { namespace detail {
       // Gatekeeping code
       if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
       {
-         dlog( "Unexpected fetch_blockchain_item_ids_message from peer ${peer}, disconnecting",
+         wlog( "Unexpected fetch_blockchain_item_ids_message from peer ${peer}, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Received an unexpected fetch_blockchain_item_ids_message" );
          return;
@@ -2487,7 +2488,8 @@ namespace graphene { namespace net { namespace detail {
       }
       else
       {
-        wlog("sync: received a list of sync items available, but I didn't ask for any!");
+        wlog( "sync: received a list of sync items available from peer ${peer}, but I didn't ask for any!",
+              ("peer", originating_peer->get_remote_endpoint()) );
       }
     }
 
@@ -2515,7 +2517,7 @@ namespace graphene { namespace net { namespace detail {
       // Gatekeeping code
       if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
       {
-         dlog( "Unexpected fetch_items_message from peer ${peer}, disconnecting",
+         wlog( "Unexpected fetch_items_message from peer ${peer}, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Received an unexpected fetch_items_message" );
          return;
@@ -2599,7 +2601,9 @@ namespace graphene { namespace net { namespace detail {
           _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_seq_counter));
           ++_items_to_fetch_seq_counter;
         }
-        wlog("Peer doesn't have the requested item.");
+        wlog( "Peer ${peer} doesn't have the requested item ${item}.",
+              ("peer", originating_peer->get_remote_endpoint())
+              ("item", requested_item) );
         trigger_fetch_items_loop();
         return;
       }
@@ -2616,7 +2620,9 @@ namespace graphene { namespace net { namespace detail {
           disconnect_from_peer(originating_peer, "You are missing a sync item you claim to have, your database is probably corrupted. Try --rebuild-index.",true,
                                fc::exception(FC_LOG_MESSAGE(error,"You are missing a sync item you claim to have, your database is probably corrupted. Try --rebuild-index.",
                                ("item_id", requested_item))));
-        wlog("Peer doesn't have the requested sync item.  This really shouldn't happen");
+        wlog( "Peer ${peer} doesn't have the requested sync item ${item}.  This really shouldn't happen",
+              ("peer", originating_peer->get_remote_endpoint())
+              ("item", requested_item) );
         trigger_fetch_sync_items_loop();
         return;
       }
@@ -2630,7 +2636,7 @@ namespace graphene { namespace net { namespace detail {
       // Gatekeeping code
       if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
       {
-         dlog( "Unexpected item_ids_inventory_message from peer ${peer}, disconnecting",
+         wlog( "Unexpected item_ids_inventory_message from peer ${peer}, disconnecting",
                ("peer", originating_peer->get_remote_endpoint()) );
          disconnect_from_peer( originating_peer, "Received an unexpected item_ids_inventory_message" );
          return;
