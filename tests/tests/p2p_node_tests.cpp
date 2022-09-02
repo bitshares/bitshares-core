@@ -36,6 +36,11 @@
 
 #include <fc/io/raw.hpp>
 
+#include <fc/log/appender.hpp>
+#include <fc/log/console_appender.hpp>
+#include <fc/log/logger.hpp>
+#include <fc/log/logger_config.hpp>
+
 #include <graphene/protocol/fee_schedule.hpp>
 
 #include "../../libraries/net/node_impl.hxx"
@@ -101,6 +106,7 @@ class test_node : public graphene::net::node, public graphene::net::node_delegat
             std::shared_ptr<test_delegate> d{};
             graphene::net::peer_connection_ptr peer = graphene::net::peer_connection::make_shared( d.get() );
             peer->set_remote_endpoint( fc::optional<fc::ip::endpoint>( fc::ip::endpoint::from_string( url )) );
+            peer->remote_inbound_endpoint = peer->get_remote_endpoint();
             my->move_peer_to_active_list( peer ); 
             return std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr>( d, peer );
          }).wait();
@@ -184,74 +190,100 @@ class test_node : public graphene::net::node, public graphene::net::node_delegat
 
 class test_peer : public graphene::net::peer_connection
 {
-   public:
+public:
    test_peer(graphene::net::peer_connection_delegate* del) : graphene::net::peer_connection(del) 
    {
-      message_received = nullptr;
    }
 
-   std::shared_ptr<graphene::net::message> message_received;
+   std::vector<graphene::net::message> messages_received;
    
    void send_message( const graphene::net::message& message_to_send, 
          size_t message_send_time_field_offset = (size_t)-1 ) override
    {
-      message_received = nullptr;
-      try 
-      {
-         switch ( message_to_send.msg_type.value() )
-         {
-            case graphene::net::core_message_type_enum::address_message_type :
-            {
-               graphene::net::address_message m = message_to_send.as<graphene::net::address_message>();
-               message_received = std::make_shared<graphene::net::message>(m);
-               break;
-            }
-            case graphene::net::core_message_type_enum::check_firewall_reply_message_type :
-            {
-               auto m = message_to_send.as<graphene::net::check_firewall_reply_message>();
-               message_received = std::make_shared<graphene::net::message>(m);
-               break;
-            }
-            default:
-               break;
-         }
-      } catch (...) {}
-      
+      messages_received.push_back( message_to_send );
    }
 };
 
-void test_address_message( std::shared_ptr<graphene::net::message> msg, std::size_t num_elements )
+void test_closing_connection_message( const graphene::net::message& msg )
 {
-   if (msg != nullptr)
+   try
    {
-      graphene::net::address_message addr_msg = static_cast<graphene::net::address_message>( 
-            msg->as<graphene::net::address_message>() );
+      const auto& closing_msg = msg.as<graphene::net::closing_connection_message>();
+   }
+   catch( fc::exception& )
+   {
+      BOOST_FAIL( "Expecting closing_connection_message" );
+   }
+}
+
+void test_address_message( const graphene::net::message& msg, std::size_t num_elements )
+{
+   try
+   {
+      const auto& addr_msg = msg.as<graphene::net::address_message>();
       BOOST_CHECK_EQUAL( addr_msg.addresses.size(), num_elements );
-   } 
-   else 
+   }
+   catch( fc::exception& )
    {
-      BOOST_FAIL( "address_message was null" );
+      BOOST_FAIL( "Expecting address_message" );
    }
 }
 
-void test_firewall_message( std::shared_ptr<graphene::net::message> msg )
+struct p2p_fixture
 {
-  if (msg != nullptr)
+   p2p_fixture()
    {
-      graphene::net::check_firewall_reply_message fw_msg = 
-            static_cast<graphene::net::check_firewall_reply_message >( 
-            msg->as<graphene::net::check_firewall_reply_message>() );
-      if (fw_msg.result != graphene::net::firewall_check_result::unable_to_check )
-         BOOST_FAIL( "Expected \"Unable to check\"" );
-   } 
-   else 
-   {
-      BOOST_FAIL( "firewall_message was null" );
+      // Configure logging : log p2p messages to console
+      fc::logging_config logging_config = fc::logging_config::default_config();
+
+      auto logger = logging_config.loggers.back(); // get a copy of the default logger
+      logger.name = "p2p";                         // update the name to p2p
+      logging_config.loggers.push_back( logger );  // add it to logging_config
+
+      fc::configure_logging(logging_config);
    }
+   ~p2p_fixture()
+   {
+      // Restore default logging config
+      fc::configure_logging( fc::logging_config::default_config() );
+   }
+};
 
+BOOST_FIXTURE_TEST_SUITE( p2p_node_tests, p2p_fixture )
+
+/****
+ * If a node requests addresses without sending hello_message first, it will be disconnected.
+ */
+BOOST_AUTO_TEST_CASE( address_request_without_hello )
+{
+   // create a node
+   int node1_port = fc::network::get_available_port();
+   fc::temp_directory node1_dir;
+   test_node node1( "Node1", node1_dir.path(), node1_port );
+   node1.disable_peer_advertising();
+
+   // get something in their list of connections
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts
+         = node1.create_peer_connection( "127.0.0.1:8090" );
+
+   // request addresses
+   test_delegate peer3_delegate{};
+   std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>( &peer3_delegate );
+   graphene::net::address_request_message req;
+   node1.on_message( peer3_ptr, req );
+
+   // check the results
+   BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 1U );
+   const auto& msg = peer3_ptr->messages_received.front();
+   test_closing_connection_message( msg );
+
+   // request again
+   peer3_ptr->messages_received.clear();
+   node1.on_message( peer3_ptr, req );
+
+   // the request is ignored
+   BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 0 );
 }
-
-BOOST_AUTO_TEST_SUITE( p2p_node_tests )
 
 /****
  * Assure that when disable_peer_advertising is set,
@@ -267,16 +299,18 @@ BOOST_AUTO_TEST_CASE( disable_peer_advertising )
 
    // get something in their list of connections
    std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts
-    = node1.create_peer_connection( "127.0.0.1:8090" );
+         = node1.create_peer_connection( "127.0.0.1:8090" );
 
    // verify that they do not share it with others
    test_delegate peer3_delegate{};
    std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>( &peer3_delegate );
+   peer3_ptr->their_state = test_peer::their_connection_state::connection_accepted;
    graphene::net::address_request_message req;
    node1.on_message( peer3_ptr, req );
 
    // check the results
-   std::shared_ptr<graphene::net::message> msg = peer3_ptr->message_received;
+   BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 1U );
+   const auto& msg = peer3_ptr->messages_received.front();
    test_address_message( msg, 0 );
 }
 
@@ -294,12 +328,14 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
 
    test_delegate peer3_delegate{};
    std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>( &peer3_delegate );
+   peer3_ptr->their_state = test_peer::their_connection_state::connection_accepted;
    // verify that they do not share it with others
    {
       graphene::net::address_request_message req;
       node1.on_message( peer3_ptr, req );
       // check the results
-      std::shared_ptr<graphene::net::message> msg = peer3_ptr->message_received;
+      BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 1U );
+      const auto& msg = peer3_ptr->messages_received.front();
       test_address_message( msg, 0 );
    }
 }
@@ -316,6 +352,7 @@ BOOST_AUTO_TEST_CASE( advertise_list_test )
    // a fake peer
    test_delegate del{};
    std::shared_ptr<test_peer> my_peer( new test_peer{&del} );
+   my_peer->their_state = test_peer::their_connection_state::connection_rejected;
 
    // add 2 connections, 1 of which appears on the advertise_list
    std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node1_rslts
@@ -327,8 +364,11 @@ BOOST_AUTO_TEST_CASE( advertise_list_test )
    graphene::net::address_request_message address_request_message_received;
    my_node.on_message( my_peer, address_request_message_received );
    // check the results
-   std::shared_ptr<graphene::net::message> msg = my_peer->message_received;
-   test_address_message( msg, 1 );
+   BOOST_REQUIRE_EQUAL( my_peer->messages_received.size(), 2U );
+   const auto& msg1 = my_peer->messages_received.front();
+   test_address_message( msg1, 1 );
+   const auto& msg2 = my_peer->messages_received.back();
+   test_closing_connection_message( msg2 );
 }
 
 BOOST_AUTO_TEST_CASE( exclude_list )
@@ -350,11 +390,15 @@ BOOST_AUTO_TEST_CASE( exclude_list )
    // act like my_node received an address_request message from my_peer
    test_delegate del_4{};
    std::shared_ptr<test_peer> peer_4( new test_peer(&del_4) );
+   peer_4->their_state = test_peer::their_connection_state::connection_rejected;
    graphene::net::address_request_message address_request_message_received;
    my_node.on_message( peer_4, address_request_message_received );
    // check the results
-   std::shared_ptr<graphene::net::message> msg = peer_4->message_received;
-   test_address_message( msg, 2 );
+   BOOST_REQUIRE_EQUAL( peer_4->messages_received.size(), 2U );
+   const auto& msg1 = peer_4->messages_received.front();
+   test_address_message( msg1, 2 );
+   const auto& msg2 = peer_4->messages_received.back();
+   test_closing_connection_message( msg2 );
 }
 
 BOOST_AUTO_TEST_SUITE_END()
