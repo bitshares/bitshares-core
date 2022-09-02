@@ -4208,6 +4208,11 @@ namespace graphene { namespace net { namespace detail {
         // those flags will prevent us from detecting that other applications are
         // listening on that port.  We'd like to detect that, so we'll set up a temporary
         // tcp server without that flag to see if we can listen on that port.
+        // Note: There is a race condition where another application may start listening
+        //       on the same port just after the temporary tcp server is destroyed and
+        //       before we try to listen with the real tcp server.
+        //       This happens frequently when running multiple test cases at the same
+        //       time, but less likely in production.
         bool first = true;
         for( ;; )
         {

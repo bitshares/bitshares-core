@@ -195,8 +195,17 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fc::set_option( options, "enable-p2p-network", false );
    else if( rand() % 100 >= 50 ) // Disable P2P network randomly for test cases
       fc::set_option( options, "enable-p2p-network", false );
-   else if( rand() % 100 >= 50 ) // this should lead to no change
-      fc::set_option( options, "enable-p2p-network", true );
+   else
+   {
+      if( rand() % 100 >= 50 ) // this should lead to no change
+      {
+         fc::set_option( options, "enable-p2p-network", true );
+      }
+      fc::ip::endpoint ep;
+      ep.set_port( rand() % 20000 + 5000 );
+      idump( (ep)(std::string(ep)) );
+      fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+   }
 
    if (fixture.current_test_name == "get_account_history_operations")
    {
