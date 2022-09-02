@@ -152,6 +152,20 @@ namespace graphene { namespace net { namespace detail {
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
 
+   /// Greatly delays the next connection to the endpoint
+   static void greatly_delay_next_conn_to( node_impl* impl, const fc::ip::endpoint& ep )
+   {
+      fc::optional<potential_peer_record> updated_peer_record
+            = impl->_potential_peer_db.lookup_entry_for_endpoint( ep );
+      if( updated_peer_record )
+      {
+         updated_peer_record->last_connection_disposition = last_connection_rejected;
+         updated_peer_record->last_connection_attempt_time = fc::time_point::now();
+         constexpr uint32_t failed_attempts_to_add = 120; // * 30 seconds = 1 hour
+         updated_peer_record->number_of_failed_connection_attempts += failed_attempts_to_add;
+         impl->_potential_peer_db.update_entry( *updated_peer_record );
+      }
+   }
    static void update_address_seen_time( node_impl* impl, const peer_connection* active_peer )
    {
       fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
@@ -468,8 +482,10 @@ namespace graphene { namespace net { namespace detail {
       if( _update_seed_nodes_loop_done.valid() && _update_seed_nodes_loop_done.canceled() )
          return;
 
+      constexpr uint32_t five = 5;
+      auto interval = _active_connections.empty() ? fc::minutes(five) : fc::hours(1);
       _update_seed_nodes_loop_done = fc::schedule( [this]() { update_seed_nodes_task(); },
-                                                   fc::time_point::now() + fc::hours(3),
+                                                   fc::time_point::now() + interval,
                                                    "update_seed_nodes_loop" );
    }
 
@@ -1285,7 +1301,7 @@ namespace graphene { namespace net { namespace detail {
          // Note: if found, a copy is returned
          auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(address.remote_endpoint);
          // Note:
-         // TODO fix the comments here (since we don't save node_id in the peer database so far)
+         // We don't save node_id in the peer database so far
          // 1. node_id of that peer may have changed, but we don't check or update
          // 2. we don't check by node_id either, in case when a peer's IP address has changed, we don't handle it
          // 3. if the peer's inbound port is not 0, no matter if the address is reported as firewalled or not,
@@ -1341,6 +1357,14 @@ namespace graphene { namespace net { namespace detail {
            ("type", graphene::net::core_message_type_enum(received_message.msg_type.value()))("hash", message_hash)
            ("size", received_message.size)
            ("endpoint", originating_peer->get_remote_endpoint()));
+      // Gatekeeping code
+      if( originating_peer->we_have_requested_close
+          && received_message.msg_type.value() != core_message_type_enum::closing_connection_message_type )
+      {
+         dlog( "Unexpected message from peer ${peer} while we have requested to close connection",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
       switch ( received_message.msg_type.value() )
       {
       case core_message_type_enum::hello_message_type:
@@ -1495,6 +1519,15 @@ namespace graphene { namespace net { namespace detail {
          wlog( "Received hello message from peer ${peer} on a different chain: ${message}",
                ("peer", originating_peer->get_remote_endpoint())
                ("message", hello_message_received) );
+         // If it is an outbound connection, make sure we won't reconnect to the peer soon
+         if( peer_connection_direction::outbound == originating_peer->direction )
+         {
+            // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+            //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+            //       It seems the best approach is to reduce its weight significantly.
+            greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
+         }
+         // Now reject
          std::ostringstream rejection_message;
          rejection_message << "You're on a different chain than I am.  I'm on " << _chain_id.str() <<
                               " and you're on " << hello_message_received.chain_id.str();
@@ -1555,6 +1588,15 @@ namespace graphene { namespace net { namespace detail {
       // Check whether the peer is myself
       if( _node_id == peer_node_id )
       {
+         // If it is an outbound connection, make sure we won't reconnect to the peer soon
+         if( peer_connection_direction::outbound == originating_peer->direction )
+         {
+            // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+            //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+            //       It seems the best approach is to reduce its weight significantly.
+            greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
+         }
+         // Now reject
          // Note: this can happen in rare cases if the peer is not actually myself but another node.
          //       Anyway, we see it as ourselves, reject it and disconnect it.
          connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
@@ -1642,12 +1684,32 @@ namespace graphene { namespace net { namespace detail {
           // If it is an outbound connection, update the existing connection's inbound_endpoint.
           // Note: there may be a race condition that multiple tasks try to write the same data
           if( peer_connection_direction::outbound == originating_peer->direction
-              && peer_connection_direction::inbound == already_connected_peer->direction
               && originating_peer->node_public_key == already_connected_peer->node_public_key )
           {
-              already_connected_peer->remote_inbound_endpoint = originating_peer->get_remote_endpoint();
-              already_connected_peer->inbound_endpoint_verified = true;
-              already_connected_peer->is_firewalled = firewalled_state::not_firewalled;
+              // Do not replace a verified public address with a private or local address.
+              // Note: there is a scenario that some nodes in the same local network may have connected to each other,
+              //         and of course some are outbound connections and some are inbound, so we are unable to update
+              //         all the data, not to mention that their external addresses might be inaccessible to each
+              //         other.
+              //       Unless they are all configured with the "p2p-inbound-endpoint" option with an external address,
+              //         even if they all start out connecting to each other's external addresses, at some point they
+              //         may try to connect to each other's local addresses and possibly stay connected.
+              //       In this case, if the nodes aren't configured with the "advertise-peer-algorithm" option and
+              //         related options properly, when advertising connected peers to other peers, they may expose
+              //         that they are in the same local network and connected to each other.
+              //       On the other hand, when we skip updates in some cases, we may end up trying to reconnect soon
+              //         and endlessly (which is addressed with additional_inbound_endpoints).
+              auto old_inbound_endpoint = already_connected_peer->get_endpoint_for_connecting();
+              auto new_inbound_endpoint = originating_peer->get_remote_endpoint();
+              already_connected_peer->additional_inbound_endpoints.insert( *new_inbound_endpoint );
+              if ( !already_connected_peer->inbound_endpoint_verified // which implies direction == inbound
+                   || new_inbound_endpoint->get_address().is_public_address()
+                   || !old_inbound_endpoint->get_address().is_public_address() )
+              {
+                 already_connected_peer->remote_inbound_endpoint = new_inbound_endpoint;
+                 already_connected_peer->inbound_endpoint_verified = true;
+                 already_connected_peer->is_firewalled = firewalled_state::not_firewalled;
+              }
           }
           // Now reject
           connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
@@ -1778,9 +1840,12 @@ namespace graphene { namespace net { namespace detail {
           // For an inbound connection, we should have not saved anything to the peer database yet, nor we will
           //   save anything (it would be weird if they rejected us but we didn't reject them),
           //   so using remote_endpoint here at least won't do anything bad.
-          //   Note: we should not erase data by the peer's claimed inbound_address or inbound_port,
+          //   Note: we should not erase or update data by the peer's claimed inbound_address,
           //         because the data is still unreliable.
-          _potential_peer_db.erase(originating_peer->get_socket().remote_endpoint());
+          // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+          //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+          //       It seems the best approach is to reduce its weight significantly.
+          greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
           // Note: we do not send closing_connection_message, but close directly. This is probably OK
           move_peer_to_closing_list(originating_peer->shared_from_this());
           originating_peer->close_connection();
@@ -4379,19 +4444,32 @@ namespace graphene { namespace net { namespace detail {
       fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& active_peer : _active_connections )
       {
+         // Note: for outbound connections, checking by remote_endpoint is OK,
+         //         and we will ignore the inbound address and port it sends to us when handshaking.
+         //       For an inbound active connection, we want to verify its inbound endpoint, if it happens to be
+         //         the same as remote_endpoint but not yet verified, we consider it as not connected.
+         //       * If verification succeeds, we will mark it as "verified" and won't try to connect again.
+         //       * We may fail to verify if it is firewalled, in this case number_of_failed_connection_attempts
+         //         will increase, so we will not reconnect soon, but will wait longer and longer.
          fc::optional<fc::ip::endpoint> endpoint_for_this_peer = active_peer->get_remote_endpoint();
-         if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+         if( peer_connection_direction::outbound == active_peer->direction
+             && endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
             return active_peer;
          if( peer_connection_direction::inbound == active_peer->direction
              && active_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
              && *active_peer->get_endpoint_for_connecting() == remote_endpoint )
             return active_peer;
+         for( const auto& ep : active_peer->additional_inbound_endpoints )
+         {
+            if( ep == remote_endpoint )
+               return active_peer;
+         }
       }
       return peer_connection_ptr();
    }
 
-    peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
-    {
+   peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
+   {
       VERIFY_CORRECT_THREAD();
       peer_connection_ptr active_ptr = get_active_conn_for_endpoint( remote_endpoint );
       if ( active_ptr != peer_connection_ptr() )
@@ -4399,16 +4477,24 @@ namespace graphene { namespace net { namespace detail {
       fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
       for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
       {
-        fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
-        if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
-          return handshaking_peer;
-        if( peer_connection_direction::inbound == handshaking_peer->direction
+         // For an inbound handshaking connection, there is a race condition since we might not know its node_id yet,
+         // so be stricter here.
+         // Even so, there may be situations that we end up having multiple active connections with them.
+         fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
+         if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            return handshaking_peer;
+         if( peer_connection_direction::inbound == handshaking_peer->direction
              && handshaking_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
              && *handshaking_peer->get_endpoint_for_connecting() == remote_endpoint )
-           return handshaking_peer;
+            return handshaking_peer;
+         for( const auto& ep : handshaking_peer->additional_inbound_endpoints )
+         {
+            if( ep == remote_endpoint )
+               return handshaking_peer;
+         }
       }
       return peer_connection_ptr();
-    }
+   }
 
     bool node_impl::is_connected_to_endpoint( const fc::ip::endpoint& remote_endpoint ) const
     {
@@ -4821,7 +4907,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       fc::mutable_variant_object info;
-      info["listening_on"] = _actual_listening_endpoint;
+      info["listening_on"] = std::string( _actual_listening_endpoint );
       info["node_public_key"] = fc::variant( _node_public_key, 1 );
       info["node_id"] = fc::variant( _node_id, 1 );
       return info;
