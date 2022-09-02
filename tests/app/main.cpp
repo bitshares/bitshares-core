@@ -220,15 +220,11 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    using namespace graphene::app;
    try {
       // Configure logging
-      fc::logging_config logging_config;
-      logging_config.appenders.push_back( fc::appender_config( "stderr", "console",
-            fc::variant( fc::console_appender::config(), GRAPHENE_MAX_NESTED_OBJECTS ) ) );
+      fc::logging_config logging_config = fc::logging_config::default_config();
 
-      fc::logger_config logger_config("p2p");
-      logger_config.level = fc::log_level::debug;
-      logger_config.appenders.push_back("stderr");
-
-      logging_config.loggers.push_back(logger_config);
+      auto logger = logging_config.loggers.back(); // get a copy of the default logger
+      logger.name = "p2p";                         // update the name to p2p
+      logging_config.loggers.push_back( logger );  // add it to logging_config
 
       fc::configure_logging(logging_config);
 
