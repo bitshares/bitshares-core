@@ -319,27 +319,28 @@ namespace graphene { namespace net { namespace detail {
       ilog( "done" );
     }
 
-    void node_impl::save_node_configuration()
-    {
+   void node_impl::save_node_configuration()
+   {
       VERIFY_CORRECT_THREAD();
-      if( fc::exists(_node_configuration_directory ) )
+
+      fc::path configuration_file_name( _node_configuration_directory / NODE_CONFIGURATION_FILENAME );
+      try
       {
-        fc::path configuration_file_name( _node_configuration_directory / NODE_CONFIGURATION_FILENAME );
-        try
-        {
-          fc::json::save_to_file( _node_configuration, configuration_file_name );
-        }
-        catch (const fc::canceled_exception&)
-        {
-          throw;
-        }
-        catch ( const fc::exception& except )
-        {
-          elog( "error writing node configuration to file ${filename}: ${error}",
-               ( "filename", configuration_file_name )("error", except.to_detail_string() ) );
-        }
+         if( !fc::exists(_node_configuration_directory ) )
+            fc::create_directories( _node_configuration_directory );
+         fc::json::save_to_file( _node_configuration, configuration_file_name );
+         dlog( "Saved node configuration to file ${filename}", ( "filename", configuration_file_name ) );
       }
-    }
+      catch (const fc::canceled_exception&)
+      {
+         throw;
+      }
+      catch ( const fc::exception& except )
+      {
+         wlog( "error writing node configuration to file ${filename}: ${error}",
+               ( "filename", configuration_file_name )("error", except.to_detail_string() ) );
+      }
+   }
 
     void node_impl::p2p_network_connect_loop()
     {
