@@ -1547,12 +1547,23 @@ namespace graphene { namespace net { namespace detail {
 
       // Validate the peer's public key.
       // Note: the node_id in user_data is not verified.
-      fc::sha256::encoder shared_secret_encoder;
-      fc::sha512 shared_secret = originating_peer->get_shared_secret();
-      shared_secret_encoder.write(shared_secret.data(), sizeof(shared_secret));
-      fc::ecc::public_key expected_node_public_key( hello_message_received.signed_shared_secret,
-                                                    shared_secret_encoder.result(), false );
-      if( hello_message_received.node_public_key != expected_node_public_key.serialize() )
+      fc::optional<fc::ecc::public_key> expected_node_public_key;
+      try
+      {
+         fc::sha256::encoder shared_secret_encoder;
+         fc::sha512 shared_secret = originating_peer->get_shared_secret();
+         shared_secret_encoder.write(shared_secret.data(), sizeof(shared_secret));
+         expected_node_public_key = fc::ecc::public_key( hello_message_received.signed_shared_secret,
+                                                         shared_secret_encoder.result(), false );
+      }
+      catch( fc::exception& e )
+      {
+         wlog( "Error when validating signature in hello message from peer ${peer}: ${e}",
+               ("peer", originating_peer->get_remote_endpoint())("e", e.to_detail_string()) );
+      }
+
+      if( !expected_node_public_key
+          || hello_message_received.node_public_key != expected_node_public_key->serialize() )
       {
          wlog( "Invalid signature in hello message from peer ${peer}",
                ("peer", originating_peer->get_remote_endpoint()) );
