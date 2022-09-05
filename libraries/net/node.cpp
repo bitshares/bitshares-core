@@ -1665,7 +1665,7 @@ namespace graphene { namespace net { namespace detail {
               std::ostringstream rejection_message;
               rejection_message << "Your client is outdated -- you can only understand blocks up to #" << next_fork_block_number << ", but I'm already on block #" << head_block_num;
               connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                              originating_peer->get_socket().remote_endpoint(),
+                                                              *originating_peer->get_remote_endpoint(),
                                                               rejection_reason_code::unspecified,
                                                               rejection_message.str() );
 
@@ -1730,7 +1730,7 @@ namespace graphene { namespace net { namespace detail {
                 _allowed_peers.find(originating_peer->node_id) == _allowed_peers.end())
         {
           connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                          originating_peer->get_socket().remote_endpoint(),
+                                                          *originating_peer->get_remote_endpoint(),
                                                           rejection_reason_code::blocked,
                                                           "you are not in my allowed_peers list");
           originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
@@ -1762,7 +1762,7 @@ namespace graphene { namespace net { namespace detail {
 
              // Second, we add the address we see, with the inbound port the peer told us.
              // It might be the same as above, but that's OK.
-             fc::ip::endpoint peers_actual_outbound_endpoint = originating_peer->get_socket().remote_endpoint();
+             fc::ip::endpoint peers_actual_outbound_endpoint = *originating_peer->get_remote_endpoint();
              endpoints_to_save.insert( fc::ip::endpoint( peers_actual_outbound_endpoint.get_address(),
                                                          originating_peer->inbound_port ) );
 
@@ -1781,7 +1781,7 @@ namespace graphene { namespace net { namespace detail {
           if (!is_accepting_new_connections())
           {
             connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                            originating_peer->get_socket().remote_endpoint(),
+                                                            *originating_peer->get_remote_endpoint(),
                                                             rejection_reason_code::not_accepting_connections,
                                                             "not accepting any more incoming connections");
             originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
