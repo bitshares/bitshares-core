@@ -615,7 +615,7 @@ public:
       bool _node_is_shutting_down = false;
 
       /// Maximum number of addresses to handle at one time
-      size_t _max_addresses_to_handle_at_once = MAX_ADDRESSES_TO_HANDLE_AT_ONCE;
+      size_t _max_addrs_to_handle_at_once = MAX_ADDRESSES_TO_HANDLE_AT_ONCE;
       /// Maximum number of blocks to handle at one time
       size_t _max_blocks_to_handle_at_once = MAX_BLOCKS_TO_HANDLE_AT_ONCE;
       /// Maximum number of sync blocks to prefetch

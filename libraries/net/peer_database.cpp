@@ -68,7 +68,7 @@ namespace graphene { namespace net {
       void clear();
       void erase(const fc::ip::endpoint& endpointToErase);
       void update_entry(const potential_peer_record& updatedRecord);
-      potential_peer_record lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)const;
+      potential_peer_record lookup_or_create_entry_for_ep(const fc::ip::endpoint& endpointToLookup)const;
       fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)const;
 
       peer_database::iterator begin() const;
@@ -156,7 +156,7 @@ namespace graphene { namespace net {
         _potential_peer_set.get<endpoint_index>().insert(updatedRecord);
     }
 
-    potential_peer_record peer_database_impl::lookup_or_create_entry_for_endpoint(
+    potential_peer_record peer_database_impl::lookup_or_create_entry_for_ep(
           const fc::ip::endpoint& endpointToLookup ) const
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToLookup);
@@ -254,10 +254,10 @@ namespace graphene { namespace net {
     my->update_entry(updatedRecord);
   }
 
-  potential_peer_record peer_database::lookup_or_create_entry_for_endpoint(
+  potential_peer_record peer_database::lookup_or_create_entry_for_ep(
         const fc::ip::endpoint& endpointToLookup ) const
   {
-    return my->lookup_or_create_entry_for_endpoint(endpointToLookup);
+    return my->lookup_or_create_entry_for_ep(endpointToLookup);
   }
 
   fc::optional<potential_peer_record> peer_database::lookup_entry_for_endpoint(

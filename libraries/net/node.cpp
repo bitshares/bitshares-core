@@ -1300,7 +1300,7 @@ namespace graphene { namespace net { namespace detail {
          if( 0 == address.remote_endpoint.port() )
             continue;
          // Note: if found, a copy is returned
-         auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(address.remote_endpoint);
+         auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(address.remote_endpoint);
          // Note:
          // We don't save node_id in the peer database so far
          // 1. node_id of that peer may have changed, but we don't check or update
@@ -1556,7 +1556,7 @@ namespace graphene { namespace net { namespace detail {
          expected_node_public_key = fc::ecc::public_key( hello_message_received.signed_shared_secret,
                                                          shared_secret_encoder.result(), false );
       }
-      catch( fc::exception& e )
+      catch( const fc::exception& e )
       {
          wlog( "Error when validating signature in hello message from peer ${peer}: ${e}",
                ("peer", originating_peer->get_remote_endpoint())("e", e.to_detail_string()) );
@@ -1587,6 +1587,8 @@ namespace graphene { namespace net { namespace detail {
       catch (const fc::exception&)
       {
         // either it's not there or it's not a valid session id.  either way, ignore.
+        dlog( "Peer ${endpoint} sent us a hello message without a valid node_id in user_data",
+              ("endpoint", originating_peer->get_remote_endpoint() ) );
       }
       // The peer's node_id should not be null
       static const node_id_t null_node_id;
@@ -1780,7 +1782,7 @@ namespace graphene { namespace net { namespace detail {
              for( const auto& ep : endpoints_to_save )
              {
                 // add to the peer database
-                auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint( ep );
+                auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep( ep );
                 updated_peer_record.last_seen_time = fc::time_point::now();
                 _potential_peer_db.update_entry( updated_peer_record );
              }
@@ -1977,7 +1979,7 @@ namespace graphene { namespace net { namespace detail {
                ("endpoint", address.remote_endpoint)("time", address.last_seen_time)
                ("fw", address.firewalled) );
          ++count;
-         if( count >= _max_addresses_to_handle_at_once )
+         if( count >= _max_addrs_to_handle_at_once )
             break;
       }
       std::vector<graphene::net::address_info> updated_addresses;
@@ -1995,7 +1997,7 @@ namespace graphene { namespace net { namespace detail {
                                          address.direction,
                                          address.firewalled );
          ++count;
-         if( count >= _max_addresses_to_handle_at_once )
+         if( count >= _max_addrs_to_handle_at_once )
             break;
       }
       if ( _node_configuration.connect_to_new_peers
@@ -4043,7 +4045,7 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
 
       // create or find the database entry for the new peer
-      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
       updated_peer_record.last_connection_disposition = last_connection_failed;
       updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
       _potential_peer_db.update_entry(updated_peer_record);
@@ -4059,7 +4061,7 @@ namespace graphene { namespace net { namespace detail {
         new_peer->is_firewalled = firewalled_state::not_firewalled;
 
         // connection succeeded, we've started handshaking.  record that in our database
-        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_handshaking_failed;
         updated_peer_record.number_of_successful_connection_attempts++;
         updated_peer_record.last_seen_time = fc::time_point::now();
@@ -4073,7 +4075,7 @@ namespace graphene { namespace net { namespace detail {
       if( connect_failed_exception )
       {
         // connection failed.  record that in our database
-        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_failed;
         updated_peer_record.number_of_failed_connection_attempts++;
         if (new_peer->connection_closed_error)
@@ -4336,7 +4338,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       // if we're connecting to them, we believe they're not firewalled
-      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
+      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(ep);
 
       // if we've recently connected to this peer, reset the last_connection_attempt_time to allow
       // us to immediately retry this peer
@@ -4828,7 +4830,7 @@ namespace graphene { namespace net { namespace detail {
       if (params.contains("maximum_number_of_connections"))
         _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>(1);
       if (params.contains("max_addresses_to_handle_at_once"))
-        _max_addresses_to_handle_at_once = params["max_addresses_to_handle_at_once"].as<uint32_t>(1);
+        _max_addrs_to_handle_at_once = params["max_addresses_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_blocks_to_handle_at_once"))
         _max_blocks_to_handle_at_once = params["max_blocks_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_sync_blocks_to_prefetch"))
@@ -4851,7 +4853,7 @@ namespace graphene { namespace net { namespace detail {
       result["peer_connection_retry_timeout"] = _peer_connection_retry_timeout;
       result["desired_number_of_connections"] = _desired_number_of_connections;
       result["maximum_number_of_connections"] = _maximum_number_of_connections;
-      result["max_addresses_to_handle_at_once"] = _max_addresses_to_handle_at_once;
+      result["max_addresses_to_handle_at_once"] = _max_addrs_to_handle_at_once;
       result["max_blocks_to_handle_at_once"] = _max_blocks_to_handle_at_once;
       result["max_sync_blocks_to_prefetch"] = _max_sync_blocks_to_prefetch;
       result["max_sync_blocks_per_peer"] = _max_sync_blocks_per_peer;

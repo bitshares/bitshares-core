@@ -102,7 +102,10 @@ public:
     try {
       if (hello_message_received.user_data.contains("node_id"))
         _node_id = hello_message_received.user_data["node_id"].as<graphene::net::node_id_t>( 1 );
-    } catch( fc::exception& ) { /* do nothing */ }
+    } catch( const fc::exception& ) {
+        dlog( "Peer ${endpoint} sent us a hello message with an invalid node_id in user_data",
+              ("endpoint", originating_peer->get_remote_endpoint() ) );
+    }
     originating_peer->send_message(graphene::net::connection_rejected_message());
   }
 
@@ -206,9 +209,7 @@ int main(int argc, char** argv)
   std::map<fc::ip::endpoint, graphene::net::node_id_t> node_id_by_endpoint;
   std::vector<std::shared_ptr<peer_probe>> probes;
 
-  const auto& update_info_by_probe = [ &connections_by_node_id, &address_info_by_node_id,
-                                       &node_id_by_endpoint, &my_node_id,
-                                       &nodes_already_visited, &nodes_to_visit_set, &nodes_to_visit ]
+  const auto& update_info_by_probe = [ &connections_by_node_id, &address_info_by_node_id, &node_id_by_endpoint ]
                                      ( const std::shared_ptr<peer_probe>& probe )
   {
           idump( (probe->_node_id)(probe->_remote)(probe->_peers.size()) );
@@ -224,11 +225,14 @@ int main(int argc, char** argv)
           address_info_by_node_id[this_node_info.node_id] = this_node_info;
 
           node_id_by_endpoint[probe->_remote] = probe->_node_id;
+  };
 
-          for (const graphene::net::address_info& info : probe->_peers)
-          {
+  const auto& update_info_by_address_info = [ &address_info_by_node_id, &my_node_id,
+                                              &nodes_already_visited, &nodes_to_visit_set, &nodes_to_visit ]
+                                            ( const graphene::net::address_info& info )
+  {
              if (info.node_id == my_node_id) // We should not be in the list, just be defensive here
-                continue;
+                return;
              if (nodes_already_visited.find(info.remote_endpoint) == nodes_already_visited.end() &&
                  nodes_to_visit_set.find(info.remote_endpoint) == nodes_to_visit_set.end())
              {
@@ -247,7 +251,6 @@ int main(int argc, char** argv)
                 // Replace private or local addresses with public addresses when possible
                 address_info_by_node_id[info.node_id].remote_endpoint = info.remote_endpoint;
              }
-          }
   };
 
   constexpr size_t max_concurrent_probes = 200;
@@ -283,6 +286,8 @@ int main(int argc, char** argv)
           continue;
        }
        update_info_by_probe(probe);
+       for (const graphene::net::address_info& info : probe->_peers)
+          update_info_by_address_info( info );
     }
 
     constexpr uint32_t five = 5;
