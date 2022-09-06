@@ -146,12 +146,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->add_seed_nodes(seeds);
    }
 
-   if ( _options->count( "disable-peer-advertising" ) > 0
-        && _options->at( "disable-peer-advertising").as<bool>() ) // == true
-   {
-      _p2p_network->disable_peer_advertising();
-   }
-   else if( _options->count( "advertise-peer-algorithm" ) > 0 )
+   if( _options->count( "advertise-peer-algorithm" ) > 0 )
    {
       std::string algo = _options->at("advertise-peer-algorithm").as<string>();
       std::vector<std::string> list;
@@ -1196,8 +1191,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("exclude-peer-node", bpo::value<vector<string>>()->composing(),
           "P2P node to not advertise, only takes effect when algorithm is 'exclude_list' "
           "(may specify multiple times)")
-         ("disable-peer-advertising", bpo::value<bool>()->implicit_value(false),
-          "Disable advertising your peers. Note: Overrides any advertise-peer-algorithm settings")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
           "P2P node to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),

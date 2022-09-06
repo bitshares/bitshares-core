@@ -847,44 +847,6 @@ BOOST_AUTO_TEST_CASE( address_request_without_hello )
    BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 0 );
 }
 
-/****
- * Assure that when disable_peer_advertising is set,
- * the node does not share its peer list
- */
-BOOST_AUTO_TEST_CASE( disable_peer_advertising )
-{
-   // create a node (node1)
-   int node1_port = fc::network::get_available_port();
-   fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
-   // simulate that node1 started to connect to the network and accepting connections
-   fake_network_connect_guard guard( node1 );
-
-   // disable peer advertising
-   node1.disable_peer_advertising();
-
-   // get something in the list of connections
-   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts
-         = node1.create_peer_connection( "127.0.0.1:8090" );
-
-   // a new peer (peer3)
-   std::pair<std::shared_ptr<test_delegate>, std::shared_ptr<test_peer>> peer3
-         = node1.create_test_peer( "1.2.3.4:5678" );
-   std::shared_ptr<test_peer> peer3_ptr = peer3.second;
-   // simulate that node1 got its hello request and accepted the connection
-   peer3_ptr->their_state = test_peer::their_connection_state::connection_accepted;
-
-   // peer3 request addresses
-   graphene::net::address_request_message req;
-   node1.on_message( peer3_ptr, req );
-
-   // check the results
-   // Node1 does not share the peer list with others
-   BOOST_REQUIRE_EQUAL( peer3_ptr->messages_received.size(), 1U );
-   const auto& msg = peer3_ptr->messages_received.front();
-   test_address_message( msg, 0 );
-}
-
 BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
 {
    // create a node (node1)

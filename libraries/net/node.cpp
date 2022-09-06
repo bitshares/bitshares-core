@@ -4910,12 +4910,6 @@ namespace graphene { namespace net { namespace detail {
       _rate_limiter.set_download_limit( download_bytes_per_second );
     }
 
-    void node_impl::disable_peer_advertising()
-    {
-      VERIFY_CORRECT_THREAD();
-      _address_builder = nullptr;
-    }
-
     fc::variant_object node_impl::get_call_statistics() const
     {
       VERIFY_CORRECT_THREAD();
@@ -5125,11 +5119,6 @@ namespace graphene { namespace net { namespace detail {
                                        uint32_t download_bytes_per_second) const
   {
     INVOKE_IN_IMPL(set_total_bandwidth_limit, upload_bytes_per_second, download_bytes_per_second);
-  }
-
-  void node::disable_peer_advertising() const
-  {
-    INVOKE_IN_IMPL(disable_peer_advertising);
   }
 
   fc::variant_object node::get_call_statistics() const

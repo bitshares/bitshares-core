@@ -818,7 +818,6 @@ public:
       void                       clear_peer_database();
       void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second,
                                                             uint32_t download_bytes_per_second );
-      void                       disable_peer_advertising();
       fc::variant_object         get_call_statistics() const;
       graphene::net::message     get_message_for_item(const item_id& item) override;
 

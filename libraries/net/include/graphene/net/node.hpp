@@ -317,7 +317,6 @@ namespace graphene { namespace net {
 
         std::vector<potential_peer_record> get_potential_peers() const;
 
-        void disable_peer_advertising() const;
         fc::variant_object get_call_statistics() const;
       protected:
         node_impl_ptr my;
