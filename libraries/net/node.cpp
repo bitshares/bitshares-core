@@ -155,6 +155,7 @@ namespace graphene { namespace net { namespace detail {
    /// Greatly delays the next connection to the endpoint
    static void greatly_delay_next_conn_to( node_impl* impl, const fc::ip::endpoint& ep )
    {
+      dlog( "Greatly delaying the next connection to endpoint ${ep}", ("ep", ep) );
       fc::optional<potential_peer_record> updated_peer_record
             = impl->_potential_peer_db.lookup_entry_for_endpoint( ep );
       if( updated_peer_record )
@@ -1602,6 +1603,10 @@ namespace graphene { namespace net { namespace detail {
       // Check whether the peer is myself
       if( _node_id == peer_node_id )
       {
+         dlog( "Received a hello_message from peer ${peer} with id ${id} that is myself or claimed to be myself, "
+               "rejection",
+               ("peer", originating_peer->get_remote_endpoint())
+               ("id", peer_node_id) );
          // If it is an outbound connection, make sure we won't reconnect to the peer soon
          if( peer_connection_direction::outbound == originating_peer->direction )
          {
@@ -1619,9 +1624,6 @@ namespace graphene { namespace net { namespace detail {
                                                           "I'm connecting to myself" );
          originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
          originating_peer->send_message( message(connection_rejected) );
-         dlog( "Received a hello_message from peer ${peer} that is myself or claimed to be myself, rejection",
-               ("peer", originating_peer->get_remote_endpoint())
-               ("id", originating_peer->node_id) );
          disconnect_from_peer( originating_peer, connection_rejected.reason_string );
          return;
       }
@@ -1700,6 +1702,10 @@ namespace graphene { namespace net { namespace detail {
           if( peer_connection_direction::outbound == originating_peer->direction
               && originating_peer->node_public_key == already_connected_peer->node_public_key )
           {
+              dlog( "Verified that endpoint ${ep} is reachable and belongs to peer ${peer} with id ${id}",
+                    ("ep", originating_peer->get_remote_endpoint())
+                    ("peer", already_connected_peer->get_remote_endpoint())
+                    ("id", already_connected_peer->node_id) );
               // Do not replace a verified public address with a private or local address.
               // Note: there is a scenario that some nodes in the same local network may have connected to each other,
               //         and of course some are outbound connections and some are inbound, so we are unable to update
@@ -1720,6 +1726,9 @@ namespace graphene { namespace net { namespace detail {
                    || new_inbound_endpoint->get_address().is_public_address()
                    || !old_inbound_endpoint->get_address().is_public_address() )
               {
+                 dlog( "Saving verification result for peer ${peer} with id ${id}",
+                       ("peer", already_connected_peer->get_remote_endpoint())
+                       ("id", already_connected_peer->node_id) );
                  already_connected_peer->remote_inbound_endpoint = new_inbound_endpoint;
                  already_connected_peer->inbound_endpoint_verified = true;
                  already_connected_peer->is_firewalled = firewalled_state::not_firewalled;

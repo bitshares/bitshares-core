@@ -238,6 +238,7 @@ namespace graphene { namespace net
         direction = peer_connection_direction::outbound;
 
         _remote_endpoint = remote_endpoint;
+        bool failed_to_bind = false;
         if( local_endpoint )
         {
           // the caller wants us to bind the local side of this socket to a specific ip/port
@@ -254,11 +255,40 @@ namespace graphene { namespace net
           }
           catch ( const fc::exception& except )
           {
-            wlog( "Failed to bind to desired local endpoint ${endpoint}, will connect using an OS-selected endpoint: ${except}", ("endpoint", *local_endpoint )("except", except ) );
+             failed_to_bind = true;
+             wlog( "Failed to bind to desired local endpoint ${endpoint}, will connect using an OS-selected "
+                   "endpoint: ${except}",
+                   ("endpoint", *local_endpoint )("except", except ) );
           }
         }
         negotiation_status = connection_negotiation_status::connecting;
-        _message_connection.connect_to( remote_endpoint );
+        bool retry = false;
+        try
+        {
+           _message_connection.connect_to( remote_endpoint );
+        }
+        catch ( const fc::canceled_exception& )
+        {
+           throw;
+        }
+        catch ( const fc::exception& except )
+        {
+           if( local_endpoint && !failed_to_bind )
+           {
+              retry = true;
+              wlog( "Failed to connect to remote endpoint ${remote_endpoint} from local endpoint ${local_endpoint}, "
+                    "will connect using an OS-selected endpoint: ${except}",
+                    ("remote_endpoint", remote_endpoint )("local_endpoint", *local_endpoint )("except", except ) );
+           }
+           else
+              throw;
+        }
+        if( retry )
+        {
+           get_socket().close();
+           get_socket().open();
+           _message_connection.connect_to( remote_endpoint );
+        }
         negotiation_status = connection_negotiation_status::connected;
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
@@ -268,12 +298,14 @@ namespace graphene { namespace net
       }
       catch ( fc::exception& e )
       {
-        wlog( "error connecting to peer ${remote_endpoint}: ${e}", ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
+        wlog( "error connecting to peer ${remote_endpoint}: ${e}",
+              ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
         throw;
       }
     } // connect_to()
 
-    void peer_connection::on_message( message_oriented_connection* originating_connection, const message& received_message )
+    void peer_connection::on_message( message_oriented_connection* originating_connection,
+                                      const message& received_message )
     {
       VERIFY_CORRECT_THREAD();
       _currently_handling_message = true;
