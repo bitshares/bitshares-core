@@ -1949,9 +1949,9 @@ namespace graphene { namespace net { namespace detail {
          _address_builder = std::make_shared<all_address_builder>();
    }
 
-    void node_impl::on_address_message(peer_connection* originating_peer,
-                                       const address_message& address_message_received)
-    {
+   void node_impl::on_address_message( peer_connection* originating_peer,
+                                       const address_message& address_message_received )
+   {
       VERIFY_CORRECT_THREAD();
       // Do some gatekeeping here.
       // Malious peers can easily bypass our checks in on_hello_message(), and we will then request addresses anyway,
@@ -1972,39 +1972,40 @@ namespace graphene { namespace net { namespace detail {
       dlog( "Received an address message containing ${size} addresses for peer ${peer}",
             ("size", address_message_received.addresses.size())
             ("peer", originating_peer->get_remote_endpoint()) );
-      size_t count = 0;
-      for (const address_info& address : address_message_received.addresses)
+      if( _node_configuration.connect_to_new_peers )
       {
-         dlog( "    ${endpoint} last seen ${time}, firewalled status ${fw}",
-               ("endpoint", address.remote_endpoint)("time", address.last_seen_time)
-               ("fw", address.firewalled) );
-         ++count;
-         if( count >= _max_addrs_to_handle_at_once )
-            break;
+         size_t count = 0;
+         for (const address_info& address : address_message_received.addresses)
+         {
+            dlog( "    ${endpoint} last seen ${time}, firewalled status ${fw}",
+                  ("endpoint", address.remote_endpoint)("time", address.last_seen_time)
+                  ("fw", address.firewalled) );
+            ++count;
+            if( count >= _max_addrs_to_handle_at_once )
+               break;
+         }
+         std::vector<graphene::net::address_info> updated_addresses;
+         updated_addresses.reserve( count );
+         auto now = fc::time_point_sec(fc::time_point::now());
+         count = 0;
+         for( const address_info& address : address_message_received.addresses )
+         {
+            if( 0 == address.remote_endpoint.port() )
+               continue;
+            updated_addresses.emplace_back( address.remote_endpoint,
+                                            now,
+                                            address.latency,
+                                            address.node_id,
+                                            address.direction,
+                                            address.firewalled );
+            ++count;
+            if( count >= _max_addrs_to_handle_at_once )
+               break;
+         }
+         if( merge_address_info_with_potential_peer_database(updated_addresses) )
+            trigger_p2p_network_connect_loop();
       }
-      std::vector<graphene::net::address_info> updated_addresses;
-      updated_addresses.reserve( count );
-      auto now = fc::time_point_sec(fc::time_point::now());
-      count = 0;
-      for( const address_info& address : address_message_received.addresses )
-      {
-         if( 0 == address.remote_endpoint.port() )
-            continue;
-         updated_addresses.emplace_back( address.remote_endpoint,
-                                         now,
-                                         address.latency,
-                                         address.node_id,
-                                         address.direction,
-                                         address.firewalled );
-         ++count;
-         if( count >= _max_addrs_to_handle_at_once )
-            break;
-      }
-      if ( _node_configuration.connect_to_new_peers
-           && merge_address_info_with_potential_peer_database(updated_addresses) )
-      {
-         trigger_p2p_network_connect_loop();
-      }
+
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
         // if we were handshaking, we need to continue with the next step in handshaking (which is either
@@ -2044,7 +2045,7 @@ namespace graphene { namespace net { namespace detail {
       }
       // else if this was an active connection, then this was just a reply to our periodic address requests.
       // we've processed it, there's nothing else to do
-    }
+   }
 
     void node_impl::on_fetch_blockchain_item_ids_message(peer_connection* originating_peer,
                                                          const fetch_blockchain_item_ids_message& fetch_blockchain_item_ids_message_received)
