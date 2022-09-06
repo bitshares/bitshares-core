@@ -283,7 +283,10 @@ public:
 
    void start_fake_network_connect_loop()
    {
-      my->_p2p_network_connect_loop_done = fc::schedule( []{}, fc::time_point::now() + fc::minutes(5), "dummy_task" );
+      this->my->get_thread()->async( [&]() {
+            my->_p2p_network_connect_loop_done
+                  = fc::schedule( [&]{}, fc::time_point::now() + fc::minutes(5), "dummy_task" );
+         }).wait();
    }
 
    void stop_fake_network_connect_loop()
@@ -320,6 +323,14 @@ public:
             peer->remote_inbound_endpoint = peer->get_remote_endpoint();
             my->move_peer_to_active_list( peer );
             return std::make_pair( d, peer );
+         }).wait();
+   }
+
+   graphene::net::hello_message create_hello_message_from_peer( std::shared_ptr<test_peer> peer_ptr,
+                                                                const graphene::net::chain_id_type& chain_id )
+   {
+      return this->my->get_thread()->async( [&](){
+            return peer_ptr->create_hello_message( chain_id );
          }).wait();
    }
 
@@ -388,7 +399,7 @@ BOOST_AUTO_TEST_CASE( hello_test )
    BOOST_CHECK( peer3_public_key != peer3_node_id );
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    req.inbound_address = fc::ip::address( "9.9.9.9" );
    node1.on_message( peer3_ptr, req );
 
@@ -444,7 +455,7 @@ BOOST_AUTO_TEST_CASE( hello_firewalled_peer_test )
    BOOST_CHECK( peer3_public_key == peer3_node_id );
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    req.inbound_address = fc::ip::address( "9.9.9.9" );
    req.inbound_port = 0;
    node1.on_message( peer3_ptr, req );
@@ -507,7 +518,7 @@ BOOST_AUTO_TEST_CASE( hello_not_accepting_connections )
    peer3_ptr->direction = graphene::net::peer_connection_direction::outbound;
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    node1.on_message( peer3_ptr, req );
 
    // check the results
@@ -545,7 +556,7 @@ BOOST_AUTO_TEST_CASE( hello_unexpected )
    peer3_ptr->their_state = test_peer::their_connection_state::connection_accepted;
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    node1.on_message( peer3_ptr, req );
 
    // check the results
@@ -594,7 +605,7 @@ BOOST_AUTO_TEST_CASE( hello_from_different_chain )
 
    // peer3 send hello
    graphene::net::chain_id_type chain_id = fc::sha256::hash(std::string("dummy_chain"));
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( chain_id );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, chain_id );
    node1.on_message( peer3_ptr, req );
 
    // check the results
@@ -637,7 +648,7 @@ BOOST_AUTO_TEST_CASE( hello_invalid_signature )
    peer3_ptr->direction = graphene::net::peer_connection_direction::inbound;
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    req.signed_shared_secret = fc::ecc::compact_signature();
    node1.on_message( peer3_ptr, req );
 
@@ -673,7 +684,7 @@ BOOST_AUTO_TEST_CASE( hello_null_node_id )
    peer3_ptr->direction = graphene::net::peer_connection_direction::inbound;
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    fc::mutable_variant_object user_data = req.user_data;
    user_data["node_id"] = fc::variant( graphene::net::node_id_t(), 1 );
    req.user_data = user_data;
@@ -718,7 +729,7 @@ BOOST_AUTO_TEST_CASE( hello_from_self )
    const auto now = fc::time_point::now();
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    fc::mutable_variant_object user_data = req.user_data;
    user_data["node_id"] = fc::variant( node1.get_node_id(), 1 );
    req.user_data = user_data;
@@ -773,7 +784,7 @@ BOOST_AUTO_TEST_CASE( hello_already_connected )
    node2_ptr->node_id = node2_ptr->node_public_key;
 
    // peer3 send hello
-   graphene::net::hello_message req = peer3_ptr->create_hello_message( node1.get_chain_id() );
+   graphene::net::hello_message req = node1.create_hello_message_from_peer( peer3_ptr, node1.get_chain_id() );
    node1.on_message( peer3_ptr, req );
 
    // check the results
