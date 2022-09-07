@@ -1660,10 +1660,24 @@ namespace graphene { namespace net { namespace detail {
       if( !originating_peer->remote_inbound_endpoint )
       {
          // Note: the data is not yet verified, so we need to use it with caution.
-         // On the one hand, we want to advertise as accurate data as possible to other peers,
+         //
+         // We will advertise "remote_inbound_endpoint" when other peers request addresses.
+         //
+         // On the one hand, we want to advertise as accurate data as possible to other peers (we will try to verify),
          // on the other hand, we still want to advertise it to other peers if we didn't have a chance to verify it.
-         originating_peer->remote_inbound_endpoint = fc::ip::endpoint( originating_peer->inbound_address,
-                                                                       originating_peer->inbound_port );
+         //
+         // When the peer is not listening (i.e. it tells us its inbound port is 0), the inbound address it tells us
+         // may be invalid (e.g. 0.0.0.0), and we are not going to verify it anyway.
+         // For observation purposes, we still advertise it to other peers, and we need to tell them an address,
+         // so we use the address we see.
+         //
+         // In addition, by now, our list or exclude list for peer advertisement only contains IP endpoints but not
+         // nodes' public keys (we can't use node_id because it changes every time the node restarts). Using a valid
+         // address is better for the purpose.
+         originating_peer->remote_inbound_endpoint
+               = fc::ip::endpoint( originating_peer->inbound_port != 0 ? originating_peer->inbound_address
+                                         : originating_peer->get_remote_endpoint()->get_address(),
+                                   originating_peer->inbound_port );
       }
 
       // if they didn't provide a last known fork, try to guess it
