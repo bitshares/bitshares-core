@@ -227,9 +227,8 @@ int main(int argc, char** argv)
           node_id_by_endpoint[probe->_remote] = probe->_node_id;
   };
 
-  const auto& update_info_by_address_info = [ &address_info_by_node_id, &my_node_id,
-                                              &nodes_already_visited, &nodes_to_visit_set, &nodes_to_visit ]
-                                            ( const graphene::net::address_info& info )
+  const auto& update_info_by_address_info = [ &address_info_by_node_id, &my_node_id, &nodes_already_visited,
+                 &nodes_to_visit_set, &nodes_to_visit ] ( const graphene::net::address_info& info )
   {
              if (info.node_id == my_node_id) // We should not be in the list, just be defensive here
                 return;
@@ -247,10 +246,8 @@ int main(int argc, char** argv)
              }
              else if ( !address_info_by_node_id[info.node_id].remote_endpoint.get_address().is_public_address()
                        && info.remote_endpoint.get_address().is_public_address() )
-             {
                 // Replace private or local addresses with public addresses when possible
                 address_info_by_node_id[info.node_id].remote_endpoint = info.remote_endpoint;
-             }
   };
 
   constexpr size_t max_concurrent_probes = 200;
