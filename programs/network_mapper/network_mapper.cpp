@@ -120,7 +120,7 @@ public:
           const graphene::net::connection_rejected_message& connection_rejected_message_received )
   {
     // Note: We will be rejected and disconnected if our chain_id is not the same as the peer's .
-    //       If we aren't be disconnected, it is OK to send an address request message.
+    //       If we aren't disconnected, it is OK to send an address request message.
     _connection_was_rejected = true;
     wlog( "peer ${endpoint} rejected our connection with reason ${reason}",
           ("endpoint", originating_peer->get_remote_endpoint() )
