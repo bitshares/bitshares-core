@@ -167,6 +167,19 @@ namespace graphene { namespace net { namespace detail {
          impl->_potential_peer_db.update_entry( *updated_peer_record );
       }
    }
+   /// Saves a successfully connected endpoint to the peer database
+   static void save_successful_address( node_impl* impl, const fc::ip::endpoint& ep )
+   {
+      dlog( "Saving successfully connected endpoint ${ep} to peer database", ("ep", ep) );
+      auto updated_peer_record = impl->_potential_peer_db.lookup_or_create_entry_for_ep( ep );
+      updated_peer_record.last_connection_disposition = last_connection_succeeded;
+      updated_peer_record.last_connection_attempt_time = fc::time_point::now();
+      // halve number_of_failed_connection_attempts
+      constexpr uint16_t two = 2;
+      updated_peer_record.number_of_failed_connection_attempts /= two;
+      updated_peer_record.last_seen_time = fc::time_point::now();
+      impl->_potential_peer_db.update_entry(updated_peer_record);
+   }
    static void update_address_seen_time( node_impl* impl, const peer_connection* active_peer )
    {
       fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
@@ -1733,6 +1746,10 @@ namespace graphene { namespace net { namespace detail {
                  already_connected_peer->inbound_endpoint_verified = true;
                  already_connected_peer->is_firewalled = firewalled_state::not_firewalled;
               }
+              // If the already connected peer is in the active connections list, save the endpoint to the peer db
+              if( peer_connection::connection_negotiation_status::negotiation_complete
+                     == already_connected_peer->negotiation_status )
+                 save_successful_address( this, *new_inbound_endpoint );
           }
           // Now reject
           connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
@@ -2028,23 +2045,7 @@ namespace graphene { namespace net { namespace detail {
           // Note: updating last_connection_disposition to last_connection_succeeded for inbound connections
           //       doesn't seem correct
           if( peer_connection_direction::outbound == originating_peer->direction )
-          {
-            const fc::optional<fc::ip::endpoint>& inbound_endpoint = originating_peer->get_endpoint_for_connecting();
-            if( inbound_endpoint.valid() && inbound_endpoint->port() != 0 )
-            {
-              // mark the connection as successful in the database
-              fc::optional<potential_peer_record> updated_peer_record
-                    = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
-              if (updated_peer_record)
-              {
-                updated_peer_record->last_connection_disposition = last_connection_succeeded;
-                // halve number_of_failed_connection_attempts
-                constexpr uint16_t two = 2;
-                updated_peer_record->number_of_failed_connection_attempts /= two;
-                _potential_peer_db.update_entry(*updated_peer_record);
-              }
-            }
-          }
+             save_successful_address( this, *originating_peer->get_remote_endpoint() );
 
           // transition it to our active list
           originating_peer->negotiation_status = peer_connection::connection_negotiation_status::negotiation_complete;
