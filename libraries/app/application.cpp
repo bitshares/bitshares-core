@@ -173,7 +173,11 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->set_connect_to_new_peers( _options->at( "p2p-connect-to-new-peers" ).as<bool>() );
 
    _p2p_network->listen_to_p2p_network();
-   ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
+   fc::ip::endpoint listening_endpoint = _p2p_network->get_actual_listening_endpoint();
+   if( listening_endpoint.port() != 0 )
+      ilog( "Configured p2p node to listen on ${ip}", ("ip", listening_endpoint) );
+   else
+      ilog( "Configured p2p node to not listen for incoming connections" );
 
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,

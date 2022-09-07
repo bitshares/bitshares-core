@@ -4072,7 +4072,9 @@ namespace graphene { namespace net { namespace detail {
       try
       {
         // blocks until the connection is established and secure connection is negotiated
-        new_peer->connect_to(remote_endpoint, _actual_listening_endpoint);
+        auto bind_to_endpoint = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint
+                                                                                : fc::optional<fc::ip::endpoint>();
+        new_peer->connect_to( remote_endpoint, bind_to_endpoint );
 
         // we connected to the peer.  guess they're not firewalled....
         new_peer->is_firewalled = firewalled_state::not_firewalled;

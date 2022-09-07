@@ -434,6 +434,8 @@ public:
       /// Stores the endpoint we're listening on.  This will be the same as
       /// _node_configuration.listen_endpoint, unless that endpoint was already
       /// in use.
+      /// This will be 0.0.0.0:0 if the node is configured to not listen.
+      // Note: updating the type to optional may break 3rd-party client applications.
       fc::ip::endpoint     _actual_listening_endpoint;
 
       /// Used by the task that manages connecting to peers
