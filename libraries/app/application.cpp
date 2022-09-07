@@ -150,10 +150,10 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    {
       std::string algo = _options->at("p2p-advertise-peer-algorithm").as<string>();
       std::vector<std::string> list;
-      if( algo == "list" && _options->count("p2p-advertise-peer-node") > 0 )
-         list = _options->at("p2p-advertise-peer-node").as<std::vector<std::string>>();
-      else if( algo == "exclude_list" && _options->count("p2p-exclude-peer-node") > 0 )
-         list = _options->at("p2p-exclude-peer-node").as<std::vector<std::string>>();
+      if( algo == "list" && _options->count("p2p-advertise-peer-endpoint") > 0 )
+         list = _options->at("p2p-advertise-peer-endpoint").as<std::vector<std::string>>();
+      else if( algo == "exclude_list" && _options->count("p2p-exclude-peer-endpoint") > 0 )
+         list = _options->at("p2p-exclude-peer-endpoint").as<std::vector<std::string>>();
       _p2p_network->set_advertise_algorithm( algo, list );
    }
 
@@ -1179,27 +1179,28 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Whether to enable P2P network (default: true). Note: if delayed_node plugin is enabled, "
           "this option will be ignored and P2P network will always be disabled.")
          ("p2p-accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
-          "Whether to accept incoming connections (default: true)")
+          "Whether to accept incoming P2P connections (default: true)")
          ("p2p-endpoint", bpo::value<string>(),
-          "Endpoint (local IP address:port) for P2P node to listen on. "
+          "The endpoint (local IP address:port) on which the node will listen for P2P connections. "
           "Specify 0.0.0.0 as address to listen on all IP addresses")
          ("p2p-inbound-endpoint", bpo::value<string>(),
-          "Endpoint (external IP address:port) that other peers should connect to. "
+          "The endpoint (external IP address:port) that other P2P peers should connect to. "
           "If the address is unknown or dynamic, specify 0.0.0.0")
          ("p2p-connect-to-new-peers", bpo::value<bool>()->implicit_value(true),
-          "Whether to connect to new peers advertised by other peers (default: true)")
+          "Whether the node will connect to new P2P peers advertised by other peers (default: true)")
          ("p2p-advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
-          "Determines which peers are advertised in response to address requests from other peers. "
+          "Determines which P2P peers are advertised in response to address requests from other peers. "
           "Algorithms: 'all', 'nothing', 'list', exclude_list'. (default: all)")
-         ("p2p-advertise-peer-node", bpo::value<vector<string>>()->composing(),
-          "P2P node to advertise, only takes effect when algorithm is 'list' (may specify multiple times)")
-         ("p2p-exclude-peer-node", bpo::value<vector<string>>()->composing(),
-          "P2P node to not advertise, only takes effect when algorithm is 'exclude_list' "
-          "(may specify multiple times)")
+         ("p2p-advertise-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to advertise, only takes effect when algorithm "
+          "is 'list' (may specify multiple times)")
+         ("p2p-exclude-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to not advertise, only takes effect when algorithm "
+          "is 'exclude_list' (may specify multiple times)")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
-          "P2P node to connect to on startup (may specify multiple times)")
+          "The endpoint (IP address:port) of the P2P peer to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
-          "JSON array of P2P nodes to connect to on startup")
+          "JSON array of P2P peers to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->composing(),
           "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
