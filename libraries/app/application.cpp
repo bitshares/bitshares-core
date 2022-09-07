@@ -146,14 +146,14 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->add_seed_nodes(seeds);
    }
 
-   if( _options->count( "advertise-peer-algorithm" ) > 0 )
+   if( _options->count( "p2p-advertise-peer-algorithm" ) > 0 )
    {
-      std::string algo = _options->at("advertise-peer-algorithm").as<string>();
+      std::string algo = _options->at("p2p-advertise-peer-algorithm").as<string>();
       std::vector<std::string> list;
-      if( algo == "list" && _options->count("advertise-peer-node") > 0 )
-         list = _options->at("advertise-peer-node").as<std::vector<std::string>>();
-      else if( algo == "exclude_list" && _options->count("exclude-peer-node") > 0 )
-         list = _options->at("exclude-peer-node").as<std::vector<std::string>>();
+      if( algo == "list" && _options->count("p2p-advertise-peer-node") > 0 )
+         list = _options->at("p2p-advertise-peer-node").as<std::vector<std::string>>();
+      else if( algo == "exclude_list" && _options->count("p2p-exclude-peer-node") > 0 )
+         list = _options->at("p2p-exclude-peer-node").as<std::vector<std::string>>();
       _p2p_network->set_advertise_algorithm( algo, list );
    }
 
@@ -166,11 +166,11 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->set_inbound_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-inbound-endpoint")
                                               .as<string>()) );
 
-   if ( _options->count("accept-incoming-connections") > 0 )
-      _p2p_network->set_accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
+   if ( _options->count("p2p-accept-incoming-connections") > 0 )
+      _p2p_network->set_accept_incoming_connections( _options->at("p2p-accept-incoming-connections").as<bool>() );
 
-   if ( _options->count("connect-to-new-peers") > 0 )
-      _p2p_network->set_connect_to_new_peers( _options->at( "connect-to-new-peers" ).as<bool>() );
+   if ( _options->count("p2p-connect-to-new-peers") > 0 )
+      _p2p_network->set_connect_to_new_peers( _options->at( "p2p-connect-to-new-peers" ).as<bool>() );
 
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
@@ -1172,23 +1172,24 @@ void application::set_program_options(boost::program_options::options_descriptio
    const auto& default_opts = application_options::get_default();
    configuration_file_options.add_options()
          ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
-          "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
+          "Whether to enable P2P network (default: true). Note: if delayed_node plugin is enabled, "
           "this option will be ignored and P2P network will always be disabled.")
+         ("p2p-accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
+          "Whether to accept incoming connections (default: true)")
          ("p2p-endpoint", bpo::value<string>(),
           "Endpoint (local IP address:port) for P2P node to listen on. "
           "Specify 0.0.0.0 as address to listen on all IP addresses")
          ("p2p-inbound-endpoint", bpo::value<string>(),
           "Endpoint (external IP address:port) that other peers should connect to. "
           "If the address is unknown or dynamic, specify 0.0.0.0")
-         ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
-          "Whether to accept incoming connections")
-         ("connect-to-new-peers", bpo::value<bool>()->implicit_value(true),
-          "Whether to connect to new peers advertised by other peers")
-         ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
-          "Determines which peers are advertised. Algorithms: 'all', 'nothing', 'list', exclude_list'")
-         ("advertise-peer-node", bpo::value<vector<string>>()->composing(),
+         ("p2p-connect-to-new-peers", bpo::value<bool>()->implicit_value(true),
+          "Whether to connect to new peers advertised by other peers (default: true)")
+         ("p2p-advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
+          "Determines which peers are advertised in response to address requests from other peers. "
+          "Algorithms: 'all', 'nothing', 'list', exclude_list'. (default: all)")
+         ("p2p-advertise-peer-node", bpo::value<vector<string>>()->composing(),
           "P2P node to advertise, only takes effect when algorithm is 'list' (may specify multiple times)")
-         ("exclude-peer-node", bpo::value<vector<string>>()->composing(),
+         ("p2p-exclude-peer-node", bpo::value<vector<string>>()->composing(),
           "P2P node to not advertise, only takes effect when algorithm is 'exclude_list' "
           "(may specify multiple times)")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
