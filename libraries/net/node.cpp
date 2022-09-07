@@ -4015,6 +4015,8 @@ namespace graphene { namespace net { namespace detail {
       // * inbound port
       // * outbound port
       //
+      // If we don't accept incoming connections, we send nothing.
+      //
       // The peer we're connecting to may assume we're firewalled if the
       // IP address and outbound port we send don't match the values it sees on its remote endpoint,
       // but it is not always true, E.G. if the peer itself is behind a reverse proxy.
@@ -4024,24 +4026,28 @@ namespace graphene { namespace net { namespace detail {
       //       nor we know whether we're behind NAT or a reverse proxy that will allow incoming connections.
       //       However, if the "p2p-inbound-endpoint" node startup option is configured, we send that instead.
 
-      fc::ip::endpoint local_endpoint(peer->get_socket().local_endpoint());
-      fc::ip::address inbound_address = local_endpoint.get_address();
-      uint16_t inbound_port = _node_configuration.accept_incoming_connections ?
-                                      _actual_listening_endpoint.port() : 0;
-
-      if( _node_configuration.inbound_endpoint.valid() )
+      fc::ip::address inbound_address; // default 0.0.0.0
+      uint16_t inbound_port = 0;
+      uint16_t outbound_port = 0;
+      if( _node_configuration.accept_incoming_connections )
       {
-         if( _node_configuration.inbound_endpoint->get_address() != fc::ip::address() )
-            inbound_address = _node_configuration.inbound_endpoint->get_address();
-         if( _node_configuration.accept_incoming_connections )
+         fc::ip::endpoint local_endpoint = peer->get_socket().local_endpoint();
+         inbound_address = local_endpoint.get_address();
+         inbound_port = _actual_listening_endpoint.port();
+         outbound_port = local_endpoint.port();
+         if( _node_configuration.inbound_endpoint.valid() )
+         {
+            if( _node_configuration.inbound_endpoint->get_address() != fc::ip::address() )
+               inbound_address = _node_configuration.inbound_endpoint->get_address();
             inbound_port = _node_configuration.inbound_endpoint->port();
+         }
       }
 
       hello_message hello(_user_agent_string,
                           core_protocol_version,
                           inbound_address,
                           inbound_port,
-                          local_endpoint.port(),
+                          outbound_port,
                           _node_public_key,
                           signature,
                           _chain_id,
