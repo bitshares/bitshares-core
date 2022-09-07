@@ -387,14 +387,11 @@ BOOST_AUTO_TEST_CASE( three_node_network )
 
       fc::temp_directory app3_dir( graphene::utilities::temp_directory_path() );
       graphene::app::application app3;
-      app3.register_plugin<account_history::account_history_plugin>();
-      app3.register_plugin< graphene::market_history::market_history_plugin >();
-      app3.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app3.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg3 = std::make_shared<boost::program_options::variables_map>();
       auto& cfg3 = *sharable_cfg3;
       fc::set_option( cfg3, "genesis-json", genesis_file );
       fc::set_option( cfg3, "seed-nodes", app3_seed_nodes_str );
+      fc::set_option( cfg3, "p2p-accept-incoming-connections", false );
       app3.initialize(app3_dir.path(), sharable_cfg3);
 
       BOOST_TEST_MESSAGE( "Starting app3 and waiting for connection" );
