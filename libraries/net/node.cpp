@@ -470,12 +470,12 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-         dlog("Starting an iteration of update_seed_nodes loop.");
+         ilog("Starting an iteration of update_seed_nodes loop.");
          for( const std::string& endpoint_string : _seed_nodes )
          {
             resolve_seed_node_and_add( endpoint_string );
          }
-         dlog("Done an iteration of update_seed_nodes loop.");
+         ilog("Done an iteration of update_seed_nodes loop.");
       }
       catch (const fc::canceled_exception&)
       {
@@ -783,7 +783,7 @@ namespace graphene { namespace net { namespace detail {
          for (const peer_connection_ptr& peer : _active_connections)
          {
           // only advertise to peers who are in sync with us
-          idump((peer->peer_needs_sync_items_from_us));
+          //idump((peer->peer_needs_sync_items_from_us)); // for debug
           if( !peer->peer_needs_sync_items_from_us )
           {
             std::map<uint32_t, std::vector<item_hash_t> > items_to_advertise_by_type;
@@ -791,7 +791,7 @@ namespace graphene { namespace net { namespace detail {
             // or anything it has advertised to us
             // group the items we need to send by type, because we'll need to send one inventory message per type
             size_t total_items_to_send = 0;
-            idump((inventory_to_advertise));
+            //idump((inventory_to_advertise)); // for debug
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
                auto adv_to_peer = peer->inventory_advertised_to_peer.find(item_to_advertise);
@@ -812,10 +812,10 @@ namespace graphene { namespace net { namespace detail {
               }
               else
               {
-                 if (adv_to_peer != peer->inventory_advertised_to_peer.end() )
-                    idump( (*adv_to_peer) );
-                 if (adv_to_us != peer->inventory_peer_advertised_to_us.end() )
-                    idump( (*adv_to_us) );
+                 //if (adv_to_peer != peer->inventory_advertised_to_peer.end() ) // for debug
+                 //   idump( (*adv_to_peer) ); // for debug
+                 //if (adv_to_us != peer->inventory_peer_advertised_to_us.end() ) // for debug
+                 //   idump( (*adv_to_us) ); // for debug
               }
             }
               dlog("advertising ${count} new item(s) of ${types} type(s) to peer ${endpoint}",
@@ -1772,7 +1772,7 @@ namespace graphene { namespace net { namespace detail {
                                                            "I'm already connected to you" );
           originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
           originating_peer->send_message( message(connection_rejected) );
-          dlog("Received a hello_message from peer ${peer} that I'm already connected to (with id ${id}), rejection",
+          ilog("Received a hello_message from peer ${peer} that I'm already connected to (with id ${id}), rejection",
                ("peer", originating_peer->get_remote_endpoint())
                ("id", originating_peer->node_id));
           // If already connected, we disconnect
@@ -1839,14 +1839,14 @@ namespace graphene { namespace net { namespace detail {
                                                             "not accepting any more incoming connections");
             originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
             originating_peer->send_message(message(connection_rejected));
-            dlog("Received a hello_message from peer ${peer}, but I'm not accepting any more connections, rejection",
+            ilog("Received a hello_message from peer ${peer}, but I'm not accepting any more connections, rejection",
                  ("peer", originating_peer->get_remote_endpoint()));
           }
           else
           {
             originating_peer->their_state = peer_connection::their_connection_state::connection_accepted;
             originating_peer->send_message(message(connection_accepted_message()));
-            dlog("Received a hello_message from peer ${peer}, sending reply to accept connection",
+            ilog("Received a hello_message from peer ${peer}, sending reply to accept connection",
                  ("peer", originating_peer->get_remote_endpoint()));
           }
         }
@@ -1866,7 +1866,7 @@ namespace graphene { namespace net { namespace detail {
          return;
       }
 
-      dlog( "Received a connection_accepted in response to my \"hello\" from ${peer}",
+      ilog( "Received a connection_accepted in response to my \"hello\" from ${peer}",
             ("peer", originating_peer->get_remote_endpoint()) );
       originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_accepted;
       originating_peer->our_state = peer_connection::our_connection_state::connection_accepted;
@@ -2122,7 +2122,7 @@ namespace graphene { namespace net { namespace detail {
       bool disconnect_from_inhibited_peer = false;
       // if our client doesn't have any items after the item the peer requested, it will send back
       // a list containing the last item the peer requested
-      idump((reply_message)(fetch_blockchain_item_ids_message_received.blockchain_synopsis));
+      //idump((reply_message)(fetch_blockchain_item_ids_message_received.blockchain_synopsis)); // for debug
       if( reply_message.item_hashes_available.empty() )
         originating_peer->peer_needs_sync_items_from_us = false; /* I have no items in my blockchain */
       else if( !fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty() &&
@@ -2930,7 +2930,7 @@ namespace graphene { namespace net { namespace detail {
       {
         std::vector<message_hash_type> contained_transaction_msg_ids;
         _delegate->handle_block(block_message_to_send, true, contained_transaction_msg_ids);
-        ilog("Successfully pushed sync block ${num} (id:${id})",
+        dlog("Successfully pushed sync block ${num} (id:${id})",
              ("num", block_message_to_send.block.block_num())
              ("id", block_message_to_send.block_id));
         _most_recent_blocks_accepted.push_back(block_message_to_send.block_id);
@@ -3296,7 +3296,7 @@ namespace graphene { namespace net { namespace detail {
           std::vector<message_hash_type> contained_transaction_msg_ids;
           _delegate->handle_block(block_message_to_process, false, contained_transaction_msg_ids);
           message_validated_time = fc::time_point::now();
-          ilog("Successfully pushed block ${num} (id:${id})",
+          dlog("Successfully pushed block ${num} (id:${id})",
                 ("num", block_message_to_process.block.block_num())
                 ("id", block_message_to_process.block_id));
           _most_recent_blocks_accepted.push_back(block_message_to_process.block_id);
