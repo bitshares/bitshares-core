@@ -1802,7 +1802,8 @@ namespace graphene { namespace net { namespace detail {
           }
           else if( 0 == originating_peer->inbound_port )
           {
-             dlog( "peer did not give an inbound port so I'm treating them as if they are firewalled." );
+             ilog( "peer ${peer} did not give an inbound port so I'm treating them as if they are firewalled.",
+                   ("peer", originating_peer->get_remote_endpoint()) );
              originating_peer->is_firewalled = firewalled_state::firewalled;
           }
           else
@@ -1822,6 +1823,9 @@ namespace graphene { namespace net { namespace detail {
              // It might be the same as above, but that's OK.
              endpoints_to_save.insert( fc::ip::endpoint( peers_actual_outbound_endpoint.get_address(),
                                                          originating_peer->inbound_port ) );
+
+             ilog( "Saving potential endpoints to the peer database for peer ${peer}: ${endpoints}",
+                   ("peer", originating_peer->get_remote_endpoint()) ("endpoints", endpoints_to_save) );
 
              for( const auto& ep : endpoints_to_save )
              {
@@ -4590,20 +4594,27 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       ilog( "----------------- PEER STATUS UPDATE --------------------" );
-      ilog( " number of peers: ${active} active, ${handshaking}, ${closing} closing.  attempting to maintain ${desired} - ${maximum} peers",
-           ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )("closing",_closing_connections.size() )
+      ilog( " number of peers: ${active} active, ${handshaking} handshaking, ${closing} closing. "
+            " attempting to maintain ${desired} - ${maximum} peers",
+           ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )
+           ( "closing", _closing_connections.size() )
            ( "desired", _desired_number_of_connections )("maximum", _maximum_number_of_connections ) );
       {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& peer : _active_connections )
          {
-            ilog( "       active peer ${endpoint} peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
+            ilog( "       active peer ${endpoint} [${direction}] peer_is_in_sync_with_us:${in_sync_with_us} "
+                  "we_are_in_sync_with_peer:${in_sync_with_them}",
                   ( "endpoint", peer->get_remote_endpoint() )
-                  ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )("in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
+                  ( "direction", peer->direction )
+                  ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )
+                  ( "in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
             if( peer->we_need_sync_items_from_peer )
-               ilog( "              above peer has ${count} sync items we might need", ("count", peer->ids_of_items_to_get.size() ) );
+               ilog( "              above peer has ${count} sync items we might need",
+                     ("count", peer->ids_of_items_to_get.size() ) );
             if (peer->inhibit_fetching_sync_blocks)
-               ilog( "              we are not fetching sync blocks from the above peer (inhibit_fetching_sync_blocks == true)" );
+               ilog( "              we are not fetching sync blocks from the above peer "
+                     "(inhibit_fetching_sync_blocks == true)" );
 
          }
       }
@@ -4611,8 +4622,10 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr& peer : _handshaking_connections )
          {
-            ilog( "  handshaking peer ${endpoint} in state ours(${our_state}) theirs(${their_state})",
-                  ( "endpoint", peer->get_remote_endpoint() )("our_state", peer->our_state )("their_state", peer->their_state ) );
+            ilog( "  handshaking peer ${endpoint} [${direction}] in state ours(${our_state}) theirs(${their_state})",
+                  ( "endpoint", peer->get_remote_endpoint() )
+                  ( "direction", peer->direction )
+                  ( "our_state", peer->our_state )( "their_state", peer->their_state ) );
          }
       }
       ilog( "--------- MEMORY USAGE ------------" );
