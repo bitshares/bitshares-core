@@ -1813,9 +1813,13 @@ namespace graphene { namespace net { namespace detail {
              fc::flat_set<fc::ip::endpoint> endpoints_to_save;
              endpoints_to_save.insert( *originating_peer->get_endpoint_for_connecting() );
 
-             // Second, we add the address we see, with the inbound port the peer told us.
+             // Second, we add the address and port we see.
              // It might be the same as above, but that's OK.
              fc::ip::endpoint peers_actual_outbound_endpoint = *originating_peer->get_remote_endpoint();
+             endpoints_to_save.insert( peers_actual_outbound_endpoint );
+
+             // Third, we add the address we see, with the inbound port the peer told us.
+             // It might be the same as above, but that's OK.
              endpoints_to_save.insert( fc::ip::endpoint( peers_actual_outbound_endpoint.get_address(),
                                                          originating_peer->inbound_port ) );
 
