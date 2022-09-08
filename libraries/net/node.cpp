@@ -1616,7 +1616,7 @@ namespace graphene { namespace net { namespace detail {
       // Check whether the peer is myself
       if( _node_id == peer_node_id )
       {
-         dlog( "Received a hello_message from peer ${peer} with id ${id} that is myself or claimed to be myself, "
+         ilog( "Received a hello_message from peer ${peer} with id ${id} that is myself or claimed to be myself, "
                "rejection",
                ("peer", originating_peer->get_remote_endpoint())
                ("id", peer_node_id) );
@@ -1729,7 +1729,7 @@ namespace graphene { namespace net { namespace detail {
           if( peer_connection_direction::outbound == originating_peer->direction
               && originating_peer->node_public_key == already_connected_peer->node_public_key )
           {
-              dlog( "Verified that endpoint ${ep} is reachable and belongs to peer ${peer} with id ${id}",
+              ilog( "Verified that endpoint ${ep} is reachable and belongs to peer ${peer} with id ${id}",
                     ("ep", originating_peer->get_remote_endpoint())
                     ("peer", already_connected_peer->get_remote_endpoint())
                     ("id", already_connected_peer->node_id) );
@@ -1753,7 +1753,7 @@ namespace graphene { namespace net { namespace detail {
                    || new_inbound_endpoint->get_address().is_public_address()
                    || !old_inbound_endpoint->get_address().is_public_address() )
               {
-                 dlog( "Saving verification result for peer ${peer} with id ${id}",
+                 ilog( "Saving verification result for peer ${peer} with id ${id}",
                        ("peer", already_connected_peer->get_remote_endpoint())
                        ("id", already_connected_peer->node_id) );
                  already_connected_peer->remote_inbound_endpoint = new_inbound_endpoint;
@@ -4085,6 +4085,7 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
+        ilog("Connecting to peer ${peer}", ("peer", remote_endpoint));
         // blocks until the connection is established and secure connection is negotiated
         auto bind_to_endpoint = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint
                                                                                 : fc::optional<fc::ip::endpoint>();
@@ -4141,7 +4142,7 @@ namespace graphene { namespace net { namespace detail {
         new_peer->our_state = peer_connection::our_connection_state::just_connected;
         new_peer->their_state = peer_connection::their_connection_state::just_connected;
         send_hello_message(new_peer);
-        dlog("Sent \"hello\" to peer ${peer}", ("peer", new_peer->get_remote_endpoint()));
+        ilog("Sent \"hello\" to peer ${peer}", ("peer", new_peer->get_remote_endpoint()));
       }
     }
 
