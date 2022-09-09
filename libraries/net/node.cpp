@@ -812,10 +812,12 @@ namespace graphene { namespace net { namespace detail {
               }
               else
               {
-                 //if (adv_to_peer != peer->inventory_advertised_to_peer.end() ) // for debug
-                 //   idump( (*adv_to_peer) ); // for debug
-                 //if (adv_to_us != peer->inventory_peer_advertised_to_us.end() ) // for debug
-                 //   idump( (*adv_to_us) ); // for debug
+                 if( adv_to_peer != peer->inventory_advertised_to_peer.end() )
+                    dlog( "adv_to_peer != peer->inventory_advertised_to_peer.end() : ${adv_to_peer}",
+                          ("adv_to_peer", *adv_to_peer) );
+                 if( adv_to_us != peer->inventory_peer_advertised_to_us.end() )
+                    dlog( "adv_to_us != peer->inventory_peer_advertised_to_us.end() : ${adv_to_us}",
+                          ("adv_to_us", *adv_to_us) );
               }
             }
               dlog("advertising ${count} new item(s) of ${types} type(s) to peer ${endpoint}",
