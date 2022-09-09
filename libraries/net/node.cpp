@@ -1755,7 +1755,8 @@ namespace graphene { namespace net { namespace detail {
                    || new_inbound_endpoint->get_address().is_public_address()
                    || !old_inbound_endpoint->get_address().is_public_address() )
               {
-                 ilog( "Saving verification result for peer ${peer} with id ${id}",
+                 ilog( "Saving verification result ${ep} for peer ${peer} with id ${id}",
+                       ("ep", new_inbound_endpoint)
                        ("peer", already_connected_peer->get_remote_endpoint())
                        ("id", already_connected_peer->node_id) );
                  already_connected_peer->remote_inbound_endpoint = new_inbound_endpoint;
