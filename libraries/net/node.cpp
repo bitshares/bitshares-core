@@ -4606,10 +4606,12 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& peer : _active_connections )
          {
-            ilog( "       active peer ${endpoint} [${direction}] peer_is_in_sync_with_us:${in_sync_with_us} "
-                  "we_are_in_sync_with_peer:${in_sync_with_them}",
+            ilog( "       active peer ${endpoint} [${direction}] (${inbound_ep} ${verified}) "
+                  "peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
                   ( "endpoint", peer->get_remote_endpoint() )
                   ( "direction", peer->direction )
+                  ( "inbound_ep", peer->get_endpoint_for_connecting() )
+                  ( "verified", peer->inbound_endpoint_verified ? "verified" : "not_verified" )
                   ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )
                   ( "in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
             if( peer->we_need_sync_items_from_peer )
