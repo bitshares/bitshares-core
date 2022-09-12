@@ -122,6 +122,9 @@ class es_objects_plugin_impl
 
       uint32_t limit_documents = _options.bulk_replay;
 
+      uint64_t docs_sent_batch = 0;
+      uint64_t docs_sent_total = 0;
+
       std::unique_ptr<graphene::utilities::es_client> es;
 
       vector<std::string> bulk_lines;
@@ -167,6 +170,8 @@ struct data_loader
             [this, &opt](const graphene::db::object &o) {
          my->prepareTemplate( static_cast<const ObjType&>(o), opt );
       });
+      my->send_bulk_if_ready(true);
+      my->docs_sent_batch = 0;
    }
 };
 
@@ -328,6 +333,20 @@ void es_objects_plugin_impl::send_bulk_if_ready( bool force )
       return;
    if( !force && bulk_lines.size() < limit_documents )
       return;
+   constexpr uint32_t log_count_threshold = 20000; // lines
+   constexpr uint32_t log_time_threshold = 3600; // seconds
+   static uint64_t next_log_count = log_count_threshold;
+   static fc::time_point next_log_time = fc::time_point::now() + fc::seconds(log_time_threshold);
+   docs_sent_batch += bulk_lines.size();
+   docs_sent_total += bulk_lines.size();
+   bool log_by_next = ( docs_sent_total >= next_log_count || fc::time_point::now() >= next_log_time );
+   if( log_by_next || limit_documents == _options.bulk_replay || force )
+   {
+      ilog( "Sending ${n} lines of bulk data to ElasticSearch, this batch ${b}, total ${t}",
+            ("n",bulk_lines.size())("b",docs_sent_batch)("t",docs_sent_total) );
+      next_log_count = docs_sent_total + log_count_threshold;
+      next_log_time = fc::time_point::now() + fc::seconds(log_time_threshold);
+   }
    // send data to elasticsearch when being forced or bulk is too large
    if( !es->send_bulk( bulk_lines ) )
    {
