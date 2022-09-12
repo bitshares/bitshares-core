@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
    }
 }
 BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
-   try{
+ try {
    graphene::app::database_api db_api( db, &( app.get_options() ));
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
@@ -223,21 +223,26 @@ BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
    account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
    transfer(account_id_type(), nathan_id, asset(100));
    transfer(account_id_type(), dan_id, asset(100));
-   asset_id_type bitusd_id = create_bitasset(
-         "USDBIT", nathan_id, 100, disable_force_settle).id;
-   asset_id_type bitdan_id = create_bitasset(
-         "DANBIT", dan_id, 100, disable_force_settle).id;
+   asset_id_type bitusd_id = create_user_issued_asset( "USDBIT", nathan_id(db), charge_market_fee).id;
+   asset_id_type bitdan_id = create_user_issued_asset( "DANBIT", dan_id(db), charge_market_fee).id;
+   issue_uia( nathan_id, asset(100, bitusd_id) );
+   issue_uia( dan_id, asset(100, bitdan_id) );
+   create_sell_order( nathan_id, asset(100, bitusd_id), asset(10000, bitdan_id) );
+   create_sell_order( dan_id, asset(100, bitdan_id), asset(10000, bitusd_id) );
    generate_block();
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_order_book(std::string(static_cast<object_id_type>(bitusd_id)),
          std::string(static_cast<object_id_type>(bitdan_id)),89), fc::exception);
    graphene::app::order_book result =db_api.get_order_book(std::string(
          static_cast<object_id_type>(bitusd_id)), std::string(static_cast<object_id_type>(bitdan_id)),78);
-   BOOST_REQUIRE_EQUAL( result.bids.size(), 0u);
-   }catch (fc::exception& e) {
+   BOOST_REQUIRE_EQUAL( result.bids.size(), 1u );
+   BOOST_CHECK( result.bids.front().owner_name == "nathan" );
+   BOOST_REQUIRE_EQUAL( result.asks.size(), 1u );
+   BOOST_CHECK( result.asks.front().owner_name == "dan" );
+ } catch (fc::exception& e) {
    edump((e.to_detail_string()));
    throw;
-   }
+ }
 }
 
 BOOST_AUTO_TEST_CASE( api_limit_lookup_accounts ) {
