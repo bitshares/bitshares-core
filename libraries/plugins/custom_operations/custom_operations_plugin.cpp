@@ -24,9 +24,7 @@
 
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 
-#include <fc/crypto/hex.hpp>
-#include <iostream>
-#include <graphene/app/database_api.hpp>
+#include <graphene/chain/operation_history_object.hpp>
 
 namespace graphene { namespace custom_operations {
 

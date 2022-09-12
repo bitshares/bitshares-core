@@ -43,21 +43,6 @@
 
 namespace graphene { namespace net
   {
-    struct firewall_check_state_data
-    {
-      node_id_t        expected_node_id;
-      fc::ip::endpoint endpoint_to_test;
-
-      // if we're coordinating a firewall check for another node, these are the helper
-      // nodes we've already had do the test (if this structure is still relevant, that
-      // that means they have all had indeterminate results
-      std::set<node_id_t> nodes_already_tested;
-
-      // If we're a just a helper node, this is the node we report back to
-      // when we have a result
-      node_id_t        requesting_peer;
-    };
-
     class peer_connection;
     class peer_connection_delegate
     {
@@ -171,7 +156,6 @@ namespace graphene { namespace net
       fc::time_point connection_closed_time;
       fc::time_point connection_terminated_time;
       peer_connection_direction direction = peer_connection_direction::unknown;
-      //connection_state state;
       firewalled_state is_firewalled = firewalled_state::unknown;
       fc::microseconds clock_offset;
       fc::microseconds round_trip_delay;
@@ -205,15 +189,21 @@ namespace graphene { namespace net
       fc::optional<std::string> platform;
       fc::optional<uint32_t> bitness;
 
-      // for inbound connections, these fields record what the peer sent us in
-      // its hello message.  For outbound, they record what we sent the peer
-      // in our hello message
+      // Initially, these fields record info about our local socket,
+      // they are useless (except the remote_inbound_endpoint field for outbound connections).
+      // After we receive a hello message, they are replaced with the info in the hello message.
       fc::ip::address inbound_address;
       uint16_t inbound_port = 0;
       uint16_t outbound_port = 0;
+      /// The inbound endpoint of the remote peer
+      fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
+      /// Whether the inbound endpoint of the remote peer is verified
+      bool inbound_endpoint_verified = false;
+      /// Some nodes may be listening on multiple endpoints
+      fc::flat_set<fc::ip::endpoint> additional_inbound_endpoints;
       /// @}
 
-      typedef std::unordered_map<item_id, fc::time_point> item_to_time_map_type;
+      using item_to_time_map_type = std::unordered_map<item_id, fc::time_point>;
 
       /// blockchain synchronization state data
       /// @{
@@ -261,14 +251,18 @@ namespace graphene { namespace net
 
       fc::future<void> accept_or_connect_task_done;
 
-      firewall_check_state_data *firewall_check_state = nullptr;
+      /// Whether we're waiting for an address message
+      bool expecting_address_message = false;
+
     private:
 #ifndef NDEBUG
       fc::thread* _thread = nullptr;
       unsigned _send_message_queue_tasks_running = 0; // temporary debugging
 #endif
       bool _currently_handling_message = false; // true while we're in the middle of handling a message from the remote system
+    protected:
       peer_connection(peer_connection_delegate* delegate);
+    private:
       void destroy();
     public:
       static peer_connection_ptr make_shared(peer_connection_delegate* delegate); // use this instead of the constructor
@@ -276,13 +270,14 @@ namespace graphene { namespace net
 
       fc::tcp_socket& get_socket();
       void accept_connection();
-      void connect_to(const fc::ip::endpoint& remote_endpoint, fc::optional<fc::ip::endpoint> local_endpoint = fc::optional<fc::ip::endpoint>());
+      void connect_to(const fc::ip::endpoint& remote_endpoint,
+                      const fc::optional<fc::ip::endpoint>& local_endpoint = fc::optional<fc::ip::endpoint>());
 
       void on_message(message_oriented_connection* originating_connection, const message& received_message) override;
       void on_connection_closed(message_oriented_connection* originating_connection) override;
 
       void send_queueable_message(std::unique_ptr<queued_message>&& message_to_send);
-      void send_message(const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1);
+      virtual void send_message( const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1 );
       void send_item(const item_id& item_to_send);
       void close_connection();
       void destroy_connection();
@@ -306,7 +301,6 @@ namespace graphene { namespace net
       void clear_old_inventory();
       bool is_inventory_advertised_to_us_list_full_for_transactions() const;
       bool is_inventory_advertised_to_us_list_full() const;
-      bool performing_firewall_check() const;
       fc::optional<fc::ip::endpoint> get_endpoint_for_connecting() const;
     private:
       void send_queued_messages_task();

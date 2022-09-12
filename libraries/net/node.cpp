@@ -47,14 +47,6 @@
 #include <boost/range/algorithm/find.hpp>
 #include <boost/range/numeric.hpp>
 
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/rolling_mean.hpp>
-#include <boost/accumulators/statistics/min.hpp>
-#include <boost/accumulators/statistics/max.hpp>
-#include <boost/accumulators/statistics/sum.hpp>
-#include <boost/accumulators/statistics/count.hpp>
-
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
@@ -69,7 +61,6 @@
 #include <fc/io/enum_type.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/crypto/rand.hpp>
-#include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>
 #include <fc/network/resolve.hpp>
 
@@ -161,12 +152,160 @@ namespace graphene { namespace net { namespace detail {
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
 
-    node_impl::node_impl(const std::string& user_agent) :
+   /// Greatly delays the next connection to the endpoint
+   static void greatly_delay_next_conn_to( node_impl* impl, const fc::ip::endpoint& ep )
+   {
+      dlog( "Greatly delaying the next connection to endpoint ${ep}", ("ep", ep) );
+      fc::optional<potential_peer_record> updated_peer_record
+            = impl->_potential_peer_db.lookup_entry_for_endpoint( ep );
+      if( updated_peer_record )
+      {
+         updated_peer_record->last_connection_disposition = last_connection_rejected;
+         updated_peer_record->last_connection_attempt_time = fc::time_point::now();
+         constexpr uint32_t failed_attempts_to_add = 120; // * 30 seconds = 1 hour
+         updated_peer_record->number_of_failed_connection_attempts += failed_attempts_to_add;
+         impl->_potential_peer_db.update_entry( *updated_peer_record );
+      }
+   }
+   /// Saves a successfully connected endpoint to the peer database
+   static void save_successful_address( node_impl* impl, const fc::ip::endpoint& ep )
+   {
+      dlog( "Saving successfully connected endpoint ${ep} to peer database", ("ep", ep) );
+      auto updated_peer_record = impl->_potential_peer_db.lookup_or_create_entry_for_ep( ep );
+      updated_peer_record.last_connection_disposition = last_connection_succeeded;
+      updated_peer_record.last_connection_attempt_time = fc::time_point::now();
+      // halve number_of_failed_connection_attempts
+      constexpr uint16_t two = 2;
+      updated_peer_record.number_of_failed_connection_attempts /= two;
+      updated_peer_record.last_seen_time = fc::time_point::now();
+      impl->_potential_peer_db.update_entry(updated_peer_record);
+   }
+   static void update_address_seen_time( node_impl* impl, const peer_connection* active_peer )
+   {
+      fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
+      if( inbound_endpoint.valid() && inbound_endpoint->port() != 0 )
+      {
+         fc::optional<potential_peer_record> updated_peer_record
+               = impl->_potential_peer_db.lookup_entry_for_endpoint( *inbound_endpoint );
+         if( updated_peer_record )
+         {
+            updated_peer_record->last_seen_time = fc::time_point::now();
+            impl->_potential_peer_db.update_entry( *updated_peer_record );
+         }
+      }
+   }
+   static void update_address_seen_time( node_impl* impl, const peer_connection_ptr& active_peer )
+   {
+      update_address_seen_time( impl, active_peer.get() );
+   }
+
+   /// Base class for list address builder and exclude_list address builder
+   class generic_list_address_builder : public node_impl::address_builder
+   {
+   public:
+      fc::flat_set<fc::ip::endpoint> list;
+
+      explicit generic_list_address_builder(const std::vector<std::string>& address_list)
+      {
+         FC_ASSERT( !address_list.empty(), "The peer node list must not be empty" );
+
+         std::for_each( address_list.begin(), address_list.end(), [&list = list]( const std::string& str )
+            {
+               // ignore fc exceptions (like poorly formatted endpoints)
+               try
+               {
+                  list.insert( fc::ip::endpoint::from_string(str) );
+               }
+               catch(const fc::exception& )
+               {
+                  wlog( "Address ${addr} invalid.", ("addr", str) );
+               }
+            } );
+      }
+   };
+
+   /******
+    * Use information passed from command line or config file to advertise nodes
+    */
+   class list_address_builder : public generic_list_address_builder
+   {
+   public:
+      using generic_list_address_builder::generic_list_address_builder;
+
+      bool should_advertise( const fc::ip::endpoint& in ) const override
+      {
+         return !( list.find(in) == list.end() );
+      }
+   };
+
+   /****
+    * Advertise all nodes except a predefined list
+    */
+   class exclude_address_builder : public generic_list_address_builder
+   {
+   public:
+      using generic_list_address_builder::generic_list_address_builder;
+
+      bool should_advertise( const fc::ip::endpoint& in ) const override
+      {
+         return ( list.find( in ) == list.end() );
+      }
+   };
+
+   /***
+    * Return all peers when node asks
+    */
+   class all_address_builder : public node_impl::address_builder
+   {
+      bool should_advertise( const fc::ip::endpoint& in ) const override
+      {
+         return true;
+      }
+   };
+
+   std::shared_ptr<node_impl::address_builder> node_impl::address_builder::create_default_address_builder()
+   {
+      return std::make_shared<all_address_builder>();
+   }
+
+   void node_impl::address_builder::build(node_impl* impl, address_message& reply) const
+   {
+      reply.addresses.clear();
+      reply.addresses.reserve( impl->_active_connections.size() );
+      fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
+      fc::time_point_sec now = fc::time_point::now();
+      // only pass those that are allowed to advertise AND we are connected to
+      for( const peer_connection_ptr& active_peer : impl->_active_connections )
+      {
+         // Note:
+         // * We want to advertise the peer's inbound endpoint, but not necessarily the remote endpoint.
+         // * If the peer's inbound port is 0, we still advertise it so that observers know about it.
+         //   The peer is marked as "firewalled", so peers running older versions should be able to handle it too.
+         //
+         // If it is an outbound connection, we know that the remote endpoint works (at least for us),
+         //   and we have assigned it to the inbound endpoint, so just use either of them.
+         // If it is an inbound connection, we just advertise what we have.
+         fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
+         if( inbound_endpoint.valid() && should_advertise( *inbound_endpoint ) )
+         {
+            update_address_seen_time( impl, active_peer );
+            reply.addresses.emplace_back( *inbound_endpoint,
+                                          now,
+                                          active_peer->round_trip_delay,
+                                          active_peer->node_id,
+                                          active_peer->direction,
+                                          active_peer->is_firewalled );
+         }
+      }
+   }
+
+   node_impl::node_impl(const std::string& user_agent) :
       _user_agent_string(user_agent)
-    {
+   {
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
+      // Note: this means that the node gets a new node_id every time it restarts
       fc::rand_bytes((char*) _node_id.data(), (int)_node_id.size());
-    }
+   }
 
     node_impl::~node_impl()
     {
@@ -178,17 +317,7 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& active_peer : _active_connections)
          {
-            fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
-            if (inbound_endpoint)
-            {
-               fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db
-                     .lookup_entry_for_endpoint(*inbound_endpoint);
-               if (updated_peer_record)
-               {
-                  updated_peer_record->last_seen_time = fc::time_point::now();
-                  _potential_peer_db.update_entry(*updated_peer_record);
-               }
-            }
+            update_address_seen_time( this, active_peer );
          }
       }
 
@@ -204,27 +333,28 @@ namespace graphene { namespace net { namespace detail {
       ilog( "done" );
     }
 
-    void node_impl::save_node_configuration()
-    {
+   void node_impl::save_node_configuration()
+   {
       VERIFY_CORRECT_THREAD();
-      if( fc::exists(_node_configuration_directory ) )
+
+      fc::path configuration_file_name( _node_configuration_directory / NODE_CONFIGURATION_FILENAME );
+      try
       {
-        fc::path configuration_file_name( _node_configuration_directory / NODE_CONFIGURATION_FILENAME );
-        try
-        {
-          fc::json::save_to_file( _node_configuration, configuration_file_name );
-        }
-        catch (const fc::canceled_exception&)
-        {
-          throw;
-        }
-        catch ( const fc::exception& except )
-        {
-          elog( "error writing node configuration to file ${filename}: ${error}",
-               ( "filename", configuration_file_name )("error", except.to_detail_string() ) );
-        }
+         if( !fc::exists(_node_configuration_directory ) )
+            fc::create_directories( _node_configuration_directory );
+         fc::json::save_to_file( _node_configuration, configuration_file_name );
+         dlog( "Saved node configuration to file ${filename}", ( "filename", configuration_file_name ) );
       }
-    }
+      catch (const fc::canceled_exception&)
+      {
+         throw;
+      }
+      catch ( const fc::exception& except )
+      {
+         wlog( "error writing node configuration to file ${filename}: ${error}",
+               ( "filename", configuration_file_name )("error", except.to_detail_string() ) );
+      }
+   }
 
     void node_impl::p2p_network_connect_loop()
     {
@@ -250,9 +380,8 @@ namespace graphene { namespace net { namespace detail {
             }
             for (const potential_peer_record& add_once_peer : add_once_node_list)
             {
-              // see if we have an existing connection to that peer.  If we do, disconnect them and
-              // then try to connect the next time through the loop
-              peer_connection_ptr existing_connection_ptr = get_connection_to_endpoint( add_once_peer.endpoint );
+              // If we have an existing connection to that peer, skip it.
+              peer_connection_ptr existing_connection_ptr = get_connection_for_endpoint( add_once_peer.endpoint );
               if(!existing_connection_ptr)
                 connect_to_endpoint(add_once_peer.endpoint);
             }
@@ -271,11 +400,13 @@ namespace graphene { namespace net { namespace detail {
               fc::microseconds delay_until_retry = fc::seconds( (iter->number_of_failed_connection_attempts + 1)
                                                                 * _peer_connection_retry_timeout );
 
-              if (!is_connection_to_endpoint_in_progress(iter->endpoint) &&
-                  ((iter->last_connection_disposition != last_connection_failed &&
-                    iter->last_connection_disposition != last_connection_rejected &&
-                    iter->last_connection_disposition != last_connection_handshaking_failed) ||
-                   (fc::time_point::now() - iter->last_connection_attempt_time) > delay_until_retry))
+              bool last_connection_not_ok = ( iter->last_connection_disposition == last_connection_failed ||
+                         iter->last_connection_disposition == last_connection_rejected ||
+                         iter->last_connection_disposition == last_connection_handshaking_failed );
+
+              if( !is_connected_to_endpoint( iter->endpoint )
+                  && ( !last_connection_not_ok
+                       || ( fc::time_point::now() - iter->last_connection_attempt_time ) > delay_until_retry ) )
               {
                 connect_to_endpoint(iter->endpoint);
                 initiated_connection_this_pass = true;
@@ -339,12 +470,12 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-         dlog("Starting an iteration of update_seed_nodes loop.");
+         ilog("Starting an iteration of update_seed_nodes loop.");
          for( const std::string& endpoint_string : _seed_nodes )
          {
             resolve_seed_node_and_add( endpoint_string );
          }
-         dlog("Done an iteration of update_seed_nodes loop.");
+         ilog("Done an iteration of update_seed_nodes loop.");
       }
       catch (const fc::canceled_exception&)
       {
@@ -366,8 +497,10 @@ namespace graphene { namespace net { namespace detail {
       if( _update_seed_nodes_loop_done.valid() && _update_seed_nodes_loop_done.canceled() )
          return;
 
+      constexpr uint32_t five = 5;
+      auto interval = _active_connections.empty() ? fc::minutes(five) : fc::hours(1);
       _update_seed_nodes_loop_done = fc::schedule( [this]() { update_seed_nodes_task(); },
-                                                   fc::time_point::now() + fc::hours(3),
+                                                   fc::time_point::now() + interval,
                                                    "update_seed_nodes_loop" );
    }
 
@@ -576,7 +709,7 @@ namespace graphene { namespace net { namespace detail {
                   });
                   break;
                 }
-              }  
+              }
             }
             if (!item_fetched)
               ++item_iter;
@@ -587,7 +720,7 @@ namespace graphene { namespace net { namespace detail {
         for (const peer_and_items_to_fetch& peer_and_items : items_by_peer)
         {
           // the item lists are heterogenous and
-          // the fetch_items_message can only deal with one item type at a time.  
+          // the fetch_items_message can only deal with one item type at a time.
           std::map<uint32_t, std::vector<item_hash_t> > items_to_fetch_by_type;
           for (const item_id& item : peer_and_items.item_ids)
             items_to_fetch_by_type[item.item_type].push_back(item.item_hash);
@@ -650,7 +783,7 @@ namespace graphene { namespace net { namespace detail {
          for (const peer_connection_ptr& peer : _active_connections)
          {
           // only advertise to peers who are in sync with us
-          idump((peer->peer_needs_sync_items_from_us));
+          //idump((peer->peer_needs_sync_items_from_us)); // for debug
           if( !peer->peer_needs_sync_items_from_us )
           {
             std::map<uint32_t, std::vector<item_hash_t> > items_to_advertise_by_type;
@@ -658,7 +791,7 @@ namespace graphene { namespace net { namespace detail {
             // or anything it has advertised to us
             // group the items we need to send by type, because we'll need to send one inventory message per type
             size_t total_items_to_send = 0;
-            idump((inventory_to_advertise));
+            //idump((inventory_to_advertise)); // for debug
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
                auto adv_to_peer = peer->inventory_advertised_to_peer.find(item_to_advertise);
@@ -679,10 +812,12 @@ namespace graphene { namespace net { namespace detail {
               }
               else
               {
-                 if (adv_to_peer != peer->inventory_advertised_to_peer.end() )
-                    idump( (*adv_to_peer) );
-                 if (adv_to_us != peer->inventory_peer_advertised_to_us.end() )
-                    idump( (*adv_to_us) );
+                 if( adv_to_peer != peer->inventory_advertised_to_peer.end() )
+                    dlog( "adv_to_peer != peer->inventory_advertised_to_peer.end() : ${adv_to_peer}",
+                          ("adv_to_peer", *adv_to_peer) );
+                 if( adv_to_us != peer->inventory_peer_advertised_to_us.end() )
+                    dlog( "adv_to_us != peer->inventory_peer_advertised_to_us.end() : ${adv_to_us}",
+                          ("adv_to_us", *adv_to_us) );
               }
             }
               dlog("advertising ${count} new item(s) of ${types} type(s) to peer ${endpoint}",
@@ -742,7 +877,7 @@ namespace graphene { namespace net { namespace detail {
       // This might not be so bad because it could make us initiate more connections and
       // reconnect with the rest of the network, or it might just futher isolate us.
       // As usual, the first step is to walk through all our peers and figure out which
-      // peers need action (disconneting, sending keepalives, etc), then we walk through 
+      // peers need action (disconneting, sending keepalives, etc), then we walk through
       // those lists yielding at our leisure later.
 
       uint32_t handshaking_timeout = _peer_inactivity_timeout;
@@ -808,7 +943,7 @@ namespace graphene { namespace net { namespace detail {
                   active_peer->last_sync_item_received_time < active_ignored_request_threshold)
                {
                   wlog("Disconnecting peer ${peer} because they haven't made any progress on my remaining ${count} sync item requests",
-                        ("peer", active_peer->get_remote_endpoint())("count", 
+                        ("peer", active_peer->get_remote_endpoint())("count",
                         active_peer->sync_items_requested_from_peer.size()));
                   disconnect_due_to_request_timeout = true;
                }
@@ -843,7 +978,7 @@ namespace graphene { namespace net { namespace detail {
                   wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
                         ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeout ) );
                   peers_to_send_keep_alive.push_back(active_peer);
-               }              
+               }
                else if (active_peer->we_need_sync_items_from_peer && 
                      !active_peer->is_currently_handling_message() &&
                      !active_peer->item_ids_requested_from_peer &&
@@ -907,8 +1042,8 @@ namespace graphene { namespace net { namespace detail {
       } // scoped_lock
       peers_to_terminate.clear();
 
-      // if we're going to abruptly disconnect anyone, do it here 
-      // (it doesn't yield).  I don't think there would be any harm if this were 
+      // if we're going to abruptly disconnect anyone, do it here
+      // (it doesn't yield).  I don't think there would be any harm if this were
       // moved to the yielding section
       for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
       {
@@ -924,11 +1059,11 @@ namespace graphene { namespace net { namespace detail {
          {
             fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
-                  ( "last_message_received_seconds_ago", (peer->get_last_message_received_time() 
+                  ( "last_message_received_seconds_ago", (peer->get_last_message_received_time()
                   - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
-                  ( "last_message_sent_seconds_ago", (peer->get_last_message_sent_time() 
+                  ( "last_message_sent_seconds_ago", (peer->get_last_message_sent_time()
                   - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
-                  ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end() 
+                  ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end()
                   ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
             disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
          }
@@ -960,7 +1095,6 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::fetch_updated_peer_lists_loop()
     {
       VERIFY_CORRECT_THREAD();
-      
       {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          // JMJ 2018-10-22 Unsure why we're making a copy here, but this is probably unnecessary
@@ -969,6 +1103,7 @@ namespace graphene { namespace net { namespace detail {
          {
             try
             {
+               active_peer->expecting_address_message = true;
                active_peer->send_message(address_request_message());
             }
             catch ( const fc::canceled_exception& )
@@ -983,7 +1118,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
 
-      // this has nothing to do with updating the peer list, but we need to prune this list 
+      // this has nothing to do with updating the peer list, but we need to prune this list
       // at regular intervals, this is a fine place to do it.
       fc::time_point_sec oldest_failed_ids_to_keep(fc::time_point::now() - fc::minutes(15));
       auto oldest_failed_ids_to_keep_iter = _recently_failed_items.get<peer_connection::timestamp_index>()
@@ -1151,8 +1286,9 @@ namespace graphene { namespace net { namespace detail {
       return (uint32_t)(_handshaking_connections.size() + _active_connections.size());
     }
 
-    peer_connection_ptr node_impl::get_peer_by_node_id(const node_id_t& node_id)
+    peer_connection_ptr node_impl::get_peer_by_node_id(const node_id_t& node_id) const
     {
+      VERIFY_CORRECT_THREAD();
       {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& active_peer : _active_connections)
@@ -1168,37 +1304,6 @@ namespace graphene { namespace net { namespace detail {
       return peer_connection_ptr();
     }
 
-    bool node_impl::is_already_connected_to_id(const node_id_t& node_id)
-    {
-      VERIFY_CORRECT_THREAD();
-      if (node_id == _node_id)
-      {
-        dlog("is_already_connected_to_id returning true because the peer is us");
-        return true;
-      }
-      {
-         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
-         for (const peer_connection_ptr& active_peer : _active_connections)
-         {
-            if (node_id == active_peer->node_id)
-            {
-               dlog("is_already_connected_to_id returning true because the peer is already in our active list");
-               return true;
-            }
-         }
-      }
-      {
-         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
-         for (const peer_connection_ptr& handshaking_peer : _handshaking_connections)
-            if (node_id == handshaking_peer->node_id)
-            {
-               dlog("is_already_connected_to_id returning true because the peer is already in our handshaking list");
-               return true;
-            }
-      }
-      return false;
-    }
-
     // merge addresses received from a peer into our database
     bool node_impl::merge_address_info_with_potential_peer_database(const std::vector<address_info> addresses)
     {
@@ -1206,15 +1311,27 @@ namespace graphene { namespace net { namespace detail {
       bool new_information_received = false;
       for (const address_info& address : addresses)
       {
-        if (address.firewalled == graphene::net::firewalled_state::not_firewalled)
-        {
-          potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(address.remote_endpoint);
-          if (address.last_seen_time > updated_peer_record.last_seen_time)
+         // If the peer's inbound port is 0, we don't add it to our peer database.
+         // Although it should have been handled by the caller, be defensive here.
+         if( 0 == address.remote_endpoint.port() )
+            continue;
+         // Note: if found, a copy is returned
+         auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(address.remote_endpoint);
+         // Note:
+         // We don't save node_id in the peer database so far
+         // 1. node_id of that peer may have changed, but we don't check or update
+         // 2. we don't check by node_id either, in case when a peer's IP address has changed, we don't handle it
+         // 3. if the peer's inbound port is not 0, no matter if the address is reported as firewalled or not,
+         //    we add it to our database and check by ourselves later
+         if (address.last_seen_time > updated_peer_record.last_seen_time) // usually true, except when received from
+                                                                          // multiple peers in the same second
+         {
             new_information_received = true;
-          updated_peer_record.last_seen_time = std::max(address.last_seen_time, updated_peer_record.last_seen_time);
-          _potential_peer_db.update_entry(updated_peer_record);
-        }
+            updated_peer_record.last_seen_time = address.last_seen_time;
+            _potential_peer_db.update_entry(updated_peer_record);
+         }
       }
+      // TODO maybe delete too old info by the way
       return new_information_received;
     }
 
@@ -1257,6 +1374,14 @@ namespace graphene { namespace net { namespace detail {
            ("type", graphene::net::core_message_type_enum(received_message.msg_type.value()))("hash", message_hash)
            ("size", received_message.size)
            ("endpoint", originating_peer->get_remote_endpoint()));
+      // Gatekeeping code
+      if( originating_peer->we_have_requested_close
+          && received_message.msg_type.value() != core_message_type_enum::closing_connection_message_type )
+      {
+         dlog( "Unexpected message from peer ${peer} while we have requested to close connection",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
       switch ( received_message.msg_type.value() )
       {
       case core_message_type_enum::hello_message_type:
@@ -1304,10 +1429,8 @@ namespace graphene { namespace net { namespace detail {
         on_current_time_reply_message(originating_peer, received_message.as<current_time_reply_message>());
         break;
       case core_message_type_enum::check_firewall_message_type:
-        on_check_firewall_message(originating_peer, received_message.as<check_firewall_message>());
         break;
       case core_message_type_enum::check_firewall_reply_message_type:
-        on_check_firewall_reply_message(originating_peer, received_message.as<check_firewall_reply_message>());
         break;
       case core_message_type_enum::get_current_connections_request_message_type:
         break;
@@ -1384,9 +1507,93 @@ namespace graphene { namespace net { namespace detail {
         originating_peer->last_known_fork_block_number = user_data["last_known_fork_block_number"].as<uint32_t>(1);
     }
 
-    void node_impl::on_hello_message( peer_connection* originating_peer, const hello_message& hello_message_received )
-    {
+   void node_impl::on_hello_message( peer_connection* originating_peer, const hello_message& hello_message_received )
+   {
       VERIFY_CORRECT_THREAD();
+      // Do gatekeeping first
+      if( originating_peer->their_state != peer_connection::their_connection_state::just_connected )
+      {
+         // we can wind up here if we've connected to ourselves, and the source and
+         // destination endpoints are the same, causing messages we send out
+         // to arrive back on the initiating socket instead of the receiving
+         // socket.  If we did a complete job of enumerating local addresses,
+         // we could avoid directly connecting to ourselves, or at least detect
+         // immediately when we did it and disconnect.
+
+         // The only way I know of that we'd get an unexpected hello that we
+         //  can't really guard against is if we do a simulatenous open, we
+         // probably need to think through that case.  We're not attempting that
+         // yet, though, so it's ok to just disconnect here.
+         wlog( "Unexpected hello_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected hello_message" );
+         return;
+      }
+
+      // Check chain_id
+      if( hello_message_received.chain_id != _chain_id )
+      {
+         wlog( "Received hello message from peer ${peer} on a different chain: ${message}",
+               ("peer", originating_peer->get_remote_endpoint())
+               ("message", hello_message_received) );
+         // If it is an outbound connection, make sure we won't reconnect to the peer soon
+         if( peer_connection_direction::outbound == originating_peer->direction )
+         {
+            // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+            //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+            //       It seems the best approach is to reduce its weight significantly.
+            greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
+         }
+         // Now reject
+         std::ostringstream rejection_message;
+         rejection_message << "You're on a different chain than I am.  I'm on " << _chain_id.str() <<
+                              " and you're on " << hello_message_received.chain_id.str();
+         connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
+                                                          *originating_peer->get_remote_endpoint(),
+                                                          rejection_reason_code::different_chain,
+                                                          rejection_message.str() );
+         originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
+         originating_peer->send_message( message(connection_rejected) );
+         // for this type of message, we're immediately disconnecting this peer, instead of trying to
+         // allowing her to ask us for peers (any of our peers will be on the same chain as us, so there's no
+         // benefit of sharing them)
+         disconnect_from_peer( originating_peer, "You are on a different chain from me" );
+         return;
+      }
+
+      // Validate the peer's public key.
+      // Note: the node_id in user_data is not verified.
+      fc::optional<fc::ecc::public_key> expected_node_public_key;
+      try
+      {
+         fc::sha256::encoder shared_secret_encoder;
+         fc::sha512 shared_secret = originating_peer->get_shared_secret();
+         shared_secret_encoder.write(shared_secret.data(), sizeof(shared_secret));
+         expected_node_public_key = fc::ecc::public_key( hello_message_received.signed_shared_secret,
+                                                         shared_secret_encoder.result(), false );
+      }
+      catch( const fc::exception& e )
+      {
+         wlog( "Error when validating signature in hello message from peer ${peer}: ${e}",
+               ("peer", originating_peer->get_remote_endpoint())("e", e.to_detail_string()) );
+      }
+
+      if( !expected_node_public_key
+          || hello_message_received.node_public_key != expected_node_public_key->serialize() )
+      {
+         wlog( "Invalid signature in hello message from peer ${peer}",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
+                                                          *originating_peer->get_remote_endpoint(),
+                                                          rejection_reason_code::invalid_hello_message,
+                                                          "Invalid signature in hello message" );
+         originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
+         originating_peer->send_message( message(connection_rejected) );
+         // for this type of message, we're immediately disconnecting this peer
+         disconnect_from_peer( originating_peer, connection_rejected.reason_string );
+         return;
+      }
+
       // this already_connected check must come before we fill in peer data below
       node_id_t peer_node_id = hello_message_received.node_public_key;
       try
@@ -1396,15 +1603,47 @@ namespace graphene { namespace net { namespace detail {
       catch (const fc::exception&)
       {
         // either it's not there or it's not a valid session id.  either way, ignore.
+        dlog( "Peer ${endpoint} sent us a hello message without a valid node_id in user_data",
+              ("endpoint", originating_peer->get_remote_endpoint() ) );
       }
-      bool already_connected_to_this_peer = is_already_connected_to_id(peer_node_id);
-
-      // validate the node id
-      fc::sha256::encoder shared_secret_encoder;
-      fc::sha512 shared_secret = originating_peer->get_shared_secret();
-      shared_secret_encoder.write(shared_secret.data(), sizeof(shared_secret));
-      fc::ecc::public_key expected_node_public_key(hello_message_received.signed_shared_secret,
-                                                   shared_secret_encoder.result(), false);
+      // The peer's node_id should not be null
+      static const node_id_t null_node_id;
+      if( null_node_id == peer_node_id )
+      {
+         wlog( "The node_id in the hello_message from peer ${peer} is null, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Your node_id in the hello_message is null" );
+         return;
+      }
+      // Check whether the peer is myself
+      if( _node_id == peer_node_id )
+      {
+         ilog( "Received a hello_message from peer ${peer} with id ${id} that is myself or claimed to be myself, "
+               "rejection",
+               ("peer", originating_peer->get_remote_endpoint())
+               ("id", peer_node_id) );
+         // If it is an outbound connection, make sure we won't reconnect to the peer soon
+         if( peer_connection_direction::outbound == originating_peer->direction )
+         {
+            // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+            //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+            //       It seems the best approach is to reduce its weight significantly.
+            greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
+         }
+         // Now reject
+         // Note: this can happen in rare cases if the peer is not actually myself but another node.
+         //       Anyway, we see it as ourselves, reject it and disconnect it.
+         connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
+                                                          *originating_peer->get_remote_endpoint(),
+                                                          rejection_reason_code::connected_to_self,
+                                                          "I'm connecting to myself" );
+         originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
+         originating_peer->send_message( message(connection_rejected) );
+         disconnect_from_peer( originating_peer, connection_rejected.reason_string );
+         return;
+      }
+      // Get a pointer to an exising connection to the peer (if one exists) for later use
+      peer_connection_ptr already_connected_peer = get_peer_by_node_id( peer_node_id );
 
       // store off the data provided in the hello message
       originating_peer->user_agent = hello_message_received.user_agent;
@@ -1418,6 +1657,31 @@ namespace graphene { namespace net { namespace detail {
 
       parse_hello_user_data_for_peer(originating_peer, hello_message_received.user_data);
 
+      // For an outbound connection, we know the remote_inbound_endpoint already, so keep it unchanged.
+      // For an inbound connection, we initialize it here.
+      if( !originating_peer->remote_inbound_endpoint )
+      {
+         // Note: the data is not yet verified, so we need to use it with caution.
+         //
+         // We will advertise "remote_inbound_endpoint" when other peers request addresses.
+         //
+         // On the one hand, we want to advertise as accurate data as possible to other peers (we will try to verify),
+         // on the other hand, we still want to advertise it to other peers if we didn't have a chance to verify it.
+         //
+         // When the peer is not listening (i.e. it tells us its inbound port is 0), the inbound address it tells us
+         // may be invalid (e.g. 0.0.0.0), and we are not going to verify it anyway.
+         // For observation purposes, we still advertise it to other peers, and we need to tell them an address,
+         // so we use the address we see.
+         //
+         // In addition, by now, our list or exclude list for peer advertisement only contains IP endpoints but not
+         // nodes' public keys (we can't use node_id because it changes every time the node restarts). Using a valid
+         // address is better for the purpose.
+         originating_peer->remote_inbound_endpoint
+               = fc::ip::endpoint( originating_peer->inbound_port != 0 ? originating_peer->inbound_address
+                                         : originating_peer->get_remote_endpoint()->get_address(),
+                                   originating_peer->inbound_port );
+      }
+
       // if they didn't provide a last known fork, try to guess it
       if (originating_peer->last_known_fork_block_number == 0 &&
           originating_peer->graphene_git_revision_unix_timestamp)
@@ -1427,44 +1691,8 @@ namespace graphene { namespace net { namespace detail {
       }
 
       // now decide what to do with it
-      if (originating_peer->their_state == peer_connection::their_connection_state::just_connected)
+      if (originating_peer->last_known_fork_block_number != 0)
       {
-        if (hello_message_received.node_public_key != expected_node_public_key.serialize())
-        {
-          wlog("Invalid signature in hello message from peer ${peer}", ("peer", originating_peer->get_remote_endpoint()));
-          std::string rejection_message("Invalid signature in hello message");
-          connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                          originating_peer->get_socket().remote_endpoint(),
-                                                          rejection_reason_code::invalid_hello_message,
-                                                          rejection_message);
-
-          originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
-          originating_peer->send_message( message(connection_rejected ) );
-          // for this type of message, we're immediately disconnecting this peer
-          disconnect_from_peer( originating_peer, "Invalid signature in hello message" );
-          return;
-        }
-        if (hello_message_received.chain_id != _chain_id)
-        {
-          wlog("Received hello message from peer on a different chain: ${message}", ("message", hello_message_received));
-          std::ostringstream rejection_message;
-          rejection_message << "You're on a different chain than I am.  I'm on " << _chain_id.str() <<
-                              " and you're on " << hello_message_received.chain_id.str();
-          connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                          originating_peer->get_socket().remote_endpoint(),
-                                                          rejection_reason_code::different_chain,
-                                                          rejection_message.str());
-
-          originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
-          originating_peer->send_message(message(connection_rejected));
-          // for this type of message, we're immediately disconnecting this peer, instead of trying to
-          // allowing her to ask us for peers (any of our peers will be on the same chain as us, so there's no
-          // benefit of sharing them)
-          disconnect_from_peer(originating_peer, "You are on a different chain from me");
-          return;
-        }
-        if (originating_peer->last_known_fork_block_number != 0)
-        {
           uint32_t next_fork_block_number = get_next_known_hard_fork_block_number(originating_peer->last_known_fork_block_number);
           if (next_fork_block_number != 0)
           {
@@ -1481,7 +1709,7 @@ namespace graphene { namespace net { namespace detail {
               std::ostringstream rejection_message;
               rejection_message << "Your client is outdated -- you can only understand blocks up to #" << next_fork_block_number << ", but I'm already on block #" << head_block_num;
               connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                              originating_peer->get_socket().remote_endpoint(),
+                                                              *originating_peer->get_remote_endpoint(),
                                                               rejection_reason_code::unspecified,
                                                               rejection_message.str() );
 
@@ -1494,33 +1722,71 @@ namespace graphene { namespace net { namespace detail {
               return;
             }
           }
-        }
-        if (already_connected_to_this_peer)
-        {
+      }
 
-          connection_rejected_message connection_rejected;
-          if (_node_id == originating_peer->node_id)
-            connection_rejected = connection_rejected_message(_user_agent_string, core_protocol_version,
-                                                              originating_peer->get_socket().remote_endpoint(),
-                                                              rejection_reason_code::connected_to_self,
-                                                              "I'm connecting to myself");
-          else
-            connection_rejected = connection_rejected_message(_user_agent_string, core_protocol_version,
-                                                              originating_peer->get_socket().remote_endpoint(),
-                                                              rejection_reason_code::already_connected,
-                                                              "I'm already connected to you");
+        if( peer_connection_ptr() != already_connected_peer )
+        {
+          // If it is an outbound connection, update the existing connection's inbound_endpoint.
+          // Note: there may be a race condition that multiple tasks try to write the same data
+          if( peer_connection_direction::outbound == originating_peer->direction
+              && originating_peer->node_public_key == already_connected_peer->node_public_key )
+          {
+              ilog( "Verified that endpoint ${ep} is reachable and belongs to peer ${peer} with id ${id}",
+                    ("ep", originating_peer->get_remote_endpoint())
+                    ("peer", already_connected_peer->get_remote_endpoint())
+                    ("id", already_connected_peer->node_id) );
+              // Do not replace a verified public address with a private or local address.
+              // Note: there is a scenario that some nodes in the same local network may have connected to each other,
+              //         and of course some are outbound connections and some are inbound, so we are unable to update
+              //         all the data, not to mention that their external addresses might be inaccessible to each
+              //         other.
+              //       Unless they are all configured with the "p2p-inbound-endpoint" option with an external address,
+              //         even if they all start out connecting to each other's external addresses, at some point they
+              //         may try to connect to each other's local addresses and possibly stay connected.
+              //       In this case, if the nodes aren't configured with the "advertise-peer-algorithm" option and
+              //         related options properly, when advertising connected peers to other peers, they may expose
+              //         that they are in the same local network and connected to each other.
+              //       On the other hand, when we skip updates in some cases, we may end up trying to reconnect soon
+              //         and endlessly (which is addressed with additional_inbound_endpoints).
+              auto old_inbound_endpoint = already_connected_peer->get_endpoint_for_connecting();
+              auto new_inbound_endpoint = originating_peer->get_remote_endpoint();
+              already_connected_peer->additional_inbound_endpoints.insert( *new_inbound_endpoint );
+              if ( !already_connected_peer->inbound_endpoint_verified // which implies direction == inbound
+                   || new_inbound_endpoint->get_address().is_public_address()
+                   || !old_inbound_endpoint->get_address().is_public_address() )
+              {
+                 ilog( "Saving verification result ${ep} for peer ${peer} with id ${id}",
+                       ("ep", new_inbound_endpoint)
+                       ("peer", already_connected_peer->get_remote_endpoint())
+                       ("id", already_connected_peer->node_id) );
+                 already_connected_peer->remote_inbound_endpoint = new_inbound_endpoint;
+                 already_connected_peer->inbound_endpoint_verified = true;
+                 already_connected_peer->is_firewalled = firewalled_state::not_firewalled;
+              }
+              // If the already connected peer is in the active connections list, save the endpoint to the peer db
+              if( peer_connection::connection_negotiation_status::negotiation_complete
+                     == already_connected_peer->negotiation_status )
+                 save_successful_address( this, *new_inbound_endpoint );
+          }
+          // Now reject
+          connection_rejected_message connection_rejected( _user_agent_string, core_protocol_version,
+                                                           *originating_peer->get_remote_endpoint(),
+                                                           rejection_reason_code::already_connected,
+                                                           "I'm already connected to you" );
           originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
-          originating_peer->send_message(message(connection_rejected));
-          dlog("Received a hello_message from peer ${peer} that I'm already connected to (with id ${id}), rejection",
+          originating_peer->send_message( message(connection_rejected) );
+          ilog("Received a hello_message from peer ${peer} that I'm already connected to (with id ${id}), rejection",
                ("peer", originating_peer->get_remote_endpoint())
                ("id", originating_peer->node_id));
+          // If already connected, we disconnect
+          disconnect_from_peer( originating_peer, connection_rejected.reason_string );
         }
 #ifdef ENABLE_P2P_DEBUGGING_API
         else if(!_allowed_peers.empty() &&
                 _allowed_peers.find(originating_peer->node_id) == _allowed_peers.end())
         {
           connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                          originating_peer->get_socket().remote_endpoint(),
+                                                          *originating_peer->get_remote_endpoint(),
                                                           rejection_reason_code::blocked,
                                                           "you are not in my allowed_peers list");
           originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
@@ -1532,97 +1798,92 @@ namespace graphene { namespace net { namespace detail {
         {
           // whether we're planning on accepting them as a peer or not, they seem to be a valid node,
           // so add them to our database if they're not firewalled
-
-          // in the hello message, the peer sent us the IP address and port it thought it was connecting from.
-          // If they match the IP and port we see, we assume that they're actually on the internet and they're not
-          // firewalled.
-          fc::ip::endpoint peers_actual_outbound_endpoint = originating_peer->get_socket().remote_endpoint();
-          if( peers_actual_outbound_endpoint.get_address() == originating_peer->inbound_address &&
-              peers_actual_outbound_endpoint.port() == originating_peer->outbound_port )
+          if( peer_connection_direction::outbound == originating_peer->direction )
           {
-            if( originating_peer->inbound_port == 0 )
-            {
-              dlog( "peer does not appear to be firewalled, but they did not give an inbound port so I'm treating them as if they are." );
-              originating_peer->is_firewalled = firewalled_state::firewalled;
-            }
-            else
-            {
-              // peer is not firewalled, add it to our database
-              fc::ip::endpoint peers_inbound_endpoint(originating_peer->inbound_address, originating_peer->inbound_port);
-              potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(peers_inbound_endpoint);
-              _potential_peer_db.update_entry(updated_peer_record);
-              originating_peer->is_firewalled = firewalled_state::not_firewalled;
-            }
+             // For outbound connection, we already know the peer is not firewalled,
+             // and it should be already in the peer database. Do nothing here.
+          }
+          else if( 0 == originating_peer->inbound_port )
+          {
+             ilog( "peer ${peer} did not give an inbound port so I'm treating them as if they are firewalled.",
+                   ("peer", originating_peer->get_remote_endpoint()) );
+             originating_peer->is_firewalled = firewalled_state::firewalled;
           }
           else
           {
-            dlog("peer is firewalled: they think their outbound endpoint is ${reported_endpoint}, but I see it as ${actual_endpoint}",
-                 ("reported_endpoint", fc::ip::endpoint(originating_peer->inbound_address, originating_peer->outbound_port))
-                 ("actual_endpoint", peers_actual_outbound_endpoint));
-            originating_peer->is_firewalled = firewalled_state::firewalled;
+             // Note: no matter how we guess, we end up adding these to our peer database and trying to connect later.
+
+             // First, we add the inbound endpoint that the peer told us it is listening on.
+             fc::flat_set<fc::ip::endpoint> endpoints_to_save;
+             endpoints_to_save.insert( *originating_peer->get_endpoint_for_connecting() );
+
+             // Second, we add the address and port we see.
+             // It might be the same as above, but that's OK.
+             fc::ip::endpoint peers_actual_outbound_endpoint = *originating_peer->get_remote_endpoint();
+             endpoints_to_save.insert( peers_actual_outbound_endpoint );
+
+             // Third, we add the address we see, with the inbound port the peer told us.
+             // It might be the same as above, but that's OK.
+             endpoints_to_save.insert( fc::ip::endpoint( peers_actual_outbound_endpoint.get_address(),
+                                                         originating_peer->inbound_port ) );
+
+             ilog( "Saving potential endpoints to the peer database for peer ${peer}: ${endpoints}",
+                   ("peer", originating_peer->get_remote_endpoint()) ("endpoints", endpoints_to_save) );
+
+             for( const auto& ep : endpoints_to_save )
+             {
+                // add to the peer database
+                auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep( ep );
+                updated_peer_record.last_seen_time = fc::time_point::now();
+                _potential_peer_db.update_entry( updated_peer_record );
+             }
+
+             // Note: we don't update originating_peer->is_firewalled, because we might guess wrong
+
           }
 
           if (!is_accepting_new_connections())
           {
             connection_rejected_message connection_rejected(_user_agent_string, core_protocol_version,
-                                                            originating_peer->get_socket().remote_endpoint(),
+                                                            *originating_peer->get_remote_endpoint(),
                                                             rejection_reason_code::not_accepting_connections,
                                                             "not accepting any more incoming connections");
             originating_peer->their_state = peer_connection::their_connection_state::connection_rejected;
             originating_peer->send_message(message(connection_rejected));
-            dlog("Received a hello_message from peer ${peer}, but I'm not accepting any more connections, rejection",
+            ilog("Received a hello_message from peer ${peer}, but I'm not accepting any more connections, rejection",
                  ("peer", originating_peer->get_remote_endpoint()));
           }
           else
           {
             originating_peer->their_state = peer_connection::their_connection_state::connection_accepted;
             originating_peer->send_message(message(connection_accepted_message()));
-            dlog("Received a hello_message from peer ${peer}, sending reply to accept connection",
+            ilog("Received a hello_message from peer ${peer}, sending reply to accept connection",
                  ("peer", originating_peer->get_remote_endpoint()));
           }
         }
-      }
-      else
-      {
-        // we can wind up here if we've connected to ourself, and the source and
-        // destination endpoints are the same, causing messages we send out
-        // to arrive back on the initiating socket instead of the receiving
-        // socket.  If we did a complete job of enumerating local addresses,
-        // we could avoid directly connecting to ourselves, or at least detect
-        // immediately when we did it and disconnect.
+   }
 
-        // The only way I know of that we'd get an unexpected hello that we
-        //  can't really guard against is if we do a simulatenous open, we
-        // probably need to think through that case.  We're not attempting that
-        // yet, though, so it's ok to just disconnect here.
-        wlog("unexpected hello_message from peer, disconnecting");
-        disconnect_from_peer(originating_peer, "Received a unexpected hello_message");
-      }
-    }
-
-    void node_impl::on_connection_accepted_message( peer_connection* originating_peer,
-                                                    const connection_accepted_message& )
-    {
+   void node_impl::on_connection_accepted_message( peer_connection* originating_peer,
+                                                   const connection_accepted_message& ) const
+   {
       VERIFY_CORRECT_THREAD();
-      dlog("Received a connection_accepted in response to my \"hello\" from ${peer}",
-           ("peer", originating_peer->get_remote_endpoint()));
+      // Gatekeeping code
+      // We only send one address request message shortly after connected
+      if( originating_peer->our_state != peer_connection::our_connection_state::just_connected )
+      {
+         // Log and ignore
+         wlog( "Received an unexpected connection_accepted message from ${peer}",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
+
+      ilog( "Received a connection_accepted in response to my \"hello\" from ${peer}",
+            ("peer", originating_peer->get_remote_endpoint()) );
       originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_accepted;
       originating_peer->our_state = peer_connection::our_connection_state::connection_accepted;
+      originating_peer->expecting_address_message = true;
       originating_peer->send_message(address_request_message());
-      auto now = fc::time_point::now();
-      constexpr int64_t five = 5;
-      if (_is_firewalled == firewalled_state::unknown &&
-          _last_firewall_check_message_sent < ( now - fc::minutes(five) ) &&
-          originating_peer->core_protocol_version >= 106)
-      {
-        wlog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
-             ("peer", originating_peer->get_remote_endpoint()));
-        originating_peer->firewall_check_state = new firewall_check_state_data;
-
-        originating_peer->send_message(check_firewall_message());
-        _last_firewall_check_message_sent = now;
-      }
-    }
+   }
 
     void node_impl::on_connection_rejected_message(peer_connection* originating_peer, const connection_rejected_message& connection_rejected_message_received)
     {
@@ -1633,79 +1894,168 @@ namespace graphene { namespace net { namespace detail {
              ("peer", originating_peer->get_remote_endpoint())
              ("reason", connection_rejected_message_received.reason_string));
 
-        if (connection_rejected_message_received.reason_code == rejection_reason_code::connected_to_self)
+        originating_peer->negotiation_status = peer_connection::connection_negotiation_status
+                                                              ::peer_connection_rejected;
+        originating_peer->our_state = peer_connection::our_connection_state::connection_rejected;
+
+        if( connection_rejected_message_received.reason_code == rejection_reason_code::connected_to_self
+            || connection_rejected_message_received.reason_code == rejection_reason_code::different_chain )
         {
-          _potential_peer_db.erase(originating_peer->get_socket().remote_endpoint());
+          // Using remote_endpoint here for an outbound connection is OK.
+          // For an inbound connection, we should have not saved anything to the peer database yet, nor we will
+          //   save anything (it would be weird if they rejected us but we didn't reject them),
+          //   so using remote_endpoint here at least won't do anything bad.
+          //   Note: we should not erase or update data by the peer's claimed inbound_address,
+          //         because the data is still unreliable.
+          // Note: deleting is not the best approach since it can be readded soon and we will reconnect soon.
+          //       Marking it "permanently rejected" is also not good enough since the peer can be "fixed".
+          //       It seems the best approach is to reduce its weight significantly.
+          greatly_delay_next_conn_to( this, *originating_peer->get_remote_endpoint() );
+          // Note: we do not send closing_connection_message, but close directly. This is probably OK
           move_peer_to_closing_list(originating_peer->shared_from_this());
           originating_peer->close_connection();
         }
+        // Note: ideally, if it is an outbound connection, and the rejection reason is "already_connected",
+        //         we should update the existing connection's inbound_endpoint and mark it as verified.
+        //       However, at the moment maybe we haven't processed its hello message,
+        //         so don't know its node_id and unable to locate the existing connection.
+        //       So it is better to do the update in on_hello_message().
+        //       It is also possible that its hello message comes too late and the connection is already closed,
+        //         in which case we don't have a chance to update anyway.
         else
         {
           // update our database to record that we were rejected so we won't try to connect again for a while
           // this only happens on connections we originate, so we should already know that peer is not firewalled
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(originating_peer->get_socket().remote_endpoint());
+          fc::optional<potential_peer_record> updated_peer_record
+                = _potential_peer_db.lookup_entry_for_endpoint(originating_peer->get_socket().remote_endpoint());
           if (updated_peer_record)
           {
             updated_peer_record->last_connection_disposition = last_connection_rejected;
             updated_peer_record->last_connection_attempt_time = fc::time_point::now();
+            // Note: we do not increase number_of_failed_connection_attempts here, this is probably OK
             _potential_peer_db.update_entry(*updated_peer_record);
           }
+          originating_peer->expecting_address_message = true;
+          originating_peer->send_message(address_request_message());
         }
-
-        originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_rejected;
-        originating_peer->our_state = peer_connection::our_connection_state::connection_rejected;
-        originating_peer->send_message(address_request_message());
       }
       else
-        FC_THROW( "unexpected connection_rejected_message from peer" );
+      {
+        // Note: in older versions, FC_THROW() was called here,
+        //       which would cause on_connection_closed() to be called,
+        //       which would then close the connection when the peer_connection object was destroyed.
+        //       Explicitly closing the connection here is more intuitive.
+        wlog( "Unexpected connection_rejected_message from peer ${peer}, disconnecting",
+              ("peer", originating_peer->get_remote_endpoint()) );
+        disconnect_from_peer( originating_peer, "Received an unexpected connection_rejected_message" );
+      }
     }
 
     void node_impl::on_address_request_message(peer_connection* originating_peer, const address_request_message&)
     {
       VERIFY_CORRECT_THREAD();
-      dlog("Received an address request message");
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted
+          && originating_peer->their_state != peer_connection::their_connection_state::connection_rejected )
+      {
+         wlog( "Unexpected address_request_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected address_request_message" );
+         return;
+      }
+
+      dlog( "Received an address request message from peer ${peer}",
+            ("peer", originating_peer->get_remote_endpoint()) );
 
       address_message reply;
-      if (!_peer_advertising_disabled)
-      {
-        reply.addresses.reserve(_active_connections.size());
-        fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
-        for (const peer_connection_ptr& active_peer : _active_connections)
-        {
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
-          if (updated_peer_record)
-          {
-            updated_peer_record->last_seen_time = fc::time_point::now();
-            _potential_peer_db.update_entry(*updated_peer_record);
-          }
-
-          reply.addresses.emplace_back(address_info(*active_peer->get_remote_endpoint(),
-                                                    fc::time_point::now(),
-                                                    active_peer->round_trip_delay,
-                                                    active_peer->node_id,
-                                                    active_peer->direction,
-                                                    active_peer->is_firewalled));
-        }
-      }
+      if (_address_builder != nullptr )
+         _address_builder->build( this, reply );
       originating_peer->send_message(reply);
+
+      // If we rejected their connection, disconnect now
+      if( originating_peer->their_state == peer_connection::their_connection_state::connection_rejected )
+      {
+         disconnect_from_peer( originating_peer,
+                               "I rejected your connection request (hello message) so I'm disconnecting" );
+      }
     }
 
-    void node_impl::on_address_message(peer_connection* originating_peer,
-                                       const address_message& address_message_received)
-    {
+   void node_impl::set_advertise_algorithm( const std::string& algo,
+         const std::vector<std::string>& advertise_or_exclude_list )
+   {
       VERIFY_CORRECT_THREAD();
-      dlog("Received an address message containing ${size} addresses",
-           ("size", address_message_received.addresses.size()));
-      for (const address_info& address : address_message_received.addresses)
+      if (algo == "exclude_list")
       {
-        dlog("    ${endpoint} last seen ${time}", ("endpoint", address.remote_endpoint)("time", address.last_seen_time));
+         _address_builder = std::make_shared<exclude_address_builder>(advertise_or_exclude_list);
       }
-      std::vector<graphene::net::address_info> updated_addresses = address_message_received.addresses;
-      for (address_info& address : updated_addresses)
-        address.last_seen_time = fc::time_point_sec(fc::time_point::now());
-      bool new_information_received = merge_address_info_with_potential_peer_database(updated_addresses);
-      if (new_information_received)
-        trigger_p2p_network_connect_loop();
+      else if (algo == "list")
+      {
+         _address_builder = std::make_shared<list_address_builder>(advertise_or_exclude_list);
+      }
+      else if (algo == "nothing")
+      {
+         _address_builder = nullptr;
+      }
+      else
+         _address_builder = std::make_shared<all_address_builder>();
+   }
+
+   void node_impl::on_address_message( peer_connection* originating_peer,
+                                       const address_message& address_message_received )
+   {
+      VERIFY_CORRECT_THREAD();
+      // Do some gatekeeping here.
+      // Malious peers can easily bypass our checks in on_hello_message(), and we will then request addresses anyway,
+      //   so checking connection_state here is useless.
+      // The size can be large, so we only handle the first N addresses.
+      // The peer might send us lots of address messages even if we didn't request,
+      //   so we'd better know whether we have sent an address request message recently.
+      if( !originating_peer->expecting_address_message )
+      {
+         // Log and ignore
+         wlog( "Received an unexpected address message containing ${size} addresses for peer ${peer}",
+               ("size", address_message_received.addresses.size())
+               ("peer", originating_peer->get_remote_endpoint()) );
+         return;
+      }
+      originating_peer->expecting_address_message = false;
+
+      dlog( "Received an address message containing ${size} addresses for peer ${peer}",
+            ("size", address_message_received.addresses.size())
+            ("peer", originating_peer->get_remote_endpoint()) );
+      if( _node_configuration.connect_to_new_peers )
+      {
+         size_t count = 0;
+         for (const address_info& address : address_message_received.addresses)
+         {
+            dlog( "    ${endpoint} last seen ${time}, firewalled status ${fw}",
+                  ("endpoint", address.remote_endpoint)("time", address.last_seen_time)
+                  ("fw", address.firewalled) );
+            ++count;
+            if( count >= _max_addrs_to_handle_at_once )
+               break;
+         }
+         std::vector<graphene::net::address_info> updated_addresses;
+         updated_addresses.reserve( count );
+         auto now = fc::time_point_sec(fc::time_point::now());
+         count = 0;
+         for( const address_info& address : address_message_received.addresses )
+         {
+            if( 0 == address.remote_endpoint.port() )
+               continue;
+            updated_addresses.emplace_back( address.remote_endpoint,
+                                            now,
+                                            address.latency,
+                                            address.node_id,
+                                            address.direction,
+                                            address.firewalled );
+            ++count;
+            if( count >= _max_addrs_to_handle_at_once )
+               break;
+         }
+         if( merge_address_info_with_potential_peer_database(updated_addresses) )
+            trigger_p2p_network_connect_loop();
+      }
 
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
@@ -1717,19 +2067,12 @@ namespace graphene { namespace net { namespace detail {
           disconnect_from_peer(originating_peer, "I rejected your connection request (hello message) so I'm disconnecting");
         else
         {
-          fc::optional<fc::ip::endpoint> inbound_endpoint = originating_peer->get_endpoint_for_connecting();
-          if (inbound_endpoint)
-          {
-            // mark the connection as successful in the database
-            fc::optional<potential_peer_record> updated_peer_record
-                  = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
-            if (updated_peer_record)
-            {
-              updated_peer_record->last_connection_disposition = last_connection_succeeded;
-              _potential_peer_db.update_entry(*updated_peer_record);
-            }
-          }
+          // Note: updating last_connection_disposition to last_connection_succeeded for inbound connections
+          //       doesn't seem correct
+          if( peer_connection_direction::outbound == originating_peer->direction )
+             save_successful_address( this, *originating_peer->get_remote_endpoint() );
 
+          // transition it to our active list
           originating_peer->negotiation_status = peer_connection::connection_negotiation_status::negotiation_complete;
           move_peer_to_active_list(originating_peer->shared_from_this());
           new_peer_just_added(originating_peer->shared_from_this());
@@ -1737,12 +2080,21 @@ namespace graphene { namespace net { namespace detail {
       }
       // else if this was an active connection, then this was just a reply to our periodic address requests.
       // we've processed it, there's nothing else to do
-    }
+   }
 
     void node_impl::on_fetch_blockchain_item_ids_message(peer_connection* originating_peer,
                                                          const fetch_blockchain_item_ids_message& fetch_blockchain_item_ids_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         wlog( "Unexpected fetch_blockchain_item_ids_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected fetch_blockchain_item_ids_message" );
+         return;
+      }
+
       item_id peers_last_item_seen = item_id(fetch_blockchain_item_ids_message_received.item_type, item_hash_t());
       if (fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty())
       {
@@ -1773,7 +2125,7 @@ namespace graphene { namespace net { namespace detail {
       catch (const peer_is_on_an_unreachable_fork&)
       {
         dlog("Peer is on a fork and there's no set of blocks we can provide to switch them to our fork");
-        // we reply with an empty list as if we had an empty blockchain; 
+        // we reply with an empty list as if we had an empty blockchain;
         // we don't want to disconnect because they may be able to provide
         // us with blocks on their chain
       }
@@ -1781,7 +2133,7 @@ namespace graphene { namespace net { namespace detail {
       bool disconnect_from_inhibited_peer = false;
       // if our client doesn't have any items after the item the peer requested, it will send back
       // a list containing the last item the peer requested
-      idump((reply_message)(fetch_blockchain_item_ids_message_received.blockchain_synopsis));
+      //idump((reply_message)(fetch_blockchain_item_ids_message_received.blockchain_synopsis)); // for debug
       if( reply_message.item_hashes_available.empty() )
         originating_peer->peer_needs_sync_items_from_us = false; /* I have no items in my blockchain */
       else if( !fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty() &&
@@ -1835,22 +2187,22 @@ namespace graphene { namespace net { namespace detail {
         return;
         }
 
+      // Why only for inbound connections?
       if (originating_peer->direction == peer_connection_direction::inbound &&
           _handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
         // handshaking is done, move the connection to fully active status and start synchronizing
-        dlog("peer ${endpoint} which was handshaking with us has started synchronizing with us, start syncing with it",
+        dlog("peer ${endpoint} which was handshaking with us has started synchronizing with us, "
+             "start syncing with it",
              ("endpoint", originating_peer->get_remote_endpoint()));
-        fc::optional<fc::ip::endpoint> inbound_endpoint = originating_peer->get_endpoint_for_connecting();
-        if (inbound_endpoint)
-        {
-          // mark the connection as successful in the database
-          potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(*inbound_endpoint);
-          updated_peer_record.last_connection_disposition = last_connection_succeeded;
-          _potential_peer_db.update_entry(updated_peer_record);
-        }
+
+        // Note: there was some code here to update the peer database, similar to the code in on_address_message(),
+        //       but this is an inbound connection,
+        //       updating last_connection_disposition to last_connection_succeeded doesn't seem correct,
+        //       so the code was removed.
 
         // transition it to our active list
+        originating_peer->negotiation_status = peer_connection::connection_negotiation_status::negotiation_complete;
         move_peer_to_active_list(originating_peer->shared_from_this());
         new_peer_just_added(originating_peer->shared_from_this());
       }
@@ -1897,7 +2249,7 @@ namespace graphene { namespace net { namespace detail {
         synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
 
       // TODO: it's possible that the returned synopsis is empty if the blockchain is empty (that's fine)
-      // or if the reference point is now past our undo history (that's not). 
+      // or if the reference point is now past our undo history (that's not).
       // in the second case, we should mark this peer as one we're unable to sync with and
       // disconnect them.
       if (reference_point != item_hash_t() && synopsis.empty())
@@ -1910,10 +2262,10 @@ namespace graphene { namespace net { namespace detail {
         uint32_t first_block_num_in_ids_to_get = _delegate->get_block_number(original_ids_of_items_to_get.front());
         uint32_t true_high_block_num = first_block_num_in_ids_to_get + original_ids_of_items_to_get.size() - 1;
 
-        // in order to generate a seamless synopsis, we need to be using the same low_block_num as the 
+        // in order to generate a seamless synopsis, we need to be using the same low_block_num as the
         // backend code; the first block in the synopsis will be the low block number it used
         uint32_t low_block_num = synopsis.empty() ? 1 : _delegate->get_block_number(synopsis.front());
-        
+
         do
         {
           if( low_block_num >= first_block_num_in_ids_to_get )
@@ -1939,7 +2291,7 @@ namespace graphene { namespace net { namespace detail {
       try
       {
         std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
-      
+
         item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
         dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, "
               "(full request is ${blockchain_synopsis})",
@@ -1965,7 +2317,7 @@ namespace graphene { namespace net { namespace detail {
       if( originating_peer->item_ids_requested_from_peer )
       {
         // verify that the peer's the block ids the peer sent is a valid response to our request;
-        // It should either be an empty list of blocks, or a list of blocks that builds off of one of 
+        // It should either be an empty list of blocks, or a list of blocks that builds off of one of
         // the blocks in the synopsis we sent
         if (!blockchain_item_ids_inventory_message_received.item_hashes_available.empty())
         {
@@ -2189,7 +2541,7 @@ namespace graphene { namespace net { namespace detail {
 
           // append the remaining items to the peer's list
           boost::push_back(originating_peer->ids_of_items_to_get, item_hashes_received);
-          
+
           uint32_t new_number_of_unfetched_items = calculate_unsynced_block_count_from_all_peers();
           if (new_number_of_unfetched_items != _total_num_of_unfetched_items)
             _delegate->sync_status(blockchain_item_ids_inventory_message_received.item_type,
@@ -2251,11 +2603,12 @@ namespace graphene { namespace net { namespace detail {
       }
       else
       {
-        wlog("sync: received a list of sync items available, but I didn't ask for any!");
+        wlog( "sync: received a list of sync items available from peer ${peer}, but I didn't ask for any!",
+              ("peer", originating_peer->get_remote_endpoint()) );
       }
     }
 
-    message node_impl::get_message_for_item(const item_id& item)
+    graphene::net::message node_impl::get_message_for_item(const item_id& item)
     {
       try
       {
@@ -2273,9 +2626,18 @@ namespace graphene { namespace net { namespace detail {
     }
 
     void node_impl::on_fetch_items_message(peer_connection* originating_peer,
-                                           const fetch_items_message& fetch_items_message_received) const
+                                           const fetch_items_message& fetch_items_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         wlog( "Unexpected fetch_items_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected fetch_items_message" );
+         return;
+      }
+
       dlog("received items request for ids ${ids} of type ${type} from peer ${endpoint}",
            ("ids", fetch_items_message_received.items_to_fetch)
            ("type", fetch_items_message_received.item_type)
@@ -2354,7 +2716,9 @@ namespace graphene { namespace net { namespace detail {
           _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_seq_counter));
           ++_items_to_fetch_seq_counter;
         }
-        wlog("Peer doesn't have the requested item.");
+        wlog( "Peer ${peer} doesn't have the requested item ${item}.",
+              ("peer", originating_peer->get_remote_endpoint())
+              ("item", requested_item) );
         trigger_fetch_items_loop();
         return;
       }
@@ -2371,7 +2735,9 @@ namespace graphene { namespace net { namespace detail {
           disconnect_from_peer(originating_peer, "You are missing a sync item you claim to have, your database is probably corrupted. Try --rebuild-index.",true,
                                fc::exception(FC_LOG_MESSAGE(error,"You are missing a sync item you claim to have, your database is probably corrupted. Try --rebuild-index.",
                                ("item_id", requested_item))));
-        wlog("Peer doesn't have the requested sync item.  This really shouldn't happen");
+        wlog( "Peer ${peer} doesn't have the requested sync item ${item}.  This really shouldn't happen",
+              ("peer", originating_peer->get_remote_endpoint())
+              ("item", requested_item) );
         trigger_fetch_sync_items_loop();
         return;
       }
@@ -2382,6 +2748,14 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::on_item_ids_inventory_message(peer_connection* originating_peer, const item_ids_inventory_message& item_ids_inventory_message_received)
     {
       VERIFY_CORRECT_THREAD();
+      // Gatekeeping code
+      if( originating_peer->their_state != peer_connection::their_connection_state::connection_accepted )
+      {
+         wlog( "Unexpected item_ids_inventory_message from peer ${peer}, disconnecting",
+               ("peer", originating_peer->get_remote_endpoint()) );
+         disconnect_from_peer( originating_peer, "Received an unexpected item_ids_inventory_message" );
+         return;
+      }
 
       // expire old inventory
       // so we'll be making our decisions about whether to fetch blocks below based only on recent inventory
@@ -2445,7 +2819,7 @@ namespace graphene { namespace net { namespace detail {
                 // too, we can expect it to be around in this peer's cache for longer, so update its timestamp
                 _items_to_fetch.get<item_id_index>().modify(items_to_fetch_iter,
                                                             [](prioritized_item_id& item) { item.timestamp = fc::time_point::now(); });
-              } 
+              }
             }
           }
         }
@@ -2485,7 +2859,7 @@ namespace graphene { namespace net { namespace detail {
       }
       if( originating_peer->we_have_requested_close )
         originating_peer->close_connection();
-      }
+    }
 
     void node_impl::on_connection_closed(peer_connection* originating_peer)
     {
@@ -2496,9 +2870,11 @@ namespace graphene { namespace net { namespace detail {
       // if we closed the connection (due to timeout or handshake failure), we should have recorded an
       // error message to store in the peer database when we closed the connection
       fc::optional<fc::ip::endpoint> inbound_endpoint = originating_peer->get_endpoint_for_connecting();
-      if (originating_peer->connection_closed_error && inbound_endpoint)
+      if( originating_peer->connection_closed_error
+          && inbound_endpoint.valid() && inbound_endpoint->port() != 0 )
       {
-        fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
+        fc::optional<potential_peer_record> updated_peer_record
+              = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
         if (updated_peer_record)
         {
           updated_peer_record->last_error = *originating_peer->connection_closed_error;
@@ -2513,16 +2889,7 @@ namespace graphene { namespace net { namespace detail {
       {
         _active_connections.erase(originating_peer_ptr);
 
-        if (inbound_endpoint && originating_peer_ptr->get_remote_endpoint())
-        {
-          fc::optional<potential_peer_record> updated_peer_record
-                = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
-          if (updated_peer_record)
-          {
-            updated_peer_record->last_seen_time = fc::time_point::now();
-            _potential_peer_db.update_entry(*updated_peer_record);
-          }
-        }
+        update_address_seen_time( this, originating_peer );
       }
 
       ilog("Remote peer ${endpoint} closed their connection to us",
@@ -2535,24 +2902,6 @@ namespace graphene { namespace net { namespace detail {
       {
         _last_reported_number_of_conns = (uint32_t)_active_connections.size();
         _delegate->connection_count_changed( _last_reported_number_of_conns );
-      }
-
-      // if we had delegated a firewall check to this peer, send it to another peer
-      if (originating_peer->firewall_check_state)
-      {
-        if (originating_peer->firewall_check_state->requesting_peer != node_id_t())
-        {
-          // it's a check we're doing for another node
-          firewall_check_state_data* firewall_check_state = originating_peer->firewall_check_state;
-          originating_peer->firewall_check_state = nullptr;
-          forward_firewall_check_to_next_available_peer(firewall_check_state);
-        }
-        else
-        {
-          // we were asking them to check whether we're firewalled.  we'll just let it
-          // go for now
-          delete originating_peer->firewall_check_state;
-        }
       }
 
       // if we had requested any sync or regular items from this peer that we haven't
@@ -2592,7 +2941,7 @@ namespace graphene { namespace net { namespace detail {
       {
         std::vector<message_hash_type> contained_transaction_msg_ids;
         _delegate->handle_block(block_message_to_send, true, contained_transaction_msg_ids);
-        ilog("Successfully pushed sync block ${num} (id:${id})",
+        dlog("Successfully pushed sync block ${num} (id:${id})",
              ("num", block_message_to_send.block.block_num())
              ("id", block_message_to_send.block_id));
         _most_recent_blocks_accepted.push_back(block_message_to_send.block_id);
@@ -2958,7 +3307,7 @@ namespace graphene { namespace net { namespace detail {
           std::vector<message_hash_type> contained_transaction_msg_ids;
           _delegate->handle_block(block_message_to_process, false, contained_transaction_msg_ids);
           message_validated_time = fc::time_point::now();
-          ilog("Successfully pushed block ${num} (id:${id})",
+          dlog("Successfully pushed block ${num} (id:${id})",
                 ("num", block_message_to_process.block.block_num())
                 ("id", block_message_to_process.block_id));
           _most_recent_blocks_accepted.push_back(block_message_to_process.block_id);
@@ -3046,7 +3395,7 @@ namespace graphene { namespace net { namespace detail {
       {
         throw;
       }
-      catch (const unlinkable_block_exception& e) 
+      catch (const unlinkable_block_exception& e)
       {
         restart_sync_exception = e;
       }
@@ -3198,178 +3547,6 @@ namespace graphene { namespace net { namespace detail {
                                              - current_time_reply_message_received.request_sent_time )
                                          - ( current_time_reply_message_received.reply_transmitted_time
                                              - current_time_reply_message_received.request_received_time );
-    }
-
-    void node_impl::forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state)
-    {
-      {
-         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
-         for (const peer_connection_ptr& peer : _active_connections)
-         {
-            if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
-                  !peer->firewall_check_state && // the peer isn't already performing a check for another node
-                  firewall_check_state->nodes_already_tested.find(peer->node_id) == firewall_check_state->nodes_already_tested.end() &&
-                  peer->core_protocol_version >= 106)
-            {
-               wlog("forwarding firewall check for node ${to_check} to peer ${checker}",
-                     ("to_check", firewall_check_state->endpoint_to_test)
-                     ("checker", peer->get_remote_endpoint()));
-               firewall_check_state->nodes_already_tested.insert(peer->node_id);
-               peer->firewall_check_state = firewall_check_state;
-               check_firewall_message check_request;
-               check_request.endpoint_to_check = firewall_check_state->endpoint_to_test;
-               check_request.node_id = firewall_check_state->expected_node_id;
-               peer->send_message(check_request);
-               return;
-            }
-         }
-      } // lock_guard
-      wlog("Unable to forward firewall check for node ${to_check} to any other peers, returning 'unable'",
-           ("to_check", firewall_check_state->endpoint_to_test));
-
-      peer_connection_ptr originating_peer = get_peer_by_node_id(firewall_check_state->expected_node_id);
-      if (originating_peer)
-      {
-        check_firewall_reply_message reply;
-        reply.node_id = firewall_check_state->expected_node_id;
-        reply.endpoint_checked = firewall_check_state->endpoint_to_test;
-        reply.result = firewall_check_result::unable_to_check;
-        originating_peer->send_message(reply);
-      }
-      delete firewall_check_state;
-    }
-
-    void node_impl::on_check_firewall_message(peer_connection* originating_peer,
-                                              const check_firewall_message& check_firewall_message_received)
-    {
-      VERIFY_CORRECT_THREAD();
-
-      if (check_firewall_message_received.node_id == node_id_t() &&
-          check_firewall_message_received.endpoint_to_check == fc::ip::endpoint())
-      {
-        // originating_peer is asking us to test whether it is firewalled
-        // we're not going to try to connect back to the originating peer directly,
-        // instead, we're going to coordinate requests by asking some of our peers
-        // to try to connect to the originating peer, and relay the results back
-        wlog("Peer ${peer} wants us to check whether it is firewalled",
-             ("peer", originating_peer->get_remote_endpoint()));
-        firewall_check_state_data* firewall_check_state = new firewall_check_state_data;
-        // if they are using the same inbound and outbound port, try connecting to their outbound endpoint.
-        // if they are using a different inbound port, use their outbound address but the inbound port they reported
-        fc::ip::endpoint endpoint_to_check = originating_peer->get_socket().remote_endpoint();
-        if (originating_peer->inbound_port != originating_peer->outbound_port)
-          endpoint_to_check = fc::ip::endpoint(endpoint_to_check.get_address(), originating_peer->inbound_port);
-        firewall_check_state->endpoint_to_test = endpoint_to_check;
-        firewall_check_state->expected_node_id = originating_peer->node_id;
-        firewall_check_state->requesting_peer = originating_peer->node_id;
-
-        forward_firewall_check_to_next_available_peer(firewall_check_state);
-      }
-      else
-      {
-        // we're being asked to check another node
-        // first, find out if we're currently connected to that node.  If we are, we
-        // can't perform the test
-        if (is_already_connected_to_id(check_firewall_message_received.node_id) ||
-            is_connection_to_endpoint_in_progress(check_firewall_message_received.endpoint_to_check))
-        {
-          check_firewall_reply_message reply;
-          reply.node_id = check_firewall_message_received.node_id;
-          reply.endpoint_checked = check_firewall_message_received.endpoint_to_check;
-          reply.result = firewall_check_result::unable_to_check;
-        }
-        else
-        {
-          // we're not connected to them, so we need to set up a connection to them
-          // to test.
-          peer_connection_ptr peer_for_testing(peer_connection::make_shared(this));
-          peer_for_testing->firewall_check_state = new firewall_check_state_data;
-          peer_for_testing->firewall_check_state->endpoint_to_test = check_firewall_message_received.endpoint_to_check;
-          peer_for_testing->firewall_check_state->expected_node_id = check_firewall_message_received.node_id;
-          peer_for_testing->firewall_check_state->requesting_peer = originating_peer->node_id;
-          peer_for_testing->set_remote_endpoint(check_firewall_message_received.endpoint_to_check);
-          initiate_connect_to(peer_for_testing);
-        }
-      }
-    }
-
-    void node_impl::on_check_firewall_reply_message(peer_connection* originating_peer,
-                                                    const check_firewall_reply_message& check_firewall_reply_message_received)
-    {
-      VERIFY_CORRECT_THREAD();
-
-      if (originating_peer->firewall_check_state &&
-          originating_peer->firewall_check_state->requesting_peer != node_id_t())
-      {
-        // then this is a peer that is helping us check the firewalled state of one of our other peers
-        // and they're reporting back
-        // if they got a result, return it to the original peer.  if they were unable to check,
-        // we'll try another peer.
-        wlog("Peer ${reporter} reports firewall check status ${status} for ${peer}",
-             ("reporter", originating_peer->get_remote_endpoint())
-             ("status", check_firewall_reply_message_received.result)
-             ("peer", check_firewall_reply_message_received.endpoint_checked));
-
-        if (check_firewall_reply_message_received.result == firewall_check_result::unable_to_connect ||
-            check_firewall_reply_message_received.result == firewall_check_result::connection_successful)
-        {
-          peer_connection_ptr original_peer = get_peer_by_node_id(originating_peer->firewall_check_state->requesting_peer);
-          if (original_peer)
-          {
-            if (check_firewall_reply_message_received.result == firewall_check_result::connection_successful)
-            {
-              // if we previously thought this peer was firewalled, mark them as not firewalled
-              if (original_peer->is_firewalled != firewalled_state::not_firewalled)
-              {
-
-                original_peer->is_firewalled = firewalled_state::not_firewalled;
-                // there should be no old entry if we thought they were firewalled, so just create a new one
-                fc::optional<fc::ip::endpoint> inbound_endpoint = originating_peer->get_endpoint_for_connecting();
-                if (inbound_endpoint)
-                {
-                  potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(*inbound_endpoint);
-                  updated_peer_record.last_seen_time = fc::time_point::now();
-                  _potential_peer_db.update_entry(updated_peer_record);
-                }
-              }
-            }
-            original_peer->send_message(check_firewall_reply_message_received);
-          }
-          delete originating_peer->firewall_check_state;
-          originating_peer->firewall_check_state = nullptr;
-        }
-        else
-        {
-          // they were unable to check for us, ask another peer
-          firewall_check_state_data* firewall_check_state = originating_peer->firewall_check_state;
-          originating_peer->firewall_check_state = nullptr;
-          forward_firewall_check_to_next_available_peer(firewall_check_state);
-        }
-      }
-      else if (originating_peer->firewall_check_state)
-      {
-        // this is a reply to a firewall check we initiated.
-        wlog("Firewall check we initiated has returned with result: ${result}, endpoint = ${endpoint}",
-             ("result", check_firewall_reply_message_received.result)
-             ("endpoint", check_firewall_reply_message_received.endpoint_checked));
-        if (check_firewall_reply_message_received.result == firewall_check_result::connection_successful)
-        {
-          _is_firewalled = firewalled_state::not_firewalled;
-          _publicly_visible_listening_endpoint = check_firewall_reply_message_received.endpoint_checked;
-        }
-        else if (check_firewall_reply_message_received.result == firewall_check_result::unable_to_connect)
-        {
-          _is_firewalled = firewalled_state::firewalled;
-          _publicly_visible_listening_endpoint = fc::optional<fc::ip::endpoint>();
-        }
-        delete originating_peer->firewall_check_state;
-        originating_peer->firewall_check_state = nullptr;
-      }
-      else
-      {
-        wlog("Received a firewall check reply to a request I never sent");
-      }
-
     }
 
     // this handles any message we get that doesn't require any special processing.
@@ -3858,32 +4035,44 @@ namespace graphene { namespace net { namespace detail {
       fc::ecc::compact_signature signature
             = _node_configuration.private_key.sign_compact(shared_secret_encoder.result());
 
-      // in the hello messsage, we send three things:
-      //  ip address
-      //  outbound port
-      //  inbound port
-      // The peer we're connecting to will assume we're firewalled if the
-      // ip address and outbound port we send don't match the values it sees on its remote endpoint
+      // In the hello messsage, we send three things:
+      // * inbound IP address
+      // * inbound port
+      // * outbound port
       //
-      // if we know that we're behind a NAT that will allow incoming connections because our firewall
-      // detection figured it out, send those values instead.
+      // If we don't accept incoming connections, we send nothing.
+      //
+      // The peer we're connecting to may assume we're firewalled if the
+      // IP address and outbound port we send don't match the values it sees on its remote endpoint,
+      // but it is not always true, E.G. if the peer itself is behind a reverse proxy.
+      //
+      // Note: we no longer perform remote firewall check (ask the peer to check whether we are firewalled),
+      //       thus we don't know our external IP address,
+      //       nor we know whether we're behind NAT or a reverse proxy that will allow incoming connections.
+      //       However, if the "p2p-inbound-endpoint" node startup option is configured, we send that instead.
 
-      fc::ip::endpoint local_endpoint(peer->get_socket().local_endpoint());
-      uint16_t listening_port = _node_configuration.accept_incoming_connections ?
-                                      _actual_listening_endpoint.port() : 0;
-
-      if (_is_firewalled == firewalled_state::not_firewalled &&
-          _publicly_visible_listening_endpoint)
+      fc::ip::address inbound_address; // default 0.0.0.0
+      uint16_t inbound_port = 0;
+      uint16_t outbound_port = 0;
+      if( _node_configuration.accept_incoming_connections )
       {
-        local_endpoint = *_publicly_visible_listening_endpoint;
-        listening_port = _publicly_visible_listening_endpoint->port();
+         fc::ip::endpoint local_endpoint = peer->get_socket().local_endpoint();
+         inbound_address = local_endpoint.get_address();
+         inbound_port = _actual_listening_endpoint.port();
+         outbound_port = local_endpoint.port();
+         if( _node_configuration.inbound_endpoint.valid() )
+         {
+            if( _node_configuration.inbound_endpoint->get_address() != fc::ip::address() )
+               inbound_address = _node_configuration.inbound_endpoint->get_address();
+            inbound_port = _node_configuration.inbound_endpoint->port();
+         }
       }
 
       hello_message hello(_user_agent_string,
                           core_protocol_version,
-                          local_endpoint.get_address(),
-                          listening_port,
-                          local_endpoint.port(),
+                          inbound_address,
+                          inbound_port,
+                          outbound_port,
                           _node_public_key,
                           signature,
                           _chain_id,
@@ -3897,34 +4086,27 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
 
-      if (!new_peer->performing_firewall_check())
-      {
-        // create or find the database entry for the new peer
-        // if we're connecting to them, we believe they're not firewalled
-        potential_peer_record updated_peer_record
-              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
-        updated_peer_record.last_connection_disposition = last_connection_failed;
-        updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
-        _potential_peer_db.update_entry(updated_peer_record);
-      }
-      else
-      {
-        wlog("connecting to peer ${peer} for firewall check", ("peer", new_peer->get_remote_endpoint()));
-      }
+      // create or find the database entry for the new peer
+      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
+      updated_peer_record.last_connection_disposition = last_connection_failed;
+      updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
+      _potential_peer_db.update_entry(updated_peer_record);
 
       fc::oexception connect_failed_exception;
 
       try
       {
+        ilog("Connecting to peer ${peer}", ("peer", remote_endpoint));
         // blocks until the connection is established and secure connection is negotiated
-        new_peer->connect_to(remote_endpoint, _actual_listening_endpoint);
+        auto bind_to_endpoint = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint
+                                                                                : fc::optional<fc::ip::endpoint>();
+        new_peer->connect_to( remote_endpoint, bind_to_endpoint );
 
         // we connected to the peer.  guess they're not firewalled....
         new_peer->is_firewalled = firewalled_state::not_firewalled;
 
         // connection succeeded, we've started handshaking.  record that in our database
-        potential_peer_record updated_peer_record
-              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_handshaking_failed;
         updated_peer_record.number_of_successful_connection_attempts++;
         updated_peer_record.last_seen_time = fc::time_point::now();
@@ -3935,11 +4117,10 @@ namespace graphene { namespace net { namespace detail {
         connect_failed_exception = except;
       }
 
-      if (connect_failed_exception && !new_peer->performing_firewall_check())
+      if( connect_failed_exception )
       {
         // connection failed.  record that in our database
-        potential_peer_record updated_peer_record
-              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_failed;
         updated_peer_record.number_of_failed_connection_attempts++;
         if (new_peer->connection_closed_error)
@@ -3947,60 +4128,32 @@ namespace graphene { namespace net { namespace detail {
         else
           updated_peer_record.last_error = *connect_failed_exception;
         _potential_peer_db.update_entry(updated_peer_record);
-      }
 
-      if (new_peer->performing_firewall_check())
-      {
-        // we were connecting to test whether the node is firewalled, and we now know the result.
-        // send a message back to the requester
-        peer_connection_ptr requesting_peer = get_peer_by_node_id(new_peer->firewall_check_state->requesting_peer);
-        if (requesting_peer)
-        {
-          check_firewall_reply_message reply;
-          reply.endpoint_checked = new_peer->firewall_check_state->endpoint_to_test;
-          reply.node_id = new_peer->firewall_check_state->expected_node_id;
-          reply.result = connect_failed_exception ?
-                           firewall_check_result::unable_to_connect :
-                           firewall_check_result::connection_successful;
-          wlog("firewall check of ${peer_checked} ${success_or_failure}, sending reply to ${requester}",
-                ("peer_checked", new_peer->get_remote_endpoint())
-                ("success_or_failure", connect_failed_exception ? "failed" : "succeeded" )
-                ("requester", requesting_peer->get_remote_endpoint()));
-
-          requesting_peer->send_message(reply);
-        }
-      }
-
-      if (connect_failed_exception || new_peer->performing_firewall_check())
-      {
-        // if the connection failed or if this connection was just intended to check
-        // whether the peer is firewalled, we want to disconnect now.
+        // if the connection failed, we want to disconnect now.
         _handshaking_connections.erase(new_peer);
         _terminating_connections.erase(new_peer);
-        assert(_active_connections.find(new_peer) == _active_connections.end());
         _active_connections.erase(new_peer);
-        assert(_closing_connections.find(new_peer) == _closing_connections.end());
         _closing_connections.erase(new_peer);
 
         display_current_connections();
         trigger_p2p_network_connect_loop();
         schedule_peer_for_deletion(new_peer);
 
-        if (connect_failed_exception)
-          throw *connect_failed_exception;
+        throw *connect_failed_exception;
       }
       else
       {
         // connection was successful and we want to stay connected
         fc::ip::endpoint local_endpoint = new_peer->get_local_endpoint();
         new_peer->inbound_address = local_endpoint.get_address();
-        new_peer->inbound_port = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint.port() : 0;
+        new_peer->inbound_port = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint.port()
+                                                                                 : 0;
         new_peer->outbound_port = local_endpoint.port();
 
         new_peer->our_state = peer_connection::our_connection_state::just_connected;
         new_peer->their_state = peer_connection::their_connection_state::just_connected;
         send_hello_message(new_peer);
-        dlog("Sent \"hello\" to peer ${peer}", ("peer", new_peer->get_remote_endpoint()));
+        ilog("Sent \"hello\" to peer ${peer}", ("peer", new_peer->get_remote_endpoint()));
       }
     }
 
@@ -4055,11 +4208,10 @@ namespace graphene { namespace net { namespace detail {
         uint32_t port = GRAPHENE_NET_DEFAULT_P2P_PORT;
 #endif
         _node_configuration.listen_endpoint.set_port( port );
-        _node_configuration.accept_incoming_connections = true;
-        _node_configuration.wait_if_endpoint_is_busy = false;
 
         ilog( "generating new private key for this node" );
         _node_configuration.private_key = fc::ecc::private_key::generate();
+        save_node_configuration();
       }
 
       _node_public_key = _node_configuration.private_key.get_public_key().serialize();
@@ -4070,6 +4222,12 @@ namespace graphene { namespace net { namespace detail {
         _potential_peer_db.open(potential_peer_database_file_name);
 
         // push back the time on all peers loaded from the database so we will be able to retry them immediately
+        // Note: this step is almost useless because we didn't multiply _peer_connection_retry_timeout
+        //       by number_of_failed_connection_attempts. However, it is probably desired as we don't want
+        //       to try to connect to a large number of dead nodes at startup.
+        //       As of writing, _peer_connection_retry_timeout is 30 seconds, pushing the time back that much
+        //       won't have much impact in production.
+        //       TODO Perhaps just remove it.
         for (peer_database::iterator itr = _potential_peer_db.begin(); itr != _potential_peer_db.end(); ++itr)
         {
           potential_peer_record updated_peer_record = *itr;
@@ -4109,6 +4267,11 @@ namespace graphene { namespace net { namespace detail {
         // those flags will prevent us from detecting that other applications are
         // listening on that port.  We'd like to detect that, so we'll set up a temporary
         // tcp server without that flag to see if we can listen on that port.
+        // Note: There is a race condition where another application may start listening
+        //       on the same port just after the temporary tcp server is destroyed and
+        //       before we try to listen with the real tcp server.
+        //       This happens frequently when running multiple test cases at the same
+        //       time, but less likely in production.
         bool first = true;
         for( ;; )
         {
@@ -4220,13 +4383,21 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       // if we're connecting to them, we believe they're not firewalled
-      potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
+      auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep(ep);
 
       // if we've recently connected to this peer, reset the last_connection_attempt_time to allow
       // us to immediately retry this peer
+      // Note: to make it work, we need to multiply _peer_connection_retry_timeout
+      //         by number_of_failed_connection_attempts.
+      //       However, this step is almost useless because we will immediately try to connect anyway
+      //         due to _add_once_node_list.
+      //       On the other hand, if we connected to the peer already but it was not in the peer database somehow,
+      //         this step makes sure that it will be added to the peer database.
+      auto delay_until_retry = fc::seconds( (updated_peer_record.number_of_failed_connection_attempts + 1)
+                                            * _peer_connection_retry_timeout );
       updated_peer_record.last_connection_attempt_time
             = std::min<fc::time_point_sec>( updated_peer_record.last_connection_attempt_time,
-                                            fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout) );
+                                            fc::time_point::now() - delay_until_retry );
       _add_once_node_list.push_back(updated_peer_record);
       _potential_peer_db.update_entry(updated_peer_record);
       trigger_p2p_network_connect_loop();
@@ -4239,6 +4410,44 @@ namespace graphene { namespace net { namespace detail {
       resolve_seed_node_and_add( endpoint_string );
    }
 
+   /**
+    * @brief Helper to convert a string to a collection of endpoints
+    *
+    * This converts a string (i.e. "bitshares.eu:665535") to a collection of endpoints.
+    * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+    *
+    * @param in the incoming string
+    * @returns a vector of endpoints
+    */
+   static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& in)
+   {
+      try
+      {
+         std::string::size_type colon_pos = in.find(':');
+         if (colon_pos == std::string::npos)
+            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", in));
+         std::string port_string = in.substr(colon_pos + 1);
+         try
+         {
+            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+            std::string hostname = in.substr(0, colon_pos);
+            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+            if (endpoints.empty())
+               FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                     "The host name can not be resolved: ${hostname}",
+                     ("hostname", hostname) );
+            return endpoints;
+         }
+         catch (const boost::bad_lexical_cast&)
+         {
+            FC_THROW("Bad port: ${port}", ("port", port_string));
+         }
+      }
+      FC_CAPTURE_AND_RETHROW((in))
+   }
+
    void node_impl::resolve_seed_node_and_add(const std::string& endpoint_string)
    {
       VERIFY_CORRECT_THREAD();
@@ -4246,7 +4455,7 @@ namespace graphene { namespace net { namespace detail {
       ilog("Resolving seed node ${endpoint}", ("endpoint", endpoint_string));
       try
       {
-         endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+         endpoints = resolve_string_to_ip_endpoints(endpoint_string);
       }
       catch(...)
       {
@@ -4283,7 +4492,7 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::connect_to_endpoint(const fc::ip::endpoint& remote_endpoint)
     {
       VERIFY_CORRECT_THREAD();
-      if (is_connection_to_endpoint_in_progress(remote_endpoint))
+      if( is_connected_to_endpoint(remote_endpoint) )
         FC_THROW_EXCEPTION(already_connected_to_requested_peer, "already connected to requested endpoint ${endpoint}",
                            ("endpoint", remote_endpoint));
 
@@ -4293,34 +4502,68 @@ namespace graphene { namespace net { namespace detail {
       initiate_connect_to(new_peer);
     }
 
-    peer_connection_ptr node_impl::get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint )
-    {
+   peer_connection_ptr node_impl::get_active_conn_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
+   {
       VERIFY_CORRECT_THREAD();
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
+      for( const peer_connection_ptr& active_peer : _active_connections )
       {
-         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
-         for( const peer_connection_ptr& active_peer : _active_connections )
+         // Note: for outbound connections, checking by remote_endpoint is OK,
+         //         and we will ignore the inbound address and port it sends to us when handshaking.
+         //       For an inbound active connection, we want to verify its inbound endpoint, if it happens to be
+         //         the same as remote_endpoint but not yet verified, we consider it as not connected.
+         //       * If verification succeeds, we will mark it as "verified" and won't try to connect again.
+         //       * We may fail to verify if it is firewalled, in this case number_of_failed_connection_attempts
+         //         will increase, so we will not reconnect soon, but will wait longer and longer.
+         fc::optional<fc::ip::endpoint> endpoint_for_this_peer = active_peer->get_remote_endpoint();
+         if( peer_connection_direction::outbound == active_peer->direction
+             && endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            return active_peer;
+         if( peer_connection_direction::inbound == active_peer->direction
+             && active_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
+             && *active_peer->get_endpoint_for_connecting() == remote_endpoint )
+            return active_peer;
+         for( const auto& ep : active_peer->additional_inbound_endpoints )
          {
-            fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
-            if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            if( ep == remote_endpoint )
                return active_peer;
          }
       }
+      return peer_connection_ptr();
+   }
+
+   peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const
+   {
+      VERIFY_CORRECT_THREAD();
+      peer_connection_ptr active_ptr = get_active_conn_for_endpoint( remote_endpoint );
+      if ( active_ptr != peer_connection_ptr() )
+         return active_ptr;
+      fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
+      for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
       {
-         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
-         for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
+         // For an inbound handshaking connection, there is a race condition since we might not know its node_id yet,
+         // so be stricter here.
+         // Even so, there may be situations that we end up having multiple active connections with them.
+         fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
+         if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            return handshaking_peer;
+         if( peer_connection_direction::inbound == handshaking_peer->direction
+             && handshaking_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
+             && *handshaking_peer->get_endpoint_for_connecting() == remote_endpoint )
+            return handshaking_peer;
+         for( const auto& ep : handshaking_peer->additional_inbound_endpoints )
          {
-            fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
-            if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            if( ep == remote_endpoint )
                return handshaking_peer;
          }
       }
       return peer_connection_ptr();
-    }
+   }
 
-    bool node_impl::is_connection_to_endpoint_in_progress( const fc::ip::endpoint& remote_endpoint )
+    bool node_impl::is_connected_to_endpoint( const fc::ip::endpoint& remote_endpoint ) const
     {
       VERIFY_CORRECT_THREAD();
-      return get_connection_to_endpoint( remote_endpoint ) != peer_connection_ptr();
+      return get_connection_for_endpoint( remote_endpoint ) != peer_connection_ptr();
     }
 
     void node_impl::move_peer_to_active_list(const peer_connection_ptr& peer)
@@ -4354,20 +4597,29 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       ilog( "----------------- PEER STATUS UPDATE --------------------" );
-      ilog( " number of peers: ${active} active, ${handshaking}, ${closing} closing.  attempting to maintain ${desired} - ${maximum} peers",
-           ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )("closing",_closing_connections.size() )
+      ilog( " number of peers: ${active} active, ${handshaking} handshaking, ${closing} closing. "
+            " attempting to maintain ${desired} - ${maximum} peers",
+           ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )
+           ( "closing", _closing_connections.size() )
            ( "desired", _desired_number_of_connections )("maximum", _maximum_number_of_connections ) );
       {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& peer : _active_connections )
          {
-            ilog( "       active peer ${endpoint} peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
+            ilog( "       active peer ${endpoint} [${direction}] (${inbound_ep} ${verified}) "
+                  "peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
                   ( "endpoint", peer->get_remote_endpoint() )
-                  ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )("in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
+                  ( "direction", peer->direction )
+                  ( "inbound_ep", peer->get_endpoint_for_connecting() )
+                  ( "verified", peer->inbound_endpoint_verified ? "verified" : "not_verified" )
+                  ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )
+                  ( "in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
             if( peer->we_need_sync_items_from_peer )
-               ilog( "              above peer has ${count} sync items we might need", ("count", peer->ids_of_items_to_get.size() ) );
+               ilog( "              above peer has ${count} sync items we might need",
+                     ("count", peer->ids_of_items_to_get.size() ) );
             if (peer->inhibit_fetching_sync_blocks)
-               ilog( "              we are not fetching sync blocks from the above peer (inhibit_fetching_sync_blocks == true)" );
+               ilog( "              we are not fetching sync blocks from the above peer "
+                     "(inhibit_fetching_sync_blocks == true)" );
 
          }
       }
@@ -4375,8 +4627,10 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr& peer : _handshaking_connections )
          {
-            ilog( "  handshaking peer ${endpoint} in state ours(${our_state}) theirs(${their_state})",
-                  ( "endpoint", peer->get_remote_endpoint() )("our_state", peer->our_state )("their_state", peer->their_state ) );
+            ilog( "  handshaking peer ${endpoint} [${direction}] in state ours(${our_state}) theirs(${their_state})",
+                  ( "endpoint", peer->get_remote_endpoint() )
+                  ( "direction", peer->direction )
+                  ( "our_state", peer->our_state )( "their_state", peer->their_state ) );
          }
       }
       ilog( "--------- MEMORY USAGE ------------" );
@@ -4416,9 +4670,10 @@ namespace graphene { namespace net { namespace detail {
       {
         // we're the first to try to want to close the connection
         fc::optional<fc::ip::endpoint> inbound_endpoint = peer_to_disconnect->get_endpoint_for_connecting();
-        if (inbound_endpoint)
+        if( inbound_endpoint.valid() && inbound_endpoint->port() != 0 )
         {
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
+          fc::optional<potential_peer_record> updated_peer_record
+                = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
           if (updated_peer_record)
           {
             updated_peer_record->last_seen_time = fc::time_point::now();
@@ -4451,7 +4706,7 @@ namespace graphene { namespace net { namespace detail {
         dlog("Disconnecting from ${peer} for ${reason}", ("peer",peer_to_disconnect->get_remote_endpoint()) ("reason",reason_for_disconnect));
     }
 
-    void node_impl::listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available )
+    void node_impl::set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available )
     {
       VERIFY_CORRECT_THREAD();
       _node_configuration.listen_endpoint = ep;
@@ -4459,20 +4714,26 @@ namespace graphene { namespace net { namespace detail {
       save_node_configuration();
     }
 
-    void node_impl::accept_incoming_connections(bool accept)
+    void node_impl::set_inbound_endpoint( const fc::ip::endpoint& ep )
+    {
+      VERIFY_CORRECT_THREAD();
+      _node_configuration.inbound_endpoint = ep;
+      save_node_configuration();
+    }
+
+    void node_impl::set_accept_incoming_connections(bool accept)
     {
       VERIFY_CORRECT_THREAD();
       _node_configuration.accept_incoming_connections = accept;
       save_node_configuration();
     }
 
-    void node_impl::listen_on_port( uint16_t port, bool wait_if_not_available )
-    {
+   void node_impl::set_connect_to_new_peers( bool connect )
+   {
       VERIFY_CORRECT_THREAD();
-      _node_configuration.listen_endpoint = fc::ip::endpoint( fc::ip::address(), port );
-      _node_configuration.wait_if_endpoint_is_busy = wait_if_not_available;
+      _node_configuration.connect_to_new_peers = connect;
       save_node_configuration();
-    }
+   }
 
     fc::ip::endpoint node_impl::get_actual_listening_endpoint() const
     {
@@ -4624,6 +4885,8 @@ namespace graphene { namespace net { namespace detail {
         _desired_number_of_connections = params["desired_number_of_connections"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_connections"))
         _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>(1);
+      if (params.contains("max_addresses_to_handle_at_once"))
+        _max_addrs_to_handle_at_once = params["max_addresses_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_blocks_to_handle_at_once"))
         _max_blocks_to_handle_at_once = params["max_blocks_to_handle_at_once"].as<uint32_t>(1);
       if (params.contains("max_sync_blocks_to_prefetch"))
@@ -4646,19 +4909,22 @@ namespace graphene { namespace net { namespace detail {
       result["peer_connection_retry_timeout"] = _peer_connection_retry_timeout;
       result["desired_number_of_connections"] = _desired_number_of_connections;
       result["maximum_number_of_connections"] = _maximum_number_of_connections;
+      result["max_addresses_to_handle_at_once"] = _max_addrs_to_handle_at_once;
       result["max_blocks_to_handle_at_once"] = _max_blocks_to_handle_at_once;
       result["max_sync_blocks_to_prefetch"] = _max_sync_blocks_to_prefetch;
       result["max_sync_blocks_per_peer"] = _max_sync_blocks_per_peer;
       return result;
     }
 
-    message_propagation_data node_impl::get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id )
+    message_propagation_data node_impl::get_tx_propagation_data(
+          const graphene::net::transaction_id_type& transaction_id ) const
     {
       VERIFY_CORRECT_THREAD();
       return _message_cache.get_message_propagation_data( transaction_id );
     }
 
-    message_propagation_data node_impl::get_block_propagation_data( const graphene::net::block_id_type& block_id )
+    message_propagation_data node_impl::get_block_propagation_data(
+          const graphene::net::block_id_type& block_id ) const
     {
       VERIFY_CORRECT_THREAD();
       return _message_cache.get_message_propagation_data( block_id );
@@ -4700,12 +4966,6 @@ namespace graphene { namespace net { namespace detail {
       _rate_limiter.set_download_limit( download_bytes_per_second );
     }
 
-    void node_impl::disable_peer_advertising()
-    {
-      VERIFY_CORRECT_THREAD();
-      _peer_advertising_disabled = true;
-    }
-
     fc::variant_object node_impl::get_call_statistics() const
     {
       VERIFY_CORRECT_THREAD();
@@ -4716,10 +4976,9 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       fc::mutable_variant_object info;
-      info["listening_on"] = _actual_listening_endpoint;
+      info["listening_on"] = std::string( _actual_listening_endpoint );
       info["node_public_key"] = fc::variant( _node_public_key, 1 );
       info["node_id"] = fc::variant( _node_id, 1 );
-      info["firewalled"] = fc::variant( _is_firewalled, 1 );
       return info;
     }
     fc::variant_object node_impl::network_get_usage_stats() const
@@ -4796,44 +5055,49 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(set_node_delegate, del, delegate_thread);
   }
 
-  void node::load_configuration( const fc::path& configuration_directory )
+  void node::load_configuration( const fc::path& configuration_directory ) const
   {
     INVOKE_IN_IMPL(load_configuration, configuration_directory);
   }
 
-  void node::listen_to_p2p_network()
+  void node::listen_to_p2p_network() const
   {
     INVOKE_IN_IMPL(listen_to_p2p_network);
   }
 
-  void node::connect_to_p2p_network()
+  void node::connect_to_p2p_network() const
   {
     INVOKE_IN_IMPL(connect_to_p2p_network, my);
   }
 
-  void node::add_node( const fc::ip::endpoint& ep )
+  void node::add_node( const fc::ip::endpoint& ep ) const
   {
     INVOKE_IN_IMPL(add_node, ep);
   }
 
-  void node::connect_to_endpoint( const fc::ip::endpoint& remote_endpoint )
+  void node::connect_to_endpoint( const fc::ip::endpoint& remote_endpoint ) const
   {
     INVOKE_IN_IMPL(connect_to_endpoint, remote_endpoint);
   }
 
-  void node::listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available)
+  void node::set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available) const
   {
-    INVOKE_IN_IMPL(listen_on_endpoint, ep, wait_if_not_available);
+    INVOKE_IN_IMPL(set_listen_endpoint, ep, wait_if_not_available);
   }
 
-  void node::accept_incoming_connections(bool accept)
+  void node::set_inbound_endpoint(const fc::ip::endpoint& ep ) const
   {
-    INVOKE_IN_IMPL(accept_incoming_connections, accept);
+    INVOKE_IN_IMPL( set_inbound_endpoint, ep );
   }
 
-  void node::listen_on_port( uint16_t port, bool wait_if_not_available )
+  void node::set_accept_incoming_connections(bool accept) const
   {
-    INVOKE_IN_IMPL(listen_on_port, port, wait_if_not_available);
+    INVOKE_IN_IMPL(set_accept_incoming_connections, accept);
+  }
+
+  void node::set_connect_to_new_peers( bool connect ) const
+  {
+     INVOKE_IN_IMPL( set_connect_to_new_peers, connect );
   }
 
   fc::ip::endpoint node::get_actual_listening_endpoint() const
@@ -4851,12 +5115,12 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_connection_count);
   }
 
-  void node::broadcast( const message& msg )
+  void node::broadcast( const message& msg ) const
   {
     INVOKE_IN_IMPL(broadcast, msg);
   }
 
-  void node::sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers)
+  void node::sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) const
   {
     INVOKE_IN_IMPL(sync_from, current_head_block, hard_fork_block_numbers);
   }
@@ -4871,22 +5135,23 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_potential_peers);
   }
 
-  void node::set_advanced_node_parameters( const fc::variant_object& params )
+  void node::set_advanced_node_parameters( const fc::variant_object& params ) const
   {
     INVOKE_IN_IMPL(set_advanced_node_parameters, params);
   }
 
-  fc::variant_object node::get_advanced_node_parameters()
+  fc::variant_object node::get_advanced_node_parameters() const
   {
     INVOKE_IN_IMPL(get_advanced_node_parameters);
   }
 
-  message_propagation_data node::get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id )
+  message_propagation_data node::get_tx_propagation_data(
+        const graphene::net::transaction_id_type& transaction_id ) const
   {
-    INVOKE_IN_IMPL(get_transaction_propagation_data, transaction_id);
+    INVOKE_IN_IMPL(get_tx_propagation_data, transaction_id);
   }
 
-  message_propagation_data node::get_block_propagation_data( const graphene::net::block_id_type& block_id )
+  message_propagation_data node::get_block_propagation_data( const graphene::net::block_id_type& block_id ) const
   {
     INVOKE_IN_IMPL(get_block_propagation_data, block_id);
   }
@@ -4896,25 +5161,20 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(get_node_id);
   }
 
-  void node::set_allowed_peers( const std::vector<node_id_t>& allowed_peers )
+  void node::set_allowed_peers( const std::vector<node_id_t>& allowed_peers ) const
   {
     INVOKE_IN_IMPL(set_allowed_peers, allowed_peers);
   }
 
-  void node::clear_peer_database()
+  void node::clear_peer_database() const
   {
     INVOKE_IN_IMPL(clear_peer_database);
   }
 
   void node::set_total_bandwidth_limit(uint32_t upload_bytes_per_second,
-                                       uint32_t download_bytes_per_second)
+                                       uint32_t download_bytes_per_second) const
   {
     INVOKE_IN_IMPL(set_total_bandwidth_limit, upload_bytes_per_second, download_bytes_per_second);
-  }
-
-  void node::disable_peer_advertising()
-  {
-    INVOKE_IN_IMPL(disable_peer_advertising);
   }
 
   fc::variant_object node::get_call_statistics() const
@@ -4932,7 +5192,7 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(network_get_usage_stats);
   }
 
-  void node::close()
+  void node::close() const
   {
     INVOKE_IN_IMPL(close);
   }
@@ -5129,37 +5389,7 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
-   // TODO move this function to impl class
-   std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
-   {
-      try
-      {
-         std::string::size_type colon_pos = in.find(':');
-         if (colon_pos == std::string::npos)
-            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", in));
-         std::string port_string = in.substr(colon_pos + 1);
-         try
-         {
-            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-            std::string hostname = in.substr(0, colon_pos);
-            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-            if (endpoints.empty())
-               FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                     "The host name can not be resolved: ${hostname}",
-                     ("hostname", hostname) );
-            return endpoints;
-         }
-         catch (const boost::bad_lexical_cast&)
-         {
-            FC_THROW("Bad port: ${port}", ("port", port_string));
-         }
-      }
-      FC_CAPTURE_AND_RETHROW((in))
-   }
-
-   void node::add_seed_nodes(std::vector<std::string> seeds)
+   void node::add_seed_nodes(const std::vector<std::string>& seeds) const
    {
       for(const std::string& endpoint_string : seeds )
       {
@@ -5172,9 +5402,15 @@ namespace graphene { namespace net { namespace detail {
       }
    }
 
-   void node::add_seed_node(const std::string& in)
+   void node::add_seed_node(const std::string& in) const
    {
       INVOKE_IN_IMPL(add_seed_node, in);
+   }
+
+   void node::set_advertise_algorithm( const std::string& algo,
+         const std::vector<std::string>& advertise_or_exclude_list ) const
+   {
+      INVOKE_IN_IMPL( set_advertise_algorithm, algo, advertise_or_exclude_list );
    }
 
 } } // end namespace graphene::net

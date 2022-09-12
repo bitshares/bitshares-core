@@ -28,9 +28,7 @@
 
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
-#include <fc/io/raw_fwd.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace net {
 

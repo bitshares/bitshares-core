@@ -354,6 +354,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
 
 
       }
+      // Note: this test case ends too quickly, sometimes causing an memory access violation on cleanup
    }
    catch (fc::exception &e) {
       edump((e.to_detail_string()));
