@@ -84,6 +84,19 @@ namespace graphene { namespace app {
       string                     price;
       string                     quote;
       string                     base;
+      limit_order_id_type        id;
+      account_id_type            owner_id;
+      string                     owner_name;
+      time_point_sec             expiration;
+
+      order() = default;
+      order( const string& _price,
+             const string& _quote,
+             const string& _base,
+             const limit_order_id_type& _id,
+             const account_id_type& _oid,
+             const string& _oname,
+             const time_point_sec& _exp );
    };
 
    struct order_book
@@ -92,6 +105,8 @@ namespace graphene { namespace app {
      string                      quote;
      vector< order >             bids;
      vector< order >             asks;
+     order_book() = default;
+     order_book( const string& _base, const string& _quote );
    };
 
    struct market_ticker
@@ -191,7 +206,7 @@ FC_REFLECT( graphene::app::full_account,
             (more_data_available)
           )
 
-FC_REFLECT( graphene::app::order, (price)(quote)(base) )
+FC_REFLECT( graphene::app::order, (price)(quote)(base)(id)(owner_id)(owner_name)(expiration) )
 FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) )
 FC_REFLECT( graphene::app::market_ticker,
             (time)(base)(quote)(latest)(lowest_ask)(lowest_ask_base_size)(lowest_ask_quote_size)
