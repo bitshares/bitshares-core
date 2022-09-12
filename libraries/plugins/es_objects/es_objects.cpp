@@ -89,7 +89,7 @@ class es_objects_plugin_impl
 
          uint32_t start_es_after_block = 0;
          bool sync_db_on_startup = false;
-         
+
          void init(const boost::program_options::variables_map& options);
       };
 
