@@ -1417,9 +1417,7 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );
 
-   order_book result;
-   result.base = base;
-   result.quote = quote;
+   order_book result( base, quote );
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1431,25 +1429,24 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
 
    for( const auto& o : orders )
    {
+      auto order_price = price_to_string( o.sell_price, *assets[0], *assets[1] );
       if( o.sell_price.base.asset_id == base_id )
       {
-         order ord;
-         ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
-         ord.quote = assets[1]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+         auto quote_amt = assets[1]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
                                                               * o.sell_price.quote.amount.value
                                                               / o.sell_price.base.amount.value ) );
-         ord.base = assets[0]->amount_to_string( o.for_sale );
-         result.bids.push_back( ord );
+         auto base_amt = assets[0]->amount_to_string( o.for_sale );
+         result.bids.emplace_back( order_price, quote_amt, base_amt, o.id,
+                                   o.seller, o.seller(_db).name, o.expiration );
       }
       else
       {
-         order ord;
-         ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
-         ord.quote = assets[1]->amount_to_string( o.for_sale );
-         ord.base = assets[0]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+         auto quote_amt = assets[1]->amount_to_string( o.for_sale );
+         auto base_amt = assets[0]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
                                                              * o.sell_price.quote.amount.value
                                                              / o.sell_price.base.amount.value ) );
-         result.asks.push_back( ord );
+         result.asks.emplace_back( order_price, quote_amt, base_amt, o.id,
+                                   o.seller, o.seller(_db).name, o.expiration );
       }
    }
 
