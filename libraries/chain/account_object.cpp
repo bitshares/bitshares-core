@@ -312,6 +312,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
                     (owner_special_authority)(active_special_authority)
                     (top_n_control_flags)
                     (allowed_assets)
+                    (creation_block_num)(creation_time)
                     )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_balance_object,

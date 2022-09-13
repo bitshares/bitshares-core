@@ -768,7 +768,10 @@ namespace graphene { namespace chain {
           */
          vector<optional<operation_history_object> >  _applied_ops;
 
+      public:
+         fc::time_point_sec                _current_block_time;
          uint32_t                          _current_block_num    = 0;
+      private:
          uint16_t                          _current_trx_in_block = 0;
          uint16_t                          _current_op_in_trx    = 0;
          uint32_t                          _current_virtual_op   = 0;

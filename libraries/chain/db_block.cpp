@@ -611,6 +611,8 @@ void database::_apply_block( const signed_block& next_block )
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
 
+   _current_block_time   = next_block.timestamp;
+
    _issue_453_affected_assets.clear();
 
    signed_block processed_block( next_block ); // make a copy

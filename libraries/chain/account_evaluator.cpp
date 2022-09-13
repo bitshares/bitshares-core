@@ -177,7 +177,8 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 
    const auto& global_properties = d.get_global_properties();
 
-   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]( account_object& obj )
+   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]
+                                                           ( account_object& obj )
    {
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
@@ -208,6 +209,9 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
             obj.allowed_assets = o.extensions.value.buyback_options->markets;
             obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
          }
+
+         obj.creation_block_num = d._current_block_num;
+         obj.creation_time      = d._current_block_time;
    });
 
    const auto& dynamic_properties = d.get_dynamic_global_properties();
