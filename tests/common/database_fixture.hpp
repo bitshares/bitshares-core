@@ -585,6 +585,15 @@ struct database_fixture_init : database_fixture_base {
       asset_id_type mpa1_id(1);
       BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
       BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
+
+      BOOST_CHECK_EQUAL( account_id_type()(db).creation_block_num, 0 );
+      BOOST_CHECK( account_id_type()(db).creation_time == genesis_state.initial_timestamp );
+
+      BOOST_CHECK_EQUAL( asset_id_type()(db).creation_block_num, 0 );
+      BOOST_CHECK( asset_id_type()(db).creation_time == genesis_state.initial_timestamp );
+
+      BOOST_CHECK_EQUAL( mpa1_id(db).creation_block_num, 0 );
+      BOOST_CHECK( mpa1_id(db).creation_time == genesis_state.initial_timestamp );
    }
 
    static void init( database_fixture_init<F>& fixture )
