@@ -2089,7 +2089,22 @@ namespace graphene { namespace net { namespace detail {
         }
       }
       // else if this was an active connection, then this was just a reply to our periodic address requests.
-      // we've processed it, there's nothing else to do
+      // we've processed it.
+      // Now seems like a good time to review the peer's inbound endpoint and firewalled state
+      else if( !originating_peer->inbound_endpoint_verified // which implies direction == inbound
+               && originating_peer->inbound_port != 0 // Ignore if the peer is not listening
+               // We try not to update it a 2nd time
+               && originating_peer->get_remote_endpoint() != originating_peer->get_endpoint_for_connecting() )
+      {
+         // Our best guess for the peer's inbound endpoint now is its remote endpoint,
+         // unless we are behind a reverse proxy, in which case we try to use a public address
+         if( originating_peer->get_remote_endpoint()->get_address().is_public_address()
+             || !originating_peer->get_endpoint_for_connecting()->get_address().is_public_address() )
+            originating_peer->remote_inbound_endpoint = originating_peer->get_remote_endpoint();
+         // else do nothing
+
+         // We could reinitialize inbound endpoint verification here, but it doesn't seem necessary
+      }
    }
 
     void node_impl::on_fetch_blockchain_item_ids_message(peer_connection* originating_peer,
