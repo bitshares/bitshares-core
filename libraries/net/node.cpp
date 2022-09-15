@@ -4549,15 +4549,11 @@ namespace graphene { namespace net { namespace detail {
          if( peer_connection_direction::outbound == active_peer->direction
              && endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
             return active_peer;
-         if( peer_connection_direction::inbound == active_peer->direction
-             && active_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
-             && *active_peer->get_endpoint_for_connecting() == remote_endpoint )
+         // Note: if it is an inbound connection and its inbound endpoint is verified already,
+         //       the inbound endpoint should be in additional_inbound_endpoints
+         if( active_peer->additional_inbound_endpoints.find( remote_endpoint )
+             != active_peer->additional_inbound_endpoints.end() )
             return active_peer;
-         for( const auto& ep : active_peer->additional_inbound_endpoints )
-         {
-            if( ep == remote_endpoint )
-               return active_peer;
-         }
       }
       return peer_connection_ptr();
    }
@@ -4577,15 +4573,11 @@ namespace graphene { namespace net { namespace detail {
          fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
          if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
             return handshaking_peer;
-         if( peer_connection_direction::inbound == handshaking_peer->direction
-             && handshaking_peer->inbound_endpoint_verified // which implies get_endpoint_for_connecting().valid()
-             && *handshaking_peer->get_endpoint_for_connecting() == remote_endpoint )
+         // Note: if it is an inbound connection and its inbound endpoint is verified already,
+         //       the inbound endpoint should be in additional_inbound_endpoints
+         if( handshaking_peer->additional_inbound_endpoints.find( remote_endpoint )
+             != handshaking_peer->additional_inbound_endpoints.end() )
             return handshaking_peer;
-         for( const auto& ep : handshaking_peer->additional_inbound_endpoints )
-         {
-            if( ep == remote_endpoint )
-               return handshaking_peer;
-         }
       }
       return peer_connection_ptr();
    }
