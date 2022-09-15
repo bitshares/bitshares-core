@@ -195,12 +195,14 @@ namespace graphene { namespace net
       fc::ip::address inbound_address;
       uint16_t inbound_port = 0;
       uint16_t outbound_port = 0;
-      /// The inbound endpoint of the remote peer
+      /// The inbound endpoint of the remote peer (our best guess)
       fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
       /// Whether the inbound endpoint of the remote peer is verified
       bool inbound_endpoint_verified = false;
       /// Some nodes may be listening on multiple endpoints
       fc::flat_set<fc::ip::endpoint> additional_inbound_endpoints;
+      /// Potential inbound endpoints of the peer
+      fc::flat_map<fc::ip::endpoint, firewalled_state> potential_inbound_endpoints;
       /// @}
 
       using item_to_time_map_type = std::unordered_map<item_id, fc::time_point>;

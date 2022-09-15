@@ -1376,6 +1376,9 @@ namespace graphene { namespace net { namespace detail {
            ("endpoint", originating_peer->get_remote_endpoint()));
       // Gatekeeping code
       if( originating_peer->we_have_requested_close
+          // allow hello_message so we can learn more about the peer
+          && received_message.msg_type.value() != core_message_type_enum::hello_message_type
+          // allow closing_connection_message so we can finish disconnecting
           && received_message.msg_type.value() != core_message_type_enum::closing_connection_message_type )
       {
          dlog( "Unexpected message from peer ${peer} while we have requested to close connection",
@@ -1751,9 +1754,14 @@ namespace graphene { namespace net { namespace detail {
               auto old_inbound_endpoint = already_connected_peer->get_endpoint_for_connecting();
               auto new_inbound_endpoint = originating_peer->get_remote_endpoint();
               already_connected_peer->additional_inbound_endpoints.insert( *new_inbound_endpoint );
-              if ( !already_connected_peer->inbound_endpoint_verified // which implies direction == inbound
-                   || new_inbound_endpoint->get_address().is_public_address()
-                   || !old_inbound_endpoint->get_address().is_public_address() )
+              if( peer_connection_direction::inbound == already_connected_peer->direction )
+              {
+                 already_connected_peer->potential_inbound_endpoints[*new_inbound_endpoint]
+                       = firewalled_state::not_firewalled;
+              }
+              if( !already_connected_peer->inbound_endpoint_verified // which implies direction == inbound
+                  || new_inbound_endpoint->get_address().is_public_address()
+                  || !old_inbound_endpoint->get_address().is_public_address() )
               {
                  ilog( "Saving verification result ${ep} for peer ${peer} with id ${id}",
                        ("ep", new_inbound_endpoint)
@@ -1836,6 +1844,8 @@ namespace graphene { namespace net { namespace detail {
                 auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_ep( ep );
                 updated_peer_record.last_seen_time = fc::time_point::now();
                 _potential_peer_db.update_entry( updated_peer_record );
+                // mark as a potential inbound address
+                originating_peer->potential_inbound_endpoints[ep] = firewalled_state::unknown;
              }
 
              // Note: we don't update originating_peer->is_firewalled, because we might guess wrong
@@ -3666,6 +3676,12 @@ namespace graphene { namespace net { namespace detail {
         _last_reported_number_of_conns = (uint32_t)_active_connections.size();
         _delegate->connection_count_changed( _last_reported_number_of_conns );
       }
+      // If it is an inbound connection, try to verify its inbound endpoint
+      if( peer_connection_direction::inbound == peer->direction )
+      {
+         for( const auto& potential_inbound_endpoint : peer->potential_inbound_endpoints )
+            _add_once_node_list.push_back( potential_peer_record( potential_inbound_endpoint.first ) );
+      }
     }
 
     void node_impl::close()
@@ -4128,6 +4144,10 @@ namespace graphene { namespace net { namespace detail {
         else
           updated_peer_record.last_error = *connect_failed_exception;
         _potential_peer_db.update_entry(updated_peer_record);
+
+        // If this is for inbound endpoint verification,
+        // here we could try to find the original connection and update its firewalled state,
+        // but it doesn't seem necessary.
 
         // if the connection failed, we want to disconnect now.
         _handshaking_connections.erase(new_peer);
@@ -4665,6 +4685,12 @@ namespace graphene { namespace net { namespace detail {
       {
         // the peer has already told us that it's ready to close the connection, so just close the connection
         peer_to_disconnect->close_connection();
+      }
+      else if( peer_to_disconnect->we_have_requested_close )
+      {
+         dlog( "Disconnecting again from ${peer} for ${reason}, ignore",
+              ("peer",peer_to_disconnect->get_remote_endpoint()) ("reason",reason_for_disconnect));
+         return;
       }
       else
       {
