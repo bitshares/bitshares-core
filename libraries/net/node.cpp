@@ -1677,7 +1677,7 @@ namespace graphene { namespace net { namespace detail {
          // In addition, by now, our list or exclude list for peer advertisement only contains IP endpoints but not
          // nodes' public keys (we can't use node_id because it changes every time the node restarts). Using a valid
          // address is better for the purpose.
-         if( originating_peer->inbound_port == 0 )
+         if( 0 == originating_peer->inbound_port )
             originating_peer->remote_inbound_endpoint = fc::ip::endpoint( remote_endpoint->get_address() );
          else if( originating_peer->inbound_address.is_public_address()
                   || originating_peer->inbound_address == remote_endpoint->get_address() )
