@@ -197,8 +197,6 @@ namespace graphene { namespace net
       uint16_t outbound_port = 0;
       /// The inbound endpoint of the remote peer (our best guess)
       fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
-      /// Whether the inbound endpoint of the remote peer is verified
-      bool inbound_endpoint_verified = false;
       /// Some nodes may be listening on multiple endpoints
       fc::flat_set<fc::ip::endpoint> additional_inbound_endpoints;
       /// Potential inbound endpoints of the peer

@@ -800,7 +800,6 @@ BOOST_AUTO_TEST_CASE( hello_already_connected )
    {
       fc::ip::endpoint peer3_ep = fc::ip::endpoint::from_string( std::string("1.2.3.4:5678") );
       BOOST_CHECK( *node2_ptr->remote_inbound_endpoint == peer3_ep );
-      BOOST_CHECK( node2_ptr->inbound_endpoint_verified );
       BOOST_CHECK( graphene::net::firewalled_state::not_firewalled == node2_ptr->is_firewalled );
       BOOST_REQUIRE_EQUAL( node2_ptr->additional_inbound_endpoints.size(), 1u );
       BOOST_CHECK( *node2_ptr->additional_inbound_endpoints.begin() == peer3_ep );

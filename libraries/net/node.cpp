@@ -1767,7 +1767,7 @@ namespace graphene { namespace net { namespace detail {
                  already_connected_peer->potential_inbound_endpoints[*remote_endpoint]
                        = firewalled_state::not_firewalled;
               }
-              if( !already_connected_peer->inbound_endpoint_verified // which implies direction == inbound
+              if( already_connected_peer->is_firewalled != firewalled_state::not_firewalled // implies it's inbound
                   || remote_endpoint->get_address().is_public_address()
                   || !already_connected_peer->get_endpoint_for_connecting()->get_address().is_public_address() )
               {
@@ -1776,7 +1776,6 @@ namespace graphene { namespace net { namespace detail {
                        ("peer", already_connected_endpoint)
                        ("id", already_connected_peer->node_id) );
                  already_connected_peer->remote_inbound_endpoint = remote_endpoint;
-                 already_connected_peer->inbound_endpoint_verified = true;
                  already_connected_peer->is_firewalled = firewalled_state::not_firewalled;
               }
               // If the already connected peer is in the active connections list, save the endpoint to the peer db
@@ -4628,12 +4627,12 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& peer : _active_connections )
          {
-            ilog( "       active peer ${endpoint} [${direction}] (${inbound_ep} ${verified}) "
+            ilog( "       active peer ${endpoint} [${direction}] (${inbound_ep} ${is_firewalled}) "
                   "peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
                   ( "endpoint", peer->get_remote_endpoint() )
                   ( "direction", peer->direction )
                   ( "inbound_ep", peer->get_endpoint_for_connecting() )
-                  ( "verified", peer->inbound_endpoint_verified ? "verified" : "not_verified" )
+                  ( "is_firewalled", peer->is_firewalled)
                   ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )
                   ( "in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
             if( peer->we_need_sync_items_from_peer )
