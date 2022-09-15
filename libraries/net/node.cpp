@@ -3680,7 +3680,7 @@ namespace graphene { namespace net { namespace detail {
       if( peer_connection_direction::inbound == peer->direction )
       {
          for( const auto& potential_inbound_endpoint : peer->potential_inbound_endpoints )
-            _add_once_node_list.push_back( potential_peer_record( potential_inbound_endpoint.first ) );
+            _add_once_node_list.emplace_back( potential_inbound_endpoint.first );
       }
     }
 
