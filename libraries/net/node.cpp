@@ -2098,9 +2098,10 @@ namespace graphene { namespace net { namespace detail {
       {
          // Our best guess for the peer's inbound endpoint now is its remote endpoint,
          // unless we are behind a reverse proxy, in which case we try to use a public address
-         if( originating_peer->get_remote_endpoint()->get_address().is_public_address()
+         auto remote_endpoint = originating_peer->get_remote_endpoint(); // Note: this returns a copy
+         if( remote_endpoint->get_address().is_public_address()
              || !originating_peer->get_endpoint_for_connecting()->get_address().is_public_address() )
-            originating_peer->remote_inbound_endpoint = originating_peer->get_remote_endpoint();
+            originating_peer->remote_inbound_endpoint = remote_endpoint;
          // else do nothing
 
          // We could reinitialize inbound endpoint verification here, but it doesn't seem necessary
