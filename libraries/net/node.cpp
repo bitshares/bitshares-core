@@ -4569,7 +4569,7 @@ namespace graphene { namespace net { namespace detail {
          // For an inbound handshaking connection, there is a race condition since we might not know its node_id yet,
          // so be stricter here.
          // Even so, there may be situations that we end up having multiple active connections with them.
-         fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
+         fc::optional<fc::ip::endpoint> endpoint_for_this_peer = handshaking_peer->get_remote_endpoint();
          if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
             return handshaking_peer;
          // Note: if it is an inbound connection and its inbound endpoint is verified already,
