@@ -227,27 +227,28 @@ void database_api_impl::cancel_all_subscriptions( bool reset_callback, bool rese
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-optional<block_header> database_api::get_block_header(uint32_t block_num)const
+optional<signed_block_header> database_api::get_block_header(uint32_t block_num)const
 {
    return my->get_block_header( block_num );
 }
 
-optional<block_header> database_api_impl::get_block_header(uint32_t block_num) const
+optional<signed_block_header> database_api_impl::get_block_header(uint32_t block_num) const
 {
    auto result = _db.fetch_block_by_number(block_num);
    if(result)
       return *result;
    return {};
 }
-map<uint32_t, optional<block_header>> database_api::get_block_header_batch(const vector<uint32_t> block_nums)const
+map<uint32_t, optional<signed_block_header>> database_api::get_block_header_batch(
+      const vector<uint32_t> block_nums) const
 {
    return my->get_block_header_batch( block_nums );
 }
 
-map<uint32_t, optional<block_header>> database_api_impl::get_block_header_batch(
-                                         const vector<uint32_t> block_nums) const
+map<uint32_t, optional<signed_block_header>> database_api_impl::get_block_header_batch(
+      const vector<uint32_t> block_nums) const
 {
-   map<uint32_t, optional<block_header>> results;
+   map<uint32_t, optional<signed_block_header>> results;
    for (const uint32_t block_num : block_nums)
    {
       results[block_num] = get_block_header(block_num);
