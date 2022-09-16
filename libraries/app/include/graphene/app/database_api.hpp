@@ -153,18 +153,18 @@ class database_api
       /////////////////////////////
 
       /**
-       * @brief Retrieve a block header
+       * @brief Retrieve a signed block header
        * @param block_num Height of the block whose header should be returned
        * @return header of the referenced block, or null if no matching block was found
        */
-      optional<block_header> get_block_header(uint32_t block_num)const;
+      optional<signed_block_header> get_block_header(uint32_t block_num)const;
 
       /**
-      * @brief Retrieve multiple block header by block numbers
-      * @param block_nums vector containing heights of the block whose header should be returned
+      * @brief Retrieve multiple signed block headers by block numbers
+      * @param block_nums vector containing heights of the blocks whose headers should be returned
       * @return array of headers of the referenced blocks, or null if no matching block was found
       */
-      map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
+      map<uint32_t, optional<signed_block_header>> get_block_header_batch(const vector<uint32_t>& block_nums)const;
 
       /**
        * @brief Retrieve a full, signed block
