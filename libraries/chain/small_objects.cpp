@@ -139,7 +139,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::db::obj
                (transfer) (conditions) (memo) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::operation_history_object, (graphene::chain::object),
-                    (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
+                    (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op)(is_virtual) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_history_object, (graphene::chain::object),
                     (account)(operation_id)(sequence)(next) )
