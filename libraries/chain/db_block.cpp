@@ -535,7 +535,7 @@ void database::clear_pending()
 uint32_t database::push_applied_operation( const operation& op, bool is_virtual /* = true */ )
 {
    _applied_ops.emplace_back( operation_history_object( op, _current_block_num, _current_trx_in_block,
-                                                        _current_op_in_trx, _current_virtual_op, is_virtual ) );
+                                    _current_op_in_trx, _current_virtual_op, is_virtual, _current_block_time ) );
    ++_current_virtual_op;
    return _applied_ops.size() - 1;
 }
