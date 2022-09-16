@@ -108,6 +108,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
                h.trx_in_block = o_op->trx_in_block;
                h.op_in_trx    = o_op->op_in_trx;
                h.virtual_op   = o_op->virtual_op;
+               h.is_virtual   = o_op->is_virtual;
+               h.block_time   = o_op->block_time;
             }
          } ) );
       };
