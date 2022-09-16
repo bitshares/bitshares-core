@@ -164,7 +164,7 @@ class database_api
       * @param block_nums vector containing heights of the blocks whose headers should be returned
       * @return array of headers of the referenced blocks, or null if no matching block was found
       */
-      map<uint32_t, optional<signed_block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
+      map<uint32_t, optional<signed_block_header>> get_block_header_batch(const vector<uint32_t>& block_nums)const;
 
       /**
        * @brief Retrieve a full, signed block

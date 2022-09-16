@@ -240,13 +240,13 @@ optional<signed_block_header> database_api_impl::get_block_header(uint32_t block
    return {};
 }
 map<uint32_t, optional<signed_block_header>> database_api::get_block_header_batch(
-      const vector<uint32_t> block_nums) const
+      const vector<uint32_t>& block_nums) const
 {
    return my->get_block_header_batch( block_nums );
 }
 
 map<uint32_t, optional<signed_block_header>> database_api_impl::get_block_header_batch(
-      const vector<uint32_t> block_nums) const
+      const vector<uint32_t>& block_nums) const
 {
    map<uint32_t, optional<signed_block_header>> results;
    for (const uint32_t block_num : block_nums)
