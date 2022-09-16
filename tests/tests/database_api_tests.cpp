@@ -1479,6 +1479,75 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
 
 } FC_LOG_AND_RETHROW() }
 
+/// Tests get_block, get_block_header, get_block_header_batch
+BOOST_AUTO_TEST_CASE( get_block_tests )
+{ try {
+
+   generate_block();
+
+   ACTORS( (nathan) );
+   auto block1 = generate_block( ~graphene::chain::database::skip_witness_signature );
+   auto block2 = generate_block( ~graphene::chain::database::skip_witness_signature );
+
+   fund( nathan_id(db) );
+   auto block3 = generate_block( ~graphene::chain::database::skip_witness_signature );
+
+   idump( (block1)(block2)(block3) );
+
+   uint32_t head_block_num = db.head_block_num();
+
+   graphene::app::database_api db_api(db);
+   auto head_block = db_api.get_block( head_block_num );
+   idump( (head_block) );
+   BOOST_REQUIRE( head_block.valid() );
+   BOOST_CHECK_EQUAL( head_block->block_num(), head_block_num );
+   BOOST_CHECK_EQUAL( head_block->transactions.size(), 1U );
+   BOOST_CHECK( head_block->witness_signature != signature_type() );
+   BOOST_CHECK( head_block->id() == block3.id() );
+
+   auto head_block_header = db_api.get_block_header( head_block_num );
+   BOOST_REQUIRE( head_block_header.valid() );
+   BOOST_CHECK_EQUAL( head_block_header->block_num(), head_block_num );
+   BOOST_CHECK( head_block_header->witness_signature == head_block->witness_signature );
+   BOOST_CHECK( head_block_header->id() == head_block->id() );
+
+   auto previous_block = db_api.get_block( head_block_num - 1 );
+   BOOST_REQUIRE( previous_block.valid() );
+   BOOST_CHECK_EQUAL( previous_block->block_num(), head_block_num - 1 );
+   BOOST_CHECK_EQUAL( previous_block->transactions.size(), 0 );
+   BOOST_CHECK( previous_block->id() == head_block->previous );
+   BOOST_CHECK( previous_block->witness_signature != signature_type() );
+   BOOST_CHECK( previous_block->witness_signature != head_block->witness_signature );
+   BOOST_CHECK( previous_block->id() == block2.id() );
+
+   auto previous_block_header = db_api.get_block_header( head_block_num - 1 );
+   BOOST_REQUIRE( previous_block_header.valid() );
+   BOOST_CHECK_EQUAL( previous_block_header->block_num(), head_block_num - 1 );
+   BOOST_CHECK( previous_block_header->witness_signature == previous_block->witness_signature );
+   BOOST_CHECK( previous_block_header->id() == previous_block->id() );
+
+   auto next_block = db_api.get_block( head_block_num + 1 );
+   BOOST_CHECK( !next_block.valid() );
+
+   auto next_block_header = db_api.get_block_header( head_block_num + 1 );
+   BOOST_CHECK( !next_block_header.valid() );
+
+   const auto block_headers = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                               head_block_num - 1 } );
+   BOOST_REQUIRE_EQUAL( block_headers.size(), 3U );
+   BOOST_CHECK_THROW( block_headers.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( block_headers.at( head_block_num )->id() == head_block_header->id() );
+   BOOST_CHECK( block_headers.at( head_block_num )->witness_signature == head_block_header->witness_signature );
+   BOOST_CHECK( block_headers.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( block_headers.at( head_block_num - 1 )->id() == previous_block_header->id() );
+   BOOST_CHECK( block_headers.at( head_block_num - 1 )->witness_signature
+                == previous_block_header->witness_signature );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(verify_account_authority)
 {
       try {
