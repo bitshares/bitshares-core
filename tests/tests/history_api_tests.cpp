@@ -61,6 +61,8 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       BOOST_CHECK_EQUAL(histories.size(), 3u);
       BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
       BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
+      BOOST_CHECK( histories[2].block_time == db.head_block_time() );
+      BOOST_CHECK( !histories[2].is_virtual );
 
       // 1 account_create op larger than id1
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1),
@@ -93,6 +95,38 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       BOOST_CHECK_EQUAL(histories.size(), 3u);
       histories = hist_api.get_block_operation_history(head_block_num, 1u);
       BOOST_CHECK_EQUAL(histories.size(), 1u);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test) {
+   try {
+      graphene::app::history_api hist_api(app);
+
+      asset_id_type usd_id = create_user_issued_asset("USD").id;
+
+      ACTORS( (dan)(bob) );
+      fund( dan, asset(100) );
+      issue_uia( bob_id, asset(100, usd_id) );
+
+      create_sell_order( dan_id, asset(100), asset(100, usd_id) );
+      create_sell_order( bob_id, asset(100, usd_id), asset(100) );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200));
+
+      auto fill_order_op_id = operation::tag<fill_order_operation>::value;
+
+      vector<operation_history_object> histories = hist_api.get_account_history("dan", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+
+      BOOST_REQUIRE_GT( histories.size(), 0 );
+      BOOST_CHECK_EQUAL( histories.front().op.which(), fill_order_op_id );
+      BOOST_CHECK( histories.front().block_time == db.head_block_time() );
+      BOOST_CHECK( histories.front().is_virtual );
 
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
