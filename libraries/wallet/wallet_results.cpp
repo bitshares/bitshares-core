@@ -53,6 +53,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
             FC_ASSERT(b);
             ss << i.block_num << " ";
             ss << b->timestamp.to_iso_string() << " ";
+            ss << string(i.id) << " ";
             i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
@@ -74,6 +75,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
               FC_ASSERT(b);
               ss << i.block_num << " ";
               ss << b->timestamp.to_iso_string() << " ";
+              ss << string(i.id) << " ";
               i.op.visit(operation_printer(ss, *this, i));
               ss << " transaction_id : ";
               ss << d.transaction_id.str();
