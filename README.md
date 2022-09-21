@@ -2,7 +2,7 @@ BitShares Core
 ==============
 
 [BitShares Core](https://github.com/bitshares/bitshares-core) is the BitShares blockchain node software and command-line wallet software.
-For UI reference wallet software visit [BitShares UI](https://github.com/bitshares/bitshares-ui).
+For UI reference wallet software (browser-based wallet and desktop wallet) visit [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
@@ -12,7 +12,7 @@ Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to fin
 
 * [Getting Started](#getting-started)
 * [Support](#support)
-* [Using the API](#using-the-api)
+* [Using Built-In APIs](#using-built-in-apis)
 * [Accessing restrictable node API sets](#accessing-restrictable-node-api-sets)
 * [FAQ](#faq)
 * [License](#license)
@@ -39,12 +39,12 @@ Prebuilt binaries can be found in the [releases page](https://github.com/bitshar
 
 We recommend building on Ubuntu 20.04 LTS (64-bit)
 
-**OS Dependencies:**
+**Install OS Dependencies:**
 
     sudo apt-get update
     sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev doxygen
 
-**Build Node:**
+**Build Node And Command-Line Wallet:**
 
     git clone https://github.com/bitshares/bitshares-core.git
     cd bitshares-core
@@ -55,7 +55,7 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
     cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
-**Upgrade Node:**
+**Upgrade Node And Command-Line Wallet:**
 
     cd bitshares-core
     git remote set-url origin https://github.com/bitshares/bitshares-core.git
@@ -65,6 +65,8 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
     git submodule update --init --recursive # this command may fail
     git submodule sync --recursive
     git submodule update --init --recursive
+    mkdir build
+    cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
@@ -94,15 +96,19 @@ manually build your preferred version and use it with BitShares by specifying it
 
 **Run Node Software:**
 
-Stay on `bitshares-core` directory before you run the below `witness_node` command
+Stay on `bitshares-core/build` directory before you run the below `witness_node` command
 
     ./programs/witness_node/witness_node
 
-The node run will automatically create the `witness_node_data_dir` sub-directory along with node config files then start synchronizing with blockchain.
-It may take (usually several hours) to fully download the blockchain data.
+Under `build` directory the node run will automatically create the directory `witness_node_data_dir` along with config files underneath then start synchronizing the blockchain.
+It may take (usually several hours) to fully synchronize the blockchain data.
 The blockchain data will be stored under the directory `witness_node_data_dir`.
 
-You can stop the node run using `Ctrl+C`. Please note that stopping the node run may take (usually few minutes) to exit cleanly after stopping the node run using `Ctrl+C`.
+**Stop Node Software:**
+
+For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take (usually few minutes) to exit the run.
+It's recommended to use linux command `screen`(https://help.ubuntu.com/community/Screen) to inisiate the node run so you can go back to the node run screen to stop the run.
+
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
 In order to run a full node with all the account histories (which is usually not necessary) you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
@@ -208,7 +214,7 @@ BitShares UI bugs should be reported to the [UI issue tracker](https://github.co
 Up to date online Doxygen documentation can be found at [Doxygen.BitShares.org](https://doxygen.bitshares.org/hierarchy.html).
 
 
-Built-In APIs
+Using Built-In APIs
 -------------
 
 ### Node API
