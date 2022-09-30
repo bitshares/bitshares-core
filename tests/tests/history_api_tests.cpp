@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       create_account( "bob", account_id_type()(db), GRAPHENE_TEMP_ACCOUNT(db) );
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
+      fc::usleep(fc::milliseconds(100));
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test) {
       create_sell_order( bob_id, asset(100, usd_id), asset(100) );
 
       generate_block();
-      fc::usleep(fc::milliseconds(200));
+      fc::usleep(fc::milliseconds(100));
 
       auto fill_order_op_id = operation::tag<fill_order_operation>::value;
 
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_notify_all_on_creation) {
       create_account( "bob", account_id_type()(db), GRAPHENE_TEMP_ACCOUNT(db) );
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
+      fc::usleep(fc::milliseconds(100));
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -679,7 +679,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
       create_account("alice");
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
+      fc::usleep(fc::milliseconds(100));
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -722,7 +722,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
       }
       generate_block();
 
-      // history is set to limit transactions to 75 (see database_fixture.hpp)
+      // history is set to limit transactions to 75 (see database_fixture.cpp)
       // so asking for more should only return 75 (and not throw exception,
       // see https://github.com/bitshares/bitshares-core/issues/1490
       histories = hist_api.get_account_history_operations(
@@ -790,7 +790,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
    }
    generate_block();
 
-   // history is set to limit transactions to 125 (see database_fixture.hpp)
+   // history is set to limit transactions to 125 (see database_fixture.cpp)
    // so asking for more should only return 125 (and not throw exception,
    // see https://github.com/bitshares/bitshares-core/issues/1490
    GRAPHENE_CHECK_THROW( hist_api.get_account_history_operations("commitee-account", account_create_op_id,
