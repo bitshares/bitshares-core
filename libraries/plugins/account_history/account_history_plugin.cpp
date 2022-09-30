@@ -357,7 +357,8 @@ void account_history_plugin::plugin_set_program_options(
           "Maximum number of operations per account that will be kept in memory. "
           "Note that the actual number may be higher due to the min-blocks-to-keep option.")
          ("extended-max-ops-per-account", boost::program_options::value<uint64_t>(),
-          "Maximum number of operations to keep for accounts for which extended history is kept")
+          "Maximum number of operations to keep for accounts for which extended history is kept. "
+          "This option only takes effect when track-account is not used and max-ops-per-account is not zero.")
          ("extended-history-by-account",
           boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
           "Track longer history for these accounts (may specify multiple times)")
@@ -366,12 +367,13 @@ void account_history_plugin::plugin_set_program_options(
           "Track longer history for accounts with this registrar (may specify multiple times)")
          ("min-blocks-to-keep", boost::program_options::value<uint32_t>(),
           "Operations which are in the latest X blocks will be kept in memory. "
-          "Note that this may exceed the limit defined by the max-ops-per-account option, "
-          "but will be limited by the max-ops-per-acc-by-min-blocks option.")
+          "This option only takes effect when track-account is not used and max-ops-per-account is not zero. "
+          "Note that this option may cause more history records to be kept in memory than the limit defined by the "
+          "max-ops-per-account option, but the amount will be limited by the max-ops-per-acc-by-min-blocks option.")
          ("max-ops-per-acc-by-min-blocks", boost::program_options::value<uint64_t>(),
           "A potential higher limit on the maximum number of operations per account to be kept in memory "
-          "when the min-blocks-to-keep option exceeds the limit defined by the max-ops-per-account option. "
-          "If this is less than max-ops-per-account, max-ops-per-account will be used.")
+          "when the min-blocks-to-keep option causes the amount to exceed the limit defined by the "
+          "max-ops-per-account option. If this is less than max-ops-per-account, max-ops-per-account will be used.")
          ;
    cfg.add(cli);
 }
