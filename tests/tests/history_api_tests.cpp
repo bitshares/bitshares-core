@@ -605,6 +605,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
       throw;
    }
 }
+
 BOOST_AUTO_TEST_CASE(track_account2) {
    try {
       graphene::app::history_api hist_api(app);
@@ -662,6 +663,82 @@ BOOST_AUTO_TEST_CASE(track_account2) {
       BOOST_CHECK_EQUAL(histories.size(), 0u);
       histories = hist_api.get_account_history("dan", operation_history_id_type(1), 1, operation_history_id_type(2));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(min_blocks_to_keep_test) {
+   try {
+
+      graphene::app::history_api hist_api(app);
+
+      generate_block();
+      generate_block();
+      generate_block();
+      generate_block();
+      generate_block();
+
+      vector<operation_history_object> histories =
+            hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      // max-ops-per-account = 2
+      // min-blocks-to-keep = 3
+      // max-ops-per-acc-by-min-blocks = 5
+
+      //account_id_type() creates some ops
+      create_bitasset("USA", account_id_type());
+      create_bitasset("USB", account_id_type());
+      create_bitasset("USC", account_id_type());
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      create_bitasset("USD", account_id_type());
+      create_bitasset("USE", account_id_type());
+      create_bitasset("USF", account_id_type());
+      create_bitasset("USG", account_id_type());
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 5u);
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 4u);
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 4u);
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2u);
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2u);
+
+      generate_block();
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2u);
 
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
