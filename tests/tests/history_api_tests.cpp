@@ -202,7 +202,8 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       // account_id_type() and dan share operation id 1(account create) - share can be also in id 0
 
       // no history at all in the chain
-      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 4, operation_history_id_type(0));
+      vector<operation_history_object> histories =
+            hist_api.get_account_history("1.2.0", operation_history_id_type(0), 4, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       create_bitasset("USD", account_id_type()); // create op 0
@@ -281,43 +282,51 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
 
       // f(A, 1, 5, 9) = { 5, 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(9));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(9));
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
       // f(A, 1, 5, 6) = { 5, 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(6));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(6));
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
       // f(A, 1, 5, 5) = { 5, 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(5));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(5));
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
       // f(A, 1, 5, 4) = { 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(4));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(4));
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
 
       // f(A, 1, 5, 3) = { 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(3));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(3));
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
 
       // f(A, 1, 5, 2) = { }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(2));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(2));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // f(A, 1, 5, 1) = { }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(1));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(1));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // f(A, 1, 5, 0) = { 5, 3 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(0));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
@@ -474,11 +483,13 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       // 0 limits
       histories = hist_api.get_account_history("dan", operation_history_id_type(0), 0, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(3), 0, operation_history_id_type(9));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(3), 0,
+                                                        operation_history_id_type(9));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // non existent account
-      histories = hist_api.get_account_history("1.2.18", operation_history_id_type(0), 4, operation_history_id_type(0));
+      histories = hist_api.get_account_history("1.2.18", operation_history_id_type(0), 4,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // create a new account C = alice { 7 }
@@ -487,16 +498,19 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       generate_block();
 
       // f(C, 0, 4, 10) = { 7 }
-      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 4, operation_history_id_type(10));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 4,
+                                                        operation_history_id_type(10));
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 7u);
 
       // f(C, 8, 4, 10) = { }
-      histories = hist_api.get_account_history("alice", operation_history_id_type(8), 4, operation_history_id_type(10));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(8), 4,
+                                                        operation_history_id_type(10));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // f(A, 0, 10, 0) = { 7, 5, 3, 1, 0 }
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 5u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 7u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 5u);
@@ -534,19 +548,25 @@ BOOST_AUTO_TEST_CASE(track_account) {
       generate_block();
 
       // anything against account_id_type() should be {}
-      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
+      vector<operation_history_object> histories =
+            hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 10,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 1, operation_history_id_type(2));
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 1,
+                                                        operation_history_id_type(2));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // anything against alice should be {}
-      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
-      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 10,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
-      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 1, operation_history_id_type(2));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 1,
+                                                        operation_history_id_type(2));
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
       // dan should have history
@@ -608,7 +628,8 @@ BOOST_AUTO_TEST_CASE(track_account2) {
       generate_block();
 
       // all account_id_type() should have 4 ops {4,2,1,0}
-      vector<operation_history_object> histories = hist_api.get_account_history("committee-account", operation_history_id_type(0), 10, operation_history_id_type(0));
+      vector<operation_history_object> histories = hist_api.get_account_history("committee-account",
+            operation_history_id_type(0), 10, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 4u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 4u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 2u);
@@ -616,18 +637,21 @@ BOOST_AUTO_TEST_CASE(track_account2) {
       BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
 
       // all alice account should have 2 ops {3, 0}
-      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 10,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 0u);
 
       // alice first op should be {0}
-      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 1, operation_history_id_type(1));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 1,
+                                                        operation_history_id_type(1));
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
 
       // alice second op should be {3}
-      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 1, operation_history_id_type(0));
+      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 1,
+                                                        operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
 
@@ -699,7 +723,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
       generate_block();
 
       // history is set to limit transactions to 75 (see database_fixture.hpp)
-      // so asking for more should only return 75 (and not throw exception, 
+      // so asking for more should only return 75 (and not throw exception,
       // see https://github.com/bitshares/bitshares-core/issues/1490
       histories = hist_api.get_account_history_operations(
             "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
@@ -715,7 +739,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
 }
 //new test case for increasing the limit based on the config file
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
-   try {
+ try {
    graphene::app::history_api hist_api(app);
    //account_id_type() do 3 ops
    create_bitasset("CNY", account_id_type());
@@ -730,38 +754,38 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
 
    //account_id_type() did 1 asset_create op
    vector<operation_history_object> histories = hist_api.get_account_history_operations(
-	"committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+      "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
    BOOST_CHECK_EQUAL(histories.size(), 1u);
    BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
    BOOST_CHECK_EQUAL(histories[0].op.which(), asset_create_op_id);
 
    //account_id_type() did 2 account_create ops
    histories = hist_api.get_account_history_operations(
-	"committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+      "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
    BOOST_CHECK_EQUAL(histories.size(), 2u);
    BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
    // No asset_create op larger than id1
    histories = hist_api.get_account_history_operations(
-	"committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 200);
+      "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 200);
    BOOST_CHECK_EQUAL(histories.size(), 0u);
 
    // Limit 1 returns 1 result
    histories = hist_api.get_account_history_operations(
-	"committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
+      "committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
    BOOST_CHECK_EQUAL(histories.size(), 1u);
    BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
    // alice has 1 op
    histories = hist_api.get_account_history_operations(
-	"alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 200);
+      "alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 200);
    BOOST_CHECK_EQUAL(histories.size(), 1u);
    BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
    // create a bunch of accounts
    for(int i = 0; i < 126; ++i)
    {
-   	std::string acct_name = "mytempacct" + std::to_string(i);
+      std::string acct_name = "mytempacct" + std::to_string(i);
       create_account(acct_name);
    }
    generate_block();
@@ -769,19 +793,22 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
    // history is set to limit transactions to 125 (see database_fixture.hpp)
    // so asking for more should only return 125 (and not throw exception,
    // see https://github.com/bitshares/bitshares-core/issues/1490
-   GRAPHENE_CHECK_THROW(hist_api.get_account_history_operations("commitee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 301), fc::exception);
-   histories = hist_api.get_account_history_operations("committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+   GRAPHENE_CHECK_THROW( hist_api.get_account_history_operations("commitee-account", account_create_op_id,
+                               operation_history_id_type(),operation_history_id_type(), 301),
+                         fc::exception );
+   histories = hist_api.get_account_history_operations("committee-account", account_create_op_id,
+                         operation_history_id_type(), operation_history_id_type(), 200);
    BOOST_REQUIRE_EQUAL( histories.size(), 125u );
-   }
-   catch (fc::exception &e)
-   {
- 	edump((e.to_detail_string()));
+ }
+ catch (fc::exception &e)
+ {
+   edump((e.to_detail_string()));
    throw;
-   }
+ }
 }
 
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history) {
-   try{
+ try{
    graphene::app::history_api hist_api(app);
    //account_id_type() do 3 ops
    create_bitasset("USD", account_id_type());
@@ -794,7 +821,8 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history) {
    int asset_create_op_id = operation::tag<asset_create_operation>::value;
    int account_create_op_id = operation::tag<account_create_operation>::value;
    //account_id_type() did 3 ops and includes id0
-   vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
+   vector<operation_history_object> histories =
+         hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
 
    BOOST_CHECK_EQUAL(histories.size(), 3u);
    BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
@@ -820,21 +848,23 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history) {
    // create a bunch of accounts
    for(int i = 0; i < 126; ++i)
    {
-     	std::string acct_name = "mytempacct" + std::to_string(i);
-     	create_account(acct_name);
+      std::string acct_name = "mytempacct" + std::to_string(i);
+      create_account(acct_name);
    }
    generate_block();
 
-   GRAPHENE_CHECK_THROW(hist_api.get_account_history("1.2.0", operation_history_id_type(), 260, operation_history_id_type()), fc::exception);
+   GRAPHENE_CHECK_THROW( hist_api.get_account_history("1.2.0", operation_history_id_type(), 260,
+                               operation_history_id_type()),
+                         fc::exception );
    histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
    BOOST_REQUIRE_EQUAL( histories.size(), 125u );
-   } catch (fc::exception &e) {
+ } catch (fc::exception &e) {
    edump((e.to_detail_string()));
    throw;
-   }
+ }
 }
 BOOST_AUTO_TEST_CASE(api_limit_get_relative_account_history) {
-   try{
+ try{
    graphene::app::history_api hist_api(app);
    //account_id_type() do 3 ops
    create_bitasset("USD", account_id_type());
@@ -848,14 +878,14 @@ BOOST_AUTO_TEST_CASE(api_limit_get_relative_account_history) {
    vector<operation_history_object> histories = hist_api.get_relative_account_history("1.2.0", 126, 210, 0);
    BOOST_REQUIRE_EQUAL( histories.size(), 0u );
 
-   } catch (fc::exception &e) {
+ } catch (fc::exception &e) {
    edump((e.to_detail_string()));
    throw;
-   }
+ }
 }
 
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
-   try {
+ try {
    graphene::app::history_api hist_api(app);
    flat_set<uint16_t> operation_types;
    //account_id_type() do 3 ops
@@ -867,12 +897,11 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
    GRAPHENE_CHECK_THROW(hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 260), fc::exception);
    auto histories = hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 210);
    BOOST_REQUIRE_EQUAL( histories.total_count, 3u );
-   }
-   catch (fc::exception &e) {
+ }
+ catch (fc::exception &e) {
    edump((e.to_detail_string()));
    throw;
-   }
+ }
 }
-
 
 BOOST_AUTO_TEST_SUITE_END()
