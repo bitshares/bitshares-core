@@ -697,8 +697,9 @@ BOOST_AUTO_TEST_CASE(min_blocks_to_keep_test) {
       generate_block();
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
                                                         operation_history_id_type(0));
-      BOOST_CHECK_EQUAL(histories.size(), 3u);
-
+      BOOST_REQUIRE_EQUAL(histories.size(), 3u);
+      operation_history_id_type oldest_op_hist_id = histories.back().id;
+      BOOST_CHECK( db.find(oldest_op_hist_id) );
 
       generate_block();
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
@@ -714,6 +715,7 @@ BOOST_AUTO_TEST_CASE(min_blocks_to_keep_test) {
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
                                                         operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 5u);
+      BOOST_CHECK( !db.find(oldest_op_hist_id) );
 
       generate_block();
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,

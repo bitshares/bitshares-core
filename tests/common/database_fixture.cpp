@@ -209,6 +209,7 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
 
    if (fixture.current_test_name == "min_blocks_to_keep_test")
    {
+      fc::set_option( options, "partial-operations", true );
       fc::set_option( options, "max-ops-per-account", (uint64_t)2 );
       fc::set_option( options, "min-blocks-to-keep", (uint32_t)3 );
       fc::set_option( options, "max-ops-per-acc-by-min-blocks", (uint64_t)5 );
