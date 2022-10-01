@@ -310,7 +310,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          }).id;
 
    const asset_object& new_asset =
-     d.create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id]( asset_object& a ) {
+     d.create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id,&d]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
          a.precision = op.precision;
@@ -322,6 +322,8 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          a.dynamic_asset_data_id = dyn_asset.id;
          if( op.bitasset_opts.valid() )
             a.bitasset_data_id = bit_asset_id;
+         a.creation_block_num = d._current_block_num;
+         a.creation_time      = d._current_block_time;
       });
    FC_ASSERT( new_asset.id == next_asset_id, "Unexpected object database error, object id mismatch" );
 

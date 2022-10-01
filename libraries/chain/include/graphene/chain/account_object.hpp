@@ -287,6 +287,11 @@ namespace graphene { namespace chain {
           */
          optional< flat_set<asset_id_type> > allowed_assets;
 
+         /// The block number when the account was created
+         uint32_t       creation_block_num = 0;
+         /// The time when the account was created
+         time_point_sec creation_time;
+
          bool has_special_authority()const
          {
             return (!owner_special_authority.is_type< no_special_authority >())

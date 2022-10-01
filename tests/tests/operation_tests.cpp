@@ -1974,6 +1974,14 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       const account_statistics_object& statistics = nathan_account.statistics(db);
       BOOST_CHECK(statistics.id.space() == implementation_ids);
       BOOST_CHECK(statistics.id.type() == impl_account_statistics_object_type);
+
+      account_id_type nathan_id = nathan_account.id;
+
+      generate_block();
+
+      BOOST_CHECK_EQUAL( nathan_id(db).creation_block_num, db.head_block_num() );
+      BOOST_CHECK( nathan_id(db).creation_time == db.head_block_time() );
+
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -2216,6 +2224,12 @@ BOOST_AUTO_TEST_CASE( create_uia )
       REQUIRE_THROW_WITH_VALUE(op, symbol, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
       REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price(asset(-100), asset(1)));
       REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price(asset(100),asset(-1)));
+
+      generate_block();
+
+      BOOST_CHECK_EQUAL( test_asset_id(db).creation_block_num, db.head_block_num() );
+      BOOST_CHECK( test_asset_id(db).creation_time == db.head_block_time() );
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

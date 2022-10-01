@@ -141,7 +141,6 @@ namespace graphene { namespace chain {
 
          asset_options options;
 
-
          /// Current supply, fee pool, and collected fees are stored in a separate object as they change frequently.
          asset_dynamic_data_id_type  dynamic_asset_data_id;
          /// Extra data associated with BitAssets. This field is non-null if and only if is_market_issued() returns true
@@ -151,6 +150,11 @@ namespace graphene { namespace chain {
 
          /// The ID of the liquidity pool if the asset is the share asset of a liquidity pool
          optional<liquidity_pool_id_type> for_liquidity_pool;
+
+         /// The block number when the asset object was created
+         uint32_t       creation_block_num = 0;
+         /// The time when the asset object was created
+         time_point_sec creation_time;
 
          asset_id_type get_id()const { return id; }
 
@@ -486,6 +490,8 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (bitasset_data_id)
                     (buyback_account)
                     (for_liquidity_pool)
+                    (creation_block_num)
+                    (creation_time)
                   )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
