@@ -342,7 +342,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
          _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
       for( auto& op : proposal.proposed_transaction.operations )
-         eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
+         eval_state.operation_results.emplace_back(apply_operation(eval_state, op)); // This is a virtual operation
       // Make sure there is no unpaid samet fund debt
       const auto& samet_fund_idx = get_index_type<samet_fund_index>().indices().get<by_unpaid>();
       FC_ASSERT( samet_fund_idx.empty() || samet_fund_idx.begin()->unpaid_amount == 0,
@@ -532,14 +532,11 @@ void database::clear_pending()
    _pending_tx_session.reset();
 } FC_CAPTURE_AND_RETHROW() }
 
-uint32_t database::push_applied_operation( const operation& op )
+uint32_t database::push_applied_operation( const operation& op, bool is_virtual /* = true */ )
 {
-   _applied_ops.emplace_back(op);
-   operation_history_object& oh = *(_applied_ops.back());
-   oh.block_num    = _current_block_num;
-   oh.trx_in_block = _current_trx_in_block;
-   oh.op_in_trx    = _current_op_in_trx;
-   oh.virtual_op   = _current_virtual_op++;
+   _applied_ops.emplace_back( operation_history_object( op, _current_block_num, _current_trx_in_block,
+                                    _current_op_in_trx, _current_virtual_op, is_virtual, _current_block_time ) );
+   ++_current_virtual_op;
    return _applied_ops.size() - 1;
 }
 void database::set_applied_operation_result( uint32_t op_id, const operation_result& result )
@@ -758,7 +755,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    for( const auto& op : ptrx.operations )
    {
       _current_virtual_op = 0;
-      eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
+      eval_state.operation_results.emplace_back(apply_operation(eval_state, op, false)); // This is NOT a virtual op
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
@@ -771,7 +768,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-operation_result database::apply_operation(transaction_evaluation_state& eval_state, const operation& op)
+operation_result database::apply_operation( transaction_evaluation_state& eval_state, const operation& op,
+                                            bool is_virtual /* = true */ )
 { try {
    int i_which = op.which();
    uint64_t u_which = uint64_t( i_which );
@@ -779,7 +777,7 @@ operation_result database::apply_operation(transaction_evaluation_state& eval_st
    FC_ASSERT( u_which < _operation_evaluators.size(), "No registered evaluator for operation ${op}", ("op",op) );
    unique_ptr<op_evaluator>& eval = _operation_evaluators[ u_which ];
    FC_ASSERT( eval, "No registered evaluator for operation ${op}", ("op",op) );
-   auto op_id = push_applied_operation( op );
+   auto op_id = push_applied_operation( op, is_virtual );
    auto result = eval->evaluate( eval_state, op, true );
    set_applied_operation_result( op_id, result );
    return result;

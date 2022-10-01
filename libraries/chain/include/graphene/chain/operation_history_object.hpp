@@ -51,8 +51,11 @@ namespace graphene { namespace chain {
          static constexpr uint8_t space_id = protocol_ids;
          static constexpr uint8_t type_id  = operation_history_object_type;
 
-         operation_history_object( const operation& o ):op(o){}
+         explicit operation_history_object( const operation& o ):op(o){}
          operation_history_object(){}
+         operation_history_object( const operation& o, uint32_t bn, uint16_t tib, uint16_t oit, uint32_t vo, bool iv,
+                                   const time_point_sec& bt )
+         : op(o), block_num(bn), trx_in_block(tib), op_in_trx(oit), virtual_op(vo), is_virtual(iv), block_time(bt) {}
 
          operation         op;
          operation_result  result;
@@ -64,6 +67,10 @@ namespace graphene { namespace chain {
          uint16_t          op_in_trx = 0;
          /** any virtual operations implied by operation in block */
          uint32_t          virtual_op = 0;
+         /** Whether this is a virtual operation */
+         bool              is_virtual = false;
+         /** The timestamp of the block that caused this operation */
+         time_point_sec    block_time;
    };
 
    /**

@@ -585,10 +585,12 @@ namespace graphene { namespace chain {
           *  as any implied/virtual operations that resulted, such as filling an order.  The
           *  applied operations is cleared after applying each block and calling the block
           *  observers which may want to index these operations.
+          *  @param The operation to push
+          *  @param is_virtual Whether the operation is a virtual operation
           *
           *  @return the op_id which can be used to set the result after it has finished being applied.
           */
-         uint32_t  push_applied_operation( const operation& op );
+         uint32_t  push_applied_operation( const operation& op, bool is_virtual = true );
          void      set_applied_operation_result( uint32_t op_id, const operation_result& r );
          const vector<optional< operation_history_object > >& get_applied_operations()const;
 
@@ -681,7 +683,8 @@ namespace graphene { namespace chain {
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
-         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op,
+                                                bool is_virtual = true );
 
       private:
          void                  _apply_block( const signed_block& next_block );
