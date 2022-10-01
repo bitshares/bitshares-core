@@ -24,17 +24,9 @@
 #pragma once
 
 #include <graphene/app/plugin.hpp>
-#include <graphene/chain/database.hpp>
-
-#include <graphene/chain/operation_history_object.hpp>
-
-#include <fc/thread/future.hpp>
 
 namespace graphene { namespace account_history {
    using namespace chain;
-   //using namespace graphene::db;
-   //using boost::multi_index_container;
-   //using namespace boost::multi_index;
 
 //
 // Plugins should #define their SPACE_ID's so plugins with
