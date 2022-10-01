@@ -421,11 +421,13 @@ void account_history_plugin::plugin_set_program_options(
           "Operations which are in the latest X blocks will be kept in memory. "
           "This option only takes effect when track-account is not used and max-ops-per-account is not zero. "
           "Note that this option may cause more history records to be kept in memory than the limit defined by the "
-          "max-ops-per-account option, but the amount will be limited by the max-ops-per-acc-by-min-blocks option.")
+          "max-ops-per-account option, but the amount will be limited by the max-ops-per-acc-by-min-blocks option. "
+          "(default: 30000)")
          ("max-ops-per-acc-by-min-blocks", boost::program_options::value<uint64_t>(),
           "A potential higher limit on the maximum number of operations per account to be kept in memory "
           "when the min-blocks-to-keep option causes the amount to exceed the limit defined by the "
-          "max-ops-per-account option. If this is less than max-ops-per-account, max-ops-per-account will be used.")
+          "max-ops-per-account option. If this is less than max-ops-per-account, max-ops-per-account will be used. "
+          "(default: 1000)")
          ;
    cfg.add(cli);
 }
