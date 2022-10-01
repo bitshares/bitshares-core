@@ -81,9 +81,11 @@ class account_history_plugin_impl
       /** add one history record, then check and remove the earliest history record(s) */
       void add_account_history( const account_id_type& account_id, const operation_history_object& op );
 
-      void remove_old_histories( const account_statistics_object& stats_obj,
-                                 const account_history_object& latest_aho,
-                                 const operation_history_object& latest_op );
+      void remove_old_histories_by_account( const account_statistics_object& stats_obj,
+                                            uint32_t latest_block_num,
+                                            const exceeded_account_info_object* p_exa_obj = nullptr );
+
+      void remove_old_histories( uint32_t latest_block_num );
 
       void init_program_options(const boost::program_options::variables_map& options);
 };
@@ -221,6 +223,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       if (_partial_operations && ! oho.valid())
          skip_oho_id();
    }
+
+   remove_old_histories( b.block_num() );
 }
 
 void account_history_plugin_impl::add_account_history( const account_id_type& account_id,
@@ -240,7 +244,7 @@ void account_history_plugin_impl::add_account_history( const account_id_type& ac
        obj.total_ops = aho.sequence;
    });
    // Remove the earliest account history entries if too many.
-   remove_old_histories( stats_obj, aho, op );
+   remove_old_histories_by_account( stats_obj, op.block_num );
 }
 
 uint64_t account_history_plugin_impl::get_max_ops_to_keep( const account_id_type& account_id )
@@ -265,31 +269,51 @@ uint64_t account_history_plugin_impl::get_max_ops_to_keep( const account_id_type
    return max_ops_to_keep;
 }
 
+void account_history_plugin_impl::remove_old_histories( uint32_t latest_block_num )
+{
+   if( latest_block_num <= _min_blocks_to_keep )
+      return;
+   uint32_t oldest_block_num_to_keep = latest_block_num - _min_blocks_to_keep + 1;
+
+   graphene::chain::database& db = database();
+   const auto& exa_idx = db.get_index_type<exceeded_account_info_index>().indices().get<by_block_num>();
+   for( auto itr = exa_idx.begin();
+        itr != exa_idx.end() && itr->block_num < oldest_block_num_to_keep;
+        itr = exa_idx.begin() )
+   {
+      const auto& stats_obj = db.get_account_stats_by_owner( itr->account_id );
+      remove_old_histories_by_account( stats_obj, latest_block_num, &(*itr) );
+   }
+}
+
 // Remove the earliest account history entries if too many.
-void account_history_plugin_impl::remove_old_histories( const account_statistics_object& stats_obj,
-                                                        const account_history_object& latest_aho,
-                                                        const operation_history_object& latest_op )
+void account_history_plugin_impl::remove_old_histories_by_account( const account_statistics_object& stats_obj,
+                                                                   uint32_t latest_block_num,
+                                                                   const exceeded_account_info_object* p_exa_obj )
 {
    graphene::chain::database& db = database();
-   const account_id_type& account_id = latest_aho.account;
-   auto max_ops_to_keep = get_max_ops_to_keep( account_id );
+   const account_id_type& account_id = stats_obj.owner;
+   auto max_ops_to_keep = get_max_ops_to_keep( account_id ); // >= 1
 
+   uint32_t oldest_block_num = latest_block_num;
    while( stats_obj.total_ops - stats_obj.removed_ops > max_ops_to_keep )
    {
       // look for the earliest entry
       const auto& his_idx = db.get_index_type<account_history_index>();
       const auto& by_seq_idx = his_idx.indices().get<by_seq>();
       auto itr = by_seq_idx.lower_bound( account_id );
-      // make sure don't remove the one just added
-      if( itr == by_seq_idx.end() || itr->account != account_id || itr->id == latest_aho.id )
-         return;
+      // make sure don't remove the latest one
+      // this should always be false, just check to be safe
+      if( itr == by_seq_idx.end() || itr->account != account_id || itr->id == stats_obj.most_recent_op )
+         break;
 
       // if found, check whether to remove
       const auto remove_op_id = itr->operation_id;
       const auto& remove_op = remove_op_id(db);
-      if( remove_op.block_num + _min_blocks_to_keep > latest_op.block_num
+      oldest_block_num = remove_op.block_num;
+      if( remove_op.block_num + _min_blocks_to_keep > latest_block_num
           && stats_obj.total_ops - stats_obj.removed_ops <= _max_ops_per_acc_by_min_blocks )
-         return;
+         break;
 
       // remove the entry, and adjust account stats object
       const auto itr_remove = itr;
@@ -320,13 +344,34 @@ void account_history_plugin_impl::remove_old_histories( const account_statistics
          }
       }
    }
+   // deal with exceeded_account_info_object
+   if( !p_exa_obj )
+   {
+      const auto& exa_idx = db.get_index_type<exceeded_account_info_index>().indices().get<by_account>();
+      auto itr = exa_idx.find( account_id );
+      if( itr != exa_idx.end() )
+         p_exa_obj = &(*itr);
+   }
+   if( stats_obj.total_ops - stats_obj.removed_ops > max_ops_to_keep )
+   {
+      // create or update exceeded_account_info_object
+      if( p_exa_obj )
+         db.modify( *p_exa_obj, [oldest_block_num]( exceeded_account_info_object& obj ){
+            obj.block_num = oldest_block_num;
+         });
+      else
+         db.create<exceeded_account_info_object>(
+               [&account_id, oldest_block_num]( exceeded_account_info_object& obj ){
+            obj.account_id = account_id;
+            obj.block_num = oldest_block_num;
+         });
+   }
+   // remove exceeded_account_info_object if found
+   else if( p_exa_obj )
+      db.remove( *p_exa_obj );
 }
 
 } // end namespace detail
-
-
-
-
 
 
 account_history_plugin::account_history_plugin(graphene::app::application& app) :
@@ -385,6 +430,8 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_history_index > >();
+
+   database().add_index< primary_index< exceeded_account_info_index > >();
 }
 
 void detail::account_history_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
