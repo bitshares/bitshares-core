@@ -88,6 +88,10 @@ class account_history_plugin_impl
 
       void remove_old_histories();
 
+      /// When the partial_operations option is set,
+      /// if the specified operation history object is no longer referenced, remove it from database
+      void check_and_remove_op_history_obj( const operation_history_object& op );
+
       void init_program_options(const boost::program_options::variables_map& options);
 };
 
@@ -294,6 +298,22 @@ void account_history_plugin_impl::remove_old_histories()
    }
 }
 
+void account_history_plugin_impl::check_and_remove_op_history_obj( const operation_history_object& op )
+{
+   if( _partial_operations )
+   {
+      // check for references
+      graphene::chain::database& db = database();
+      const auto& his_idx = db.get_index_type<account_history_index>();
+      const auto& by_opid_idx = his_idx.indices().get<by_opid>();
+      if( by_opid_idx.find( op.id ) == by_opid_idx.end() )
+      {
+         // if no reference, remove
+         db.remove( op );
+      }
+   }
+}
+
 // Remove the earliest account history entries if too many.
 void account_history_plugin_impl::remove_old_histories_by_account( const account_statistics_object& stats_obj,
                                                                    const exceeded_account_object* p_exa_obj )
@@ -323,8 +343,7 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
 
       // if found, check whether to remove
       const auto& aho_to_remove = *aho_itr;
-      const auto remove_op_id = aho_to_remove.operation_id;
-      const auto& remove_op = remove_op_id(db);
+      const auto& remove_op = aho_to_remove.operation_id(db);
       oldest_block_num = remove_op.block_num;
       if( remove_op.block_num > _latest_block_number_to_remove && removed_ops >= number_of_ops_to_remove_by_blks )
          break;
@@ -335,16 +354,7 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
       ++removed_ops;
 
       // remove the operation history entry (1.11.x) if configured and no reference left
-      if( _partial_operations )
-      {
-         // check for references
-         const auto& by_opid_idx = his_idx.indices().get<by_opid>();
-         if( by_opid_idx.find( remove_op_id ) == by_opid_idx.end() )
-         {
-            // if no reference, remove
-            db.remove( remove_op );
-         }
-      }
+      check_and_remove_op_history_obj( remove_op );
    }
    // adjust account stats object and the oldest entry
    if( removed_ops != stats_obj.removed_ops )
