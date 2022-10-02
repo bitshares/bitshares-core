@@ -63,7 +63,7 @@ struct exceeded_account_object : public abstract_object<exceeded_account_object>
 
 struct by_account;
 struct by_block_num;
-using exceeded_account_multi_index_type = multi_index_container<
+using exceeded_account_multi_idx_type = multi_index_container<
    exceeded_account_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
@@ -79,7 +79,7 @@ using exceeded_account_multi_index_type = multi_index_container<
    >
 >;
 
-using exceeded_account_index = generic_index< exceeded_account_object, exceeded_account_multi_index_type >;
+using exceeded_account_index = generic_index< exceeded_account_object, exceeded_account_multi_idx_type >;
 
 namespace detail
 {
