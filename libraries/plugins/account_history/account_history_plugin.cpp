@@ -84,7 +84,7 @@ class account_history_plugin_impl
       void add_account_history( const account_id_type& account_id, const operation_history_object& op );
 
       void remove_old_histories_by_account( const account_statistics_object& stats_obj,
-                                            const exceeded_account_info_object* p_exa_obj = nullptr );
+                                            const exceeded_account_object* p_exa_obj = nullptr );
 
       void remove_old_histories();
 
@@ -280,7 +280,7 @@ void account_history_plugin_impl::remove_old_histories()
       return;
 
    const graphene::chain::database& db = database();
-   const auto& exa_idx = db.get_index_type<exceeded_account_info_index>().indices().get<by_block_num>();
+   const auto& exa_idx = db.get_index_type<exceeded_account_index>().indices().get<by_block_num>();
    auto itr = exa_idx.begin();
    while( itr != exa_idx.end() && itr->block_num <= _latest_block_number_to_remove )
    {
@@ -292,7 +292,7 @@ void account_history_plugin_impl::remove_old_histories()
 
 // Remove the earliest account history entries if too many.
 void account_history_plugin_impl::remove_old_histories_by_account( const account_statistics_object& stats_obj,
-                                                                   const exceeded_account_info_object* p_exa_obj )
+                                                                   const exceeded_account_object* p_exa_obj )
 {
    graphene::chain::database& db = database();
    const account_id_type& account_id = stats_obj.owner;
@@ -351,29 +351,29 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
          }
       }
    }
-   // deal with exceeded_account_info_object
+   // deal with exceeded_account_object
    if( !p_exa_obj )
    {
-      const auto& exa_idx = db.get_index_type<exceeded_account_info_index>().indices().get<by_account>();
+      const auto& exa_idx = db.get_index_type<exceeded_account_index>().indices().get<by_account>();
       auto itr = exa_idx.find( account_id );
       if( itr != exa_idx.end() )
          p_exa_obj = &(*itr);
    }
    if( stats_obj.removed_ops < number_of_ops_to_remove )
    {
-      // create or update exceeded_account_info_object
+      // create or update exceeded_account_object
       if( p_exa_obj )
-         db.modify( *p_exa_obj, [oldest_block_num]( exceeded_account_info_object& obj ){
+         db.modify( *p_exa_obj, [oldest_block_num]( exceeded_account_object& obj ){
             obj.block_num = oldest_block_num;
          });
       else
-         db.create<exceeded_account_info_object>(
-               [&account_id, oldest_block_num]( exceeded_account_info_object& obj ){
+         db.create<exceeded_account_object>(
+               [&account_id, oldest_block_num]( exceeded_account_object& obj ){
             obj.account_id = account_id;
             obj.block_num = oldest_block_num;
          });
    }
-   // remove exceeded_account_info_object if found
+   // remove exceeded_account_object if found
    else if( p_exa_obj )
       db.remove( *p_exa_obj );
 }
@@ -440,7 +440,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_history_index > >();
 
-   database().add_index< primary_index< exceeded_account_info_index > >();
+   database().add_index< primary_index< exceeded_account_index > >();
 }
 
 void detail::account_history_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
