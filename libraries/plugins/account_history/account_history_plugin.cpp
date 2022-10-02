@@ -310,19 +310,19 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
 
    auto removed_ops = stats_obj.removed_ops;
    // look for the earliest entry if needed
-   auto itr = ( removed_ops < number_of_ops_to_remove ) ? by_seq_idx.lower_bound( account_id )
-                                                        : by_seq_idx.begin();
+   auto aho_itr = ( removed_ops < number_of_ops_to_remove ) ? by_seq_idx.lower_bound( account_id )
+                                                            : by_seq_idx.begin();
 
    uint32_t oldest_block_num = _latest_block_number_to_remove;
    while( removed_ops < number_of_ops_to_remove )
    {
       // make sure don't remove the latest one
       // this should always be false, just check to be safe
-      if( itr == by_seq_idx.end() || itr->account != account_id || itr->id == stats_obj.most_recent_op )
+      if( aho_itr == by_seq_idx.end() || aho_itr->account != account_id || aho_itr->id == stats_obj.most_recent_op )
          break;
 
       // if found, check whether to remove
-      const auto& aho_to_remove = *itr;
+      const auto& aho_to_remove = *aho_itr;
       const auto remove_op_id = aho_to_remove.operation_id;
       const auto& remove_op = remove_op_id(db);
       oldest_block_num = remove_op.block_num;
@@ -330,7 +330,7 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
          break;
 
       // remove the entry
-      ++itr;
+      ++aho_itr;
       db.remove( aho_to_remove );
       ++removed_ops;
 
@@ -354,9 +354,9 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
       });
       // modify previous node's next pointer
       // this should be always true, but just have a check here
-      if( itr != by_seq_idx.end() && itr->account == account_id )
+      if( aho_itr != by_seq_idx.end() && aho_itr->account == account_id )
       {
-         db.modify( *itr, []( account_history_object& obj ){
+         db.modify( *aho_itr, []( account_history_object& obj ){
             obj.next = account_history_id_type();
          });
       }
@@ -366,9 +366,9 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
    if( !p_exa_obj )
    {
       const auto& exa_idx = db.get_index_type<exceeded_account_index>().indices().get<by_account>();
-      auto itr = exa_idx.find( account_id );
-      if( itr != exa_idx.end() )
-         p_exa_obj = &(*itr);
+      auto exa_itr = exa_idx.find( account_id );
+      if( exa_itr != exa_idx.end() )
+         p_exa_obj = &(*exa_itr);
    }
    if( stats_obj.removed_ops < number_of_ops_to_remove )
    {
