@@ -91,11 +91,15 @@ class account_history_plugin_impl
       void init_program_options(const boost::program_options::variables_map& options);
 };
 
+template< typename T >
+static T get_biggest_number_to_remove( T biggest_number, T amount_to_keep )
+{
+   return ( biggest_number > amount_to_keep ) ? ( biggest_number - amount_to_keep ) : 0;
+}
+
 void account_history_plugin_impl::update_account_histories( const signed_block& b )
 {
-   auto latest_block_number = b.block_num();
-   _latest_block_number_to_remove = ( latest_block_number > _min_blocks_to_keep ) ?
-                                    ( latest_block_number - _min_blocks_to_keep ) : 0;
+   _latest_block_number_to_remove = get_biggest_number_to_remove( b.block_num(), _min_blocks_to_keep );
 
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
@@ -297,47 +301,38 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
    graphene::chain::database& db = database();
    const account_id_type& account_id = stats_obj.owner;
    auto max_ops_to_keep = get_max_ops_to_keep( account_id ); // >= 1
-   auto number_of_ops_to_remove = ( stats_obj.total_ops > max_ops_to_keep ) ?
-                                  ( stats_obj.total_ops - max_ops_to_keep ) : 0;
-   auto number_of_ops_to_remove_by_blks = ( stats_obj.total_ops > _max_ops_per_acc_by_min_blocks ) ?
-                                          ( stats_obj.total_ops - _max_ops_per_acc_by_min_blocks ) : 0;
+   auto number_of_ops_to_remove = get_biggest_number_to_remove( stats_obj.total_ops, max_ops_to_keep );
+   auto number_of_ops_to_remove_by_blks = get_biggest_number_to_remove( stats_obj.total_ops,
+                                                                        _max_ops_per_acc_by_min_blocks );
+
+   const auto& his_idx = db.get_index_type<account_history_index>();
+   const auto& by_seq_idx = his_idx.indices().get<by_seq>();
+
+   auto removed_ops = stats_obj.removed_ops;
+   // look for the earliest entry if needed
+   auto itr = ( removed_ops < number_of_ops_to_remove ) ? by_seq_idx.lower_bound( account_id )
+                                                        : by_seq_idx.begin();
 
    uint32_t oldest_block_num = _latest_block_number_to_remove;
-   while( stats_obj.removed_ops < number_of_ops_to_remove )
+   while( removed_ops < number_of_ops_to_remove )
    {
-      // look for the earliest entry
-      const auto& his_idx = db.get_index_type<account_history_index>();
-      const auto& by_seq_idx = his_idx.indices().get<by_seq>();
-      auto itr = by_seq_idx.lower_bound( account_id );
       // make sure don't remove the latest one
       // this should always be false, just check to be safe
       if( itr == by_seq_idx.end() || itr->account != account_id || itr->id == stats_obj.most_recent_op )
          break;
 
       // if found, check whether to remove
-      const auto remove_op_id = itr->operation_id;
+      const auto& aho_to_remove = *itr;
+      const auto remove_op_id = aho_to_remove.operation_id;
       const auto& remove_op = remove_op_id(db);
       oldest_block_num = remove_op.block_num;
-      if( remove_op.block_num > _latest_block_number_to_remove
-          && stats_obj.removed_ops >= number_of_ops_to_remove_by_blks )
+      if( remove_op.block_num > _latest_block_number_to_remove && removed_ops >= number_of_ops_to_remove_by_blks )
          break;
 
-      // remove the entry, and adjust account stats object
-      const auto itr_remove = itr;
+      // remove the entry
       ++itr;
-      db.remove( *itr_remove );
-      db.modify( stats_obj, [&]( account_statistics_object& obj ){
-          obj.removed_ops = obj.removed_ops + 1;
-      });
-      // modify previous node's next pointer
-      // this should be always true, but just have a check here
-      if( itr != by_seq_idx.end() && itr->account == account_id )
-      {
-         db.modify( *itr, [&]( account_history_object& obj ){
-            obj.next = account_history_id_type();
-         });
-      }
-      // else need to modify the head pointer, but it shouldn't be true
+      db.remove( aho_to_remove );
+      ++removed_ops;
 
       // remove the operation history entry (1.11.x) if configured and no reference left
       if( _partial_operations )
@@ -350,6 +345,22 @@ void account_history_plugin_impl::remove_old_histories_by_account( const account
             db.remove( remove_op );
          }
       }
+   }
+   // adjust account stats object and the oldest entry
+   if( removed_ops != stats_obj.removed_ops )
+   {
+      db.modify( stats_obj, [removed_ops]( account_statistics_object& obj ){
+          obj.removed_ops = removed_ops;
+      });
+      // modify previous node's next pointer
+      // this should be always true, but just have a check here
+      if( itr != by_seq_idx.end() && itr->account == account_id )
+      {
+         db.modify( *itr, []( account_history_object& obj ){
+            obj.next = account_history_id_type();
+         });
+      }
+      // else need to modify the head pointer, but it shouldn't be true
    }
    // deal with exceeded_account_object
    if( !p_exa_obj )
