@@ -24,17 +24,11 @@
 #pragma once
 
 #include <graphene/app/plugin.hpp>
-#include <graphene/chain/database.hpp>
 
-#include <graphene/chain/operation_history_object.hpp>
-
-#include <fc/thread/future.hpp>
+#include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace account_history {
    using namespace chain;
-   //using namespace graphene::db;
-   //using boost::multi_index_container;
-   //using namespace boost::multi_index;
 
 //
 // Plugins should #define their SPACE_ID's so plugins with
@@ -52,9 +46,40 @@ namespace graphene { namespace account_history {
 
 enum account_history_object_type
 {
-   key_account_object_type = 0
+   exceeded_account_object_type = 0
 };
 
+/// This struct tracks accounts that have exceeded the max-ops-per-account limit
+struct exceeded_account_object : public abstract_object<exceeded_account_object>
+{
+   static constexpr uint8_t space_id = ACCOUNT_HISTORY_SPACE_ID;
+   static constexpr uint8_t type_id  = exceeded_account_object_type;
+
+   /// The ID of the account
+   account_id_type account_id;
+   /// The height of the block containing the oldest (not yet removed) operation related to this account
+   uint32_t        block_num;
+};
+
+struct by_account;
+struct by_block_num;
+using exceeded_account_multi_idx_type = multi_index_container<
+   exceeded_account_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_account>,
+         member< exceeded_account_object, account_id_type, &exceeded_account_object::account_id > >,
+      ordered_unique< tag<by_block_num>,
+         composite_key<
+            exceeded_account_object,
+            member< exceeded_account_object, uint32_t, &exceeded_account_object::block_num >,
+            member< object, object_id_type, &object::id >
+         >
+      >
+   >
+>;
+
+using exceeded_account_index = generic_index< exceeded_account_object, exceeded_account_multi_idx_type >;
 
 namespace detail
 {
@@ -81,3 +106,6 @@ class account_history_plugin : public graphene::app::plugin
 };
 
 } } //graphene::account_history
+
+FC_REFLECT_DERIVED( graphene::account_history::exceeded_account_object, (graphene::db::object),
+                    (account_id)(block_num) )

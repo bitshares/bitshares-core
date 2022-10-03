@@ -207,18 +207,28 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fc::set_option( options, "p2p-endpoint", std::string( ep ) );
    }
 
+   if (fixture.current_test_name == "min_blocks_to_keep_test")
+   {
+      fc::set_option( options, "partial-operations", true );
+      fc::set_option( options, "max-ops-per-account", (uint64_t)2 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)3 );
+      fc::set_option( options, "max-ops-per-acc-by-min-blocks", (uint64_t)5 );
+   }
    if (fixture.current_test_name == "get_account_history_operations")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)75 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
    }
    if (fixture.current_test_name == "api_limit_get_account_history_operations")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
       fc::set_option( options, "api-limit-get-account-history-operations", (uint32_t)300 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
       fc::set_option( options, "api-limit-get-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_grouped_limit_orders")
@@ -228,6 +238,7 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    if(fixture.current_test_name =="api_limit_get_relative_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
       fc::set_option( options, "api-limit-get-relative-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history_by_operations")
