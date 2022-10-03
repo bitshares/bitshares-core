@@ -35,11 +35,11 @@ Build instructions and additional documentation are available in the
 Prebuilt binaries can be found in the [releases page](https://github.com/bitshares/bitshares-core/releases) for download.
 
 
-### Build
+### Installing Node and Command-Line Wallet Software
 
 We recommend building on Ubuntu 20.04 LTS (64-bit)
 
-**Install OS Dependencies:**
+**Install Operating System Dependencies:**
 
     sudo apt-get update
     sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev doxygen
@@ -92,7 +92,7 @@ manually build your preferred version and use it with BitShares by specifying it
   Example: `cmake -DOPENSSL_ROOT_DIR=/path/to/openssl ..`
 
 
-### Run
+### Running and Stopping Node Software
 
 **Run Node Software:**
 
@@ -132,9 +132,9 @@ You can run the program with `--help` parameter to see more info:
     ./programs/witness_node/witness_node --help
 
 
-### Command-line Wallet Software
+### Using Command-Line Wallet
 
-Stay on `bitshares-core` directory before you run the below `cli_wallet` command
+Stay on `bitshares-core/build` directory before you run the below `cli_wallet` command
 
     ./programs/cli_wallet/cli_wallet
 
@@ -331,10 +331,10 @@ FAQ
 
     Yes. Documentation of the code base, including APIs, can be generated using Doxygen. Simply run `doxygen` in this directory.
 
-    If both Doxygen and perl are available in your build environment, the CLI wallet's `help` and `gethelp`
+    If both Doxygen and perl are available in your build environment, the command-line wallet's `help` and `gethelp`
     commands will display help generated from the doxygen documentation.
 
-    If your CLI wallet's `help` command displays descriptions without parameter names like
+    If your command-line wallet's `help` command displays descriptions without parameter names like
         `signed_transaction transfer(string, string, string, string, string, bool)`
     it means CMake was unable to find Doxygen or perl during configuration.  If found, the
     output should look like this:
@@ -342,7 +342,7 @@ FAQ
 
 - Is there a way to allow external program to drive `cli_wallet` via websocket, JSONRPC, or HTTP?
 
-    Yes. External programs may connect to the CLI wallet and make its calls over a websockets API. To do this, run the wallet in
+    Yes. External programs may connect to the command-line wallet and make its calls over a websockets API. To do this, run the wallet in
     server mode, i.e. `cli_wallet -s "127.0.0.1:9999"` and then have the external program connect to it over the specified port
     (in this example, port 9999). Please check the ["Using the API"](#using-the-api) section for more info.
 
