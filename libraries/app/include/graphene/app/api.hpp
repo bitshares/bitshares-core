@@ -78,13 +78,13 @@ namespace graphene { namespace app {
          };
 
          /**
-          * @brief Get operations relevant to the specificed account
+          * @brief Get the history of operations related to the specified account
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
           *              @a api_limit_get_account_history
           * @param start ID of the most recent operation to retrieve
-          * @return A list of operations performed by account, ordered from most recent to oldest.
+          * @return A list of operations related to the specified account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history(
             const std::string& account_name_or_id,
@@ -94,11 +94,33 @@ namespace graphene { namespace app {
          )const;
 
          /**
-          * @brief Get operations relevant to the specified account filtering by operation type
+          * @brief Get the history of operations related to the specified account no later than the specified time
+          * @param account_name_or_id The account name or ID whose history should be queried
+          * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_account_history
+          * @param start the time point to start looping back through history
+          * @return A list of operations related to the specified account, ordered from most recent to oldest.
+          *
+          * @note
+          * 1. If @p account_name_or_id cannot be tied to an account, an empty list will be returned
+          * 2. @p limit can be omitted or be @a null, if so the configured value of
+          *       @a api_limit_get_account_history will be used
+          * 3. @p start can be omitted or be @a null, if so the api will return the "first page" of the history
+          * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+          *    parameters in the middle cannot be omitted (but can be @a null).
+          */
+         vector<operation_history_object> get_account_history_by_time(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<fc::time_point_sec>& start = optional<fc::time_point_sec>()
+         )const;
+
+         /**
+          * @brief Get the history of operations related to the specified account filtering by operation types
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_types The IDs of the operation we want to get operations in the account
-          * ( 0 = transfer , 1 = limit order create, ...)
-          * @param start the sequence number where to start looping back throw the history
+          *                        ( 0 = transfer , 1 = limit order create, ...)
+          * @param start the sequence number where to start looping back through the history
           * @param limit the max number of entries to return (from start number), must not exceed the configured
           *              value of @a api_limit_get_account_history_by_operations
           * @return history_operation_detail
@@ -111,15 +133,15 @@ namespace graphene { namespace app {
          )const;
 
          /**
-          * @brief Get only asked operations relevant to the specified account
+          * @brief Get the history of operations related to the specified account filtering by operation type
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_type The type of the operation we want to get operations in the account
-          * ( 0 = transfer , 1 = limit order create, ...)
+          *                       ( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
           *              @a api_limit_get_account_history_operations
           * @param start ID of the most recent operation to retrieve
-          * @return A list of operations performed by account, ordered from most recent to oldest.
+          * @return A list of operations related to the specified account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history_operations(
             const std::string& account_name_or_id,
@@ -130,9 +152,9 @@ namespace graphene { namespace app {
          )const;
 
          /**
-          * @brief Get operations relevant to the specified account referenced
-          * by an event numbering specific to the account. The current number of operations
-          * for the account can be found in the account statistics (or use 0 for start).
+          * @brief Get the history of operations related to the specified account referenced
+          *        by an event numbering specific to the account. The current number of operations
+          *        for the account can be found in the account statistics (or use 0 for start).
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop Sequence number of earliest operation. 0 is default and will
           *             query 'limit' number of operations.
@@ -140,7 +162,7 @@ namespace graphene { namespace app {
           *              @a api_limit_get_relative_account_history
           * @param start Sequence number of the most recent operation to retrieve.
           *              0 is default, which will start querying from the most recent operation.
-          * @return A list of operations performed by account, ordered from most recent to oldest.
+          * @return A list of operations related to the specified account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_relative_account_history(
                const std::string& account_name_or_id,
@@ -787,6 +809,7 @@ FC_REFLECT( graphene::app::asset_api::asset_holders, (asset_id)(count) )
 
 FC_API(graphene::app::history_api,
        (get_account_history)
+       (get_account_history_by_time)
        (get_account_history_by_operations)
        (get_account_history_operations)
        (get_relative_account_history)

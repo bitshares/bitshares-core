@@ -222,6 +222,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       create_bitasset("OIL", dan.id); // create op 6
 
       generate_block();
+      fc::usleep(fc::milliseconds(100));
 
       // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));

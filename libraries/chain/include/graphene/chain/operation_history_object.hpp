@@ -106,6 +106,7 @@ namespace graphene { namespace chain {
    };
 
    struct by_block;
+   struct by_time;
 
    using operation_history_mlti_idx_type = multi_index_container<
       operation_history_object,
@@ -117,6 +118,16 @@ namespace graphene { namespace chain {
                member< operation_history_object, uint16_t, &operation_history_object::trx_in_block>,
                member< operation_history_object, uint16_t, &operation_history_object::op_in_trx>,
                member< operation_history_object, uint32_t, &operation_history_object::virtual_op>
+            >
+         >,
+         ordered_unique< tag<by_time>,
+            composite_key< operation_history_object,
+               member< operation_history_object, time_point_sec, &operation_history_object::block_time>,
+               member< object, object_id_type, &object::id >
+            >,
+            composite_key_compare<
+               std::greater< time_point_sec >,
+               std::greater< object_id_type >
             >
          >
       >
@@ -142,6 +153,10 @@ namespace graphene { namespace chain {
             composite_key< account_history_object,
                member< account_history_object, account_id_type, &account_history_object::account>,
                member< account_history_object, operation_history_id_type, &account_history_object::operation_id>
+            >,
+            composite_key_compare<
+               std::less< account_id_type >,
+               std::greater< operation_history_id_type >
             >
          >,
          ordered_non_unique< tag<by_opid>,

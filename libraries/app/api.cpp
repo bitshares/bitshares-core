@@ -408,7 +408,7 @@ namespace graphene { namespace app {
                                                                        uint32_t limit,
                                                                        operation_history_id_type start ) const
     {
-       FC_ASSERT( _app.chain_database() );
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
        const auto& db = *_app.chain_database();
 
        const auto configured_limit = _app.get_options().api_limit_get_account_history;
@@ -417,13 +417,16 @@ namespace graphene { namespace app {
                   ("configured_limit", configured_limit) );
 
        vector<operation_history_object> result;
+       if( start == operation_history_id_type() )
+          // Note: this means we can hardly use ID 0 as start to query for exactly the object with ID 0
+          start = operation_history_id_type::max();
+       if( start < stop )
+          return result;
+
        account_id_type account;
        try {
           database_api_helper db_api_helper( _app );
           account = db_api_helper.get_account_from_string(account_id_or_name)->id;
-          const account_history_object& node = account(db).statistics(db).most_recent_op(db);
-          if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
-             start = node.operation_id;
        } catch(...) { return result; }
 
        if(_app.is_plugin_enabled("elasticsearch")) {
@@ -438,20 +441,62 @@ namespace graphene { namespace app {
           }
        }
 
-       const auto& hist_idx = db.get_index_type<account_history_index>();
-       const auto& by_op_idx = hist_idx.indices().get<by_op>();
-       auto index_start = by_op_idx.begin();
-       auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
+       const auto& by_op_idx = db.get_index_type<account_history_index>().indices().get<by_op>();
+       auto itr = by_op_idx.lower_bound( boost::make_tuple( account, start ) );
+       auto itr_end = by_op_idx.lower_bound( boost::make_tuple( account, stop ) );
 
-       while(itr != index_start && itr->account == account && itr->operation_id.instance.value > stop.instance.value
-             && result.size() < limit)
+       while( itr != itr_end && result.size() < limit )
        {
-          if(itr->operation_id.instance.value <= start.instance.value)
-             result.push_back(itr->operation_id(db));
-          --itr;
+          result.emplace_back( itr->operation_id(db) );
+          ++itr;
        }
-       if(stop.instance.value == 0 && result.size() < limit && itr->account == account) {
-         result.push_back(itr->operation_id(db));
+       // Deal with a special case : include the object with ID 0 when it fits
+       if( 0 == stop.instance.value && result.size() < limit && itr != by_op_idx.end() )
+       {
+          const auto& obj = *itr;
+          if( obj.account == account )
+             result.emplace_back( obj.operation_id(db) );
+       }
+
+       return result;
+    }
+
+    vector<operation_history_object> history_api::get_account_history_by_time(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<fc::time_point_sec>& ostart ) const
+    {
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
+       const auto& db = *_app.chain_database();
+
+       const auto configured_limit = _app.get_options().api_limit_get_account_history;
+       uint32_t limit = olimit.valid() ? *olimit : configured_limit;
+       FC_ASSERT( limit <= configured_limit,
+                  "limit can not be greater than ${configured_limit}",
+                  ("configured_limit", configured_limit) );
+
+       vector<operation_history_object> result;
+       account_id_type account;
+       try {
+          database_api_helper db_api_helper( _app );
+          account = db_api_helper.get_account_from_string(account_name_or_id)->id;
+       } catch(...) { return result; }
+
+       fc::time_point_sec start = ostart.valid() ? *ostart : fc::time_point_sec::maximum();
+
+       const auto& op_hist_idx = db.get_index_type<operation_history_index>().indices().get<by_time>();
+       auto op_hist_itr = op_hist_idx.lower_bound( start );
+       if( op_hist_itr == op_hist_idx.end() )
+          return result;
+
+       const auto& acc_hist_idx = db.get_index_type<account_history_index>().indices().get<by_op>();
+       auto itr = acc_hist_idx.lower_bound( boost::make_tuple( account, op_hist_itr->id ) );
+       auto itr_end = acc_hist_idx.upper_bound( account );
+
+       while( itr != itr_end && result.size() < limit )
+       {
+          result.emplace_back( itr->operation_id(db) );
+          ++itr;
        }
 
        return result;
@@ -464,7 +509,7 @@ namespace graphene { namespace app {
           operation_history_id_type stop,
           uint32_t limit ) const
     {
-       FC_ASSERT( _app.chain_database() );
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
        const auto& db = *_app.chain_database();
 
        const auto configured_limit = _app.get_options().api_limit_get_account_history_operations;
@@ -509,7 +554,7 @@ namespace graphene { namespace app {
                                                                                 uint32_t limit,
                                                                                 uint64_t start ) const
     {
-       FC_ASSERT( _app.chain_database() );
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
        const auto& db = *_app.chain_database();
 
        const auto configured_limit = _app.get_options().api_limit_get_relative_account_history;
@@ -551,7 +596,7 @@ namespace graphene { namespace app {
           uint32_t block_num,
           const optional<uint16_t>& trx_in_block ) const
     {
-       FC_ASSERT(_app.chain_database());
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
        const auto& db = *_app.chain_database();
        const auto& idx = db.get_index_type<operation_history_index>().indices().get<by_block>();
        auto range = trx_in_block.valid() ? idx.equal_range( boost::make_tuple( block_num, *trx_in_block  ) )
