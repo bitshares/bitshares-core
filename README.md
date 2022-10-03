@@ -101,17 +101,17 @@ Stay on `bitshares-core/build` directory before you run the below `witness_node`
     ./programs/witness_node/witness_node
 
 Under `build` directory the node run will automatically create the directory `witness_node_data_dir` along with config files underneath then start synchronizing the blockchain.
-It may take (usually several hours) to fully synchronize the blockchain data.
+It may take usually several hours to fully synchronize the blockchain data.
 The blockchain data will be stored under the directory `witness_node_data_dir`.
 
 **Stop Node Software:**
 
-For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take (usually few minutes) to exit the run.
+For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
 It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to inisiate the node run so you can go back to the node run screen to stop it.
 
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account histories (which is usually not necessary) you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
+In order to run a full node with all the account histories which usually unnecessary, you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
 
 | Default | Full | Minimal  | ElasticSearch
 | --- | --- | --- | ---
