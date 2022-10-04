@@ -171,21 +171,36 @@ namespace graphene { namespace app {
                uint64_t start = 0) const;
 
          /**
-          * @brief Get all operations inside a block or a transaction, including virtual operations
+          * @brief Get all operations within a block or a transaction, including virtual operations
           * @param block_num the number (height) of the block to fetch
           * @param trx_in_block the sequence of a transaction in the block, starts from @a 0, optional.
           *                     If specified, will return only operations of that transaction.
           *                     If omitted, will return all operations in the specified block.
           * @return a list of @a operation_history objects ordered by ID
           *
-          * @note the data is fetched from @a account_history plugin, thus the result is possible to
-          *       be incomplete due to the @a partial-operations option configured in the API node.
-          *       For complete data, it is recommended to query from ElasticSearch where data is
-          *       maintained by @a elastic_search plugin.
+          * @note the data is fetched from the @a account_history plugin, so results may be
+          *       incomplete due to the @a partial-operations option configured in the API node.
+          *       To get complete data, it is recommended to query from ElasticSearch where the data is
+          *       maintained by the @a elastic_search plugin.
           */
          vector<operation_history_object> get_block_operation_history(
                uint32_t block_num,
                const optional<uint16_t>& trx_in_block = {} ) const;
+
+         /**
+          * @brief Get all operations, including virtual operations, within the most recent block
+          *        (no later than the specified time) containing at least one operation
+          * @param start time point, optional, if omitted, the data of the latest block containing at least
+          *              one operation will be returned
+          * @return a list of @a operation_history objects ordered by ID
+          *
+          * @note the data is fetched from the @a account_history plugin, so results may be
+          *       incomplete or incorrect due to the @a partial-operations option configured in the API node.
+          *       To get complete data, it is recommended to query from ElasticSearch where the data is
+          *       maintained by the @a elastic_search plugin.
+          */
+         vector<operation_history_object> get_block_operations_by_time(
+               const optional<fc::time_point_sec>& start = optional<fc::time_point_sec>() ) const;
 
          /**
           * @brief Get details of order executions occurred most recently in a trading pair
@@ -814,6 +829,7 @@ FC_API(graphene::app::history_api,
        (get_account_history_operations)
        (get_relative_account_history)
        (get_block_operation_history)
+       (get_block_operations_by_time)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
