@@ -96,6 +96,42 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       histories = hist_api.get_block_operation_history(head_block_num, 1u);
       BOOST_CHECK_EQUAL(histories.size(), 1u);
 
+      // get_block_operations_by_time
+      auto time1 = db.head_block_time();
+      histories = hist_api.get_block_operations_by_time(time1);
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      histories = hist_api.get_block_operations_by_time(time1 + fc::seconds(1));
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      histories = hist_api.get_block_operations_by_time(time1 - fc::seconds(1));
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      generate_block();
+      auto time2 = db.head_block_time();
+
+      histories = hist_api.get_block_operations_by_time(time1);
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      histories = hist_api.get_block_operations_by_time(time1 - fc::seconds(1));
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      histories = hist_api.get_block_operations_by_time(time2);
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      create_bitasset("USX", account_id_type());
+      generate_block();
+      auto time3 = db.head_block_time();
+
+      histories = hist_api.get_block_operations_by_time(time2);
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+
+      histories = hist_api.get_block_operations_by_time(time3);
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+
+      histories = hist_api.get_block_operations_by_time(time3 + fc::seconds(1));
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
