@@ -1,8 +1,8 @@
 BitShares Core
 ==============
 
-[BitShares Core](https://github.com/bitshares/bitshares-core) is the BitShares blockchain implementation and command-line interface.
-The web browser based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
+[BitShares Core](https://github.com/bitshares/bitshares-core) is the BitShares blockchain node software and command-line wallet software.
+For UI reference wallet software (browser-based wallet and desktop wallet) visit [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
@@ -12,7 +12,7 @@ Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to fin
 
 * [Getting Started](#getting-started)
 * [Support](#support)
-* [Using the API](#using-the-api)
+* [Using Built-In APIs](#using-built-in-apis)
 * [Accessing restrictable node API sets](#accessing-restrictable-node-api-sets)
 * [FAQ](#faq)
 * [License](#license)
@@ -25,23 +25,26 @@ Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to fin
 |`testnet`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Atestnet)|
 |`master` of `bitshares-fc`|[![](https://github.com/bitshares/bitshares-fc/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster)|
 
+
 Getting Started
 ---------------
+
 Build instructions and additional documentation are available in the
 [Wiki](https://github.com/bitshares/bitshares-core/wiki).
 
 Prebuilt binaries can be found in the [releases page](https://github.com/bitshares/bitshares-core/releases) for download.
 
-### Build
+
+### Installing Node and Command-Line Wallet Software
 
 We recommend building on Ubuntu 20.04 LTS (64-bit)
 
-**Build Dependencies:**
+**Install Operating System Dependencies:**
 
     sudo apt-get update
     sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev doxygen
 
-**Build Script:**
+**Build Node And Command-Line Wallet:**
 
     git clone https://github.com/bitshares/bitshares-core.git
     cd bitshares-core
@@ -52,8 +55,9 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
     cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
-**Upgrade Script:** (prepend to the Build Script above if you built a prior release):
+**Upgrade Node And Command-Line Wallet:**
 
+    cd bitshares-core
     git remote set-url origin https://github.com/bitshares/bitshares-core.git
     git checkout master
     git remote set-head origin --auto
@@ -61,6 +65,10 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
     git submodule update --init --recursive # this command may fail
     git submodule sync --recursive
     git submodule update --init --recursive
+    mkdir build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make
 
 **NOTE:**
 
@@ -84,20 +92,26 @@ manually build your preferred version and use it with BitShares by specifying it
   Example: `cmake -DOPENSSL_ROOT_DIR=/path/to/openssl ..`
 
 
-### Run the node software
+### Running and Stopping Node Software
 
-**After Building**, the node software `witness_node` can be launched with:
+**Run Node Software:**
+
+Stay on `bitshares-core/build` directory before you run the below `witness_node` command
 
     ./programs/witness_node/witness_node
 
-The node will automatically create a `witness_node_data_dir` directory with some config files.
-The blockchain data will be stored in the directory too.
-It may take several hours to fully synchronize the blockchain.
+Under `build` directory the node run will automatically create the directory `witness_node_data_dir` along with config files underneath then start synchronizing the blockchain.
+It may take usually several hours to fully synchronize the blockchain data.
+The blockchain data will be stored under the directory `witness_node_data_dir`.
 
-You can exit the node using `Ctrl+C`. Please be aware that the node may need some time (usually a few minutes) to exit cleanly, please be patient.
+**Stop Node Software:**
+
+For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
+It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to inisiate the node run so you can go back to the node run screen to stop it.
+
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account histories (which is usually not necessary) you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
+In order to run a full node with all the account histories which usually unnecessary, you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
 
 | Default | Full | Minimal  | ElasticSearch
 | --- | --- | --- | ---
@@ -118,9 +132,9 @@ You can run the program with `--help` parameter to see more info:
     ./programs/witness_node/witness_node --help
 
 
-### Run the command-line wallet software
+### Using Command-Line Wallet
 
-To start the command-line wallet, in a separate terminal you can run:
+Stay on `bitshares-core/build` directory before you run the below `cli_wallet` command
 
     ./programs/cli_wallet/cli_wallet
 
@@ -200,7 +214,7 @@ BitShares UI bugs should be reported to the [UI issue tracker](https://github.co
 Up to date online Doxygen documentation can be found at [Doxygen.BitShares.org](https://doxygen.bitshares.org/hierarchy.html).
 
 
-Using the API
+Using Built-In APIs
 -------------
 
 ### Node API
@@ -317,10 +331,10 @@ FAQ
 
     Yes. Documentation of the code base, including APIs, can be generated using Doxygen. Simply run `doxygen` in this directory.
 
-    If both Doxygen and perl are available in your build environment, the CLI wallet's `help` and `gethelp`
+    If both Doxygen and perl are available in your build environment, the command-line wallet's `help` and `gethelp`
     commands will display help generated from the doxygen documentation.
 
-    If your CLI wallet's `help` command displays descriptions without parameter names like
+    If your command-line wallet's `help` command displays descriptions without parameter names like
         `signed_transaction transfer(string, string, string, string, string, bool)`
     it means CMake was unable to find Doxygen or perl during configuration.  If found, the
     output should look like this:
@@ -328,7 +342,7 @@ FAQ
 
 - Is there a way to allow external program to drive `cli_wallet` via websocket, JSONRPC, or HTTP?
 
-    Yes. External programs may connect to the CLI wallet and make its calls over a websockets API. To do this, run the wallet in
+    Yes. External programs may connect to the command-line wallet and make its calls over a websockets API. To do this, run the wallet in
     server mode, i.e. `cli_wallet -s "127.0.0.1:9999"` and then have the external program connect to it over the specified port
     (in this example, port 9999). Please check the ["Using the API"](#using-the-api) section for more info.
 
@@ -379,7 +393,9 @@ FAQ
     connecting to.  Therefore the API to add p2p connections needs to be set up with proper access
     controls.
 
+
 License
 -------
+
 BitShares Core is under the MIT license. See [LICENSE](https://github.com/bitshares/bitshares-core/blob/master/LICENSE.txt)
 for more information.
