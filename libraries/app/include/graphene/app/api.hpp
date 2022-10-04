@@ -192,7 +192,7 @@ namespace graphene { namespace app {
           *        (no later than the specified time) containing at least one operation
           * @param start time point, optional, if omitted, the data of the latest block containing at least
           *              one operation will be returned
-          * @return a list of @a operation_history objects ordered by ID
+          * @return a list of @a operation_history objects ordered by ID in descending order
           *
           * @note the data is fetched from the @a account_history plugin, so results may be
           *       incomplete or incorrect due to the @a partial-operations option configured in the API node.
