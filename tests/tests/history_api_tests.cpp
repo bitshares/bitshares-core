@@ -222,6 +222,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       create_bitasset("OIL", dan.id); // create op 6
 
       generate_block();
+      fc::usleep(fc::milliseconds(100));
 
       // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));
@@ -517,6 +518,141 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       BOOST_CHECK_EQUAL(histories[2].id.instance(), 3u);
       BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
       BOOST_CHECK_EQUAL(histories[4].id.instance(), 0u);
+
+   }
+   catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(get_account_history_by_time) {
+   try {
+      graphene::app::history_api hist_api(app);
+
+      auto time1 = db.head_block_time();
+
+      // A = account_id_type() with records { 5, 3, 1, 0 }, and
+      // B = dan with records { 6, 4, 2, 1 }
+      // account_id_type() and dan share operation id 1(account create) - share can be also in id 0
+
+      // no history at all in the chain
+      vector<operation_history_object> histories = hist_api.get_account_history_by_time("1.2.0");
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      create_bitasset("USD", account_id_type()); // create op 0
+      generate_block();
+      fc::usleep(fc::milliseconds(100));
+
+      auto time2 = db.head_block_time();
+
+      // what if the account only has one history entry and it is 0?
+      histories = hist_api.get_account_history_by_time("1.2.0");
+      BOOST_REQUIRE_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", 0);
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", 2, time1);
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", 10, time2);
+      BOOST_REQUIRE_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", {}, time2);
+      BOOST_REQUIRE_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
+
+      BOOST_CHECK_THROW( hist_api.get_account_history_by_time( "1.2.0", 102 ), fc::exception );
+
+      const account_object& dan = create_account("dan"); // create op 1
+
+      create_bitasset("CNY", dan.id); // create op 2
+      create_bitasset("BTC", account_id_type()); // create op 3
+      create_bitasset("XMR", dan.id); // create op 4
+      create_bitasset("EUR", account_id_type()); // create op 5
+      create_bitasset("OIL", dan.id); // create op 6
+
+      generate_block();
+      fc::usleep(fc::milliseconds(100));
+
+      auto time3 = db.head_block_time();
+
+      histories = hist_api.get_account_history_by_time("1.2.0", {}, time2);
+      BOOST_REQUIRE_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", {}, time2 + fc::seconds(1));
+      BOOST_REQUIRE_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", {}, time3);
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", 2, time3);
+      BOOST_REQUIRE_EQUAL(histories.size(), 2u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0", 2);
+      BOOST_REQUIRE_EQUAL(histories.size(), 2u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
+
+      histories = hist_api.get_account_history_by_time("1.2.0");
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
+
+      histories = hist_api.get_account_history_by_time("dan", {}, time3);
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
+
+      histories = hist_api.get_account_history_by_time("dan", 5, time3);
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
+
+      histories = hist_api.get_account_history_by_time("dan", 5);
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
+
+      histories = hist_api.get_account_history_by_time("dan");
+      BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
+
+      histories = hist_api.get_account_history_by_time("dan", 2, time3);
+      BOOST_REQUIRE_EQUAL(histories.size(), 2u);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
+
+      histories = hist_api.get_account_history_by_time("dan", 2, time2);
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      histories = hist_api.get_account_history_by_time("dan", {}, time1);
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+      histories = hist_api.get_account_history_by_time("nathan", 2);
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
 
    }
    catch (fc::exception &e) {
