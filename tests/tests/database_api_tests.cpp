@@ -1483,6 +1483,14 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
 BOOST_AUTO_TEST_CASE( get_block_tests )
 { try {
 
+   const auto& get_block_id = []( const graphene::app::maybe_signed_block_header& header )
+   {
+      signed_block_header signed_header( static_cast<block_header>( header ) );
+      if( header.witness_signature.valid() )
+         signed_header.witness_signature = *header.witness_signature;
+      return signed_header.id();
+   };
+
    generate_block();
 
    ACTORS( (nathan) );
@@ -1505,11 +1513,35 @@ BOOST_AUTO_TEST_CASE( get_block_tests )
    BOOST_CHECK( head_block->witness_signature != signature_type() );
    BOOST_CHECK( head_block->id() == block3.id() );
 
-   auto head_block_header = db_api.get_block_header( head_block_num );
+   auto head_block_header = db_api.get_block_header( head_block_num, true );
+   idump( (head_block_header) );
    BOOST_REQUIRE( head_block_header.valid() );
    BOOST_CHECK_EQUAL( head_block_header->block_num(), head_block_num );
-   BOOST_CHECK( head_block_header->witness_signature == head_block->witness_signature );
-   BOOST_CHECK( head_block_header->id() == head_block->id() );
+   BOOST_REQUIRE( head_block_header->witness_signature.valid() );
+   BOOST_CHECK( *head_block_header->witness_signature == head_block->witness_signature );
+   BOOST_CHECK( get_block_id( *head_block_header ) == head_block->id() );
+
+   auto head_block_header2 = db_api.get_block_header( head_block_num );
+   idump( (head_block_header2) );
+   BOOST_REQUIRE( head_block_header2.valid() );
+   BOOST_CHECK_EQUAL( head_block_header2->block_num(), head_block_num );
+   BOOST_CHECK( head_block_header2->previous == head_block->previous );
+   BOOST_CHECK( head_block_header2->timestamp == head_block->timestamp );
+   BOOST_CHECK( head_block_header2->witness == head_block->witness );
+   BOOST_CHECK( head_block_header2->transaction_merkle_root == head_block->transaction_merkle_root );
+   BOOST_CHECK( !head_block_header2->witness_signature.valid() );
+   BOOST_CHECK( get_block_id( *head_block_header2 ) != head_block->id() );
+
+   auto head_block_header3 = db_api.get_block_header( head_block_num, false );
+   idump( (head_block_header3) );
+   BOOST_REQUIRE( head_block_header3.valid() );
+   BOOST_CHECK_EQUAL( head_block_header3->block_num(), head_block_num );
+   BOOST_CHECK( head_block_header3->previous == head_block->previous );
+   BOOST_CHECK( head_block_header3->timestamp == head_block->timestamp );
+   BOOST_CHECK( head_block_header3->witness == head_block->witness );
+   BOOST_CHECK( head_block_header3->transaction_merkle_root == head_block->transaction_merkle_root );
+   BOOST_CHECK( !head_block_header3->witness_signature.valid() );
+   BOOST_CHECK( get_block_id( *head_block_header3 ) == get_block_id( *head_block_header2 ) );
 
    auto previous_block = db_api.get_block( head_block_num - 1 );
    BOOST_REQUIRE( previous_block.valid() );
@@ -1520,31 +1552,63 @@ BOOST_AUTO_TEST_CASE( get_block_tests )
    BOOST_CHECK( previous_block->witness_signature != head_block->witness_signature );
    BOOST_CHECK( previous_block->id() == block2.id() );
 
-   auto previous_block_header = db_api.get_block_header( head_block_num - 1 );
+   auto previous_block_header = db_api.get_block_header( head_block_num - 1, true );
    BOOST_REQUIRE( previous_block_header.valid() );
    BOOST_CHECK_EQUAL( previous_block_header->block_num(), head_block_num - 1 );
-   BOOST_CHECK( previous_block_header->witness_signature == previous_block->witness_signature );
-   BOOST_CHECK( previous_block_header->id() == previous_block->id() );
+   BOOST_REQUIRE( previous_block_header->witness_signature.valid() );
+   BOOST_CHECK( *previous_block_header->witness_signature == previous_block->witness_signature );
+   BOOST_CHECK( get_block_id( *previous_block_header ) == previous_block->id() );
 
    auto next_block = db_api.get_block( head_block_num + 1 );
    BOOST_CHECK( !next_block.valid() );
 
-   auto next_block_header = db_api.get_block_header( head_block_num + 1 );
+   auto next_block_header = db_api.get_block_header( head_block_num + 1, true );
    BOOST_CHECK( !next_block_header.valid() );
 
    const auto block_headers = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
-                                                               head_block_num - 1 } );
+                                                               head_block_num - 1 }, true );
    BOOST_REQUIRE_EQUAL( block_headers.size(), 3U );
    BOOST_CHECK_THROW( block_headers.at( head_block_num + 2 ), std::out_of_range );
    BOOST_CHECK( !block_headers.at( head_block_num + 1 ).valid() );
    BOOST_REQUIRE( block_headers.at( head_block_num ).valid() );
    BOOST_CHECK( block_headers.at( head_block_num )->block_num() == head_block_header->block_num() );
-   BOOST_CHECK( block_headers.at( head_block_num )->id() == head_block_header->id() );
-   BOOST_CHECK( block_headers.at( head_block_num )->witness_signature == head_block_header->witness_signature );
+   BOOST_CHECK( get_block_id( *block_headers.at( head_block_num ) ) == head_block->id() );
+   BOOST_REQUIRE( block_headers.at( head_block_num )->witness_signature.valid() );
+   BOOST_CHECK( *block_headers.at( head_block_num )->witness_signature == head_block->witness_signature );
+   BOOST_REQUIRE( block_headers.at( head_block_num - 1 ).valid() );
    BOOST_CHECK( block_headers.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
-   BOOST_CHECK( block_headers.at( head_block_num - 1 )->id() == previous_block_header->id() );
-   BOOST_CHECK( block_headers.at( head_block_num - 1 )->witness_signature
-                == previous_block_header->witness_signature );
+   BOOST_CHECK( get_block_id( *block_headers.at( head_block_num - 1 ) ) == previous_block->id() );
+   BOOST_REQUIRE( block_headers.at( head_block_num - 1 )->witness_signature.valid() );
+   BOOST_CHECK( *block_headers.at( head_block_num - 1 )->witness_signature == previous_block->witness_signature );
+
+   const auto block_headers2 = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                                head_block_num - 1 } );
+   BOOST_REQUIRE_EQUAL( block_headers2.size(), 3U );
+   BOOST_CHECK_THROW( block_headers2.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers2.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers2.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers2.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers2.at( head_block_num ) ) == get_block_id( *head_block_header2 ) );
+   BOOST_CHECK( !block_headers2.at( head_block_num )->witness_signature.valid() );
+   BOOST_REQUIRE( block_headers2.at( head_block_num - 1 ).valid() );
+   BOOST_CHECK( block_headers2.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers2.at( head_block_num - 1 ) ) != previous_block->id() );
+   BOOST_CHECK( !block_headers2.at( head_block_num - 1 )->witness_signature.valid() );
+
+   const auto block_headers3 = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                                head_block_num - 1 }, false );
+   BOOST_REQUIRE_EQUAL( block_headers3.size(), 3U );
+   BOOST_CHECK_THROW( block_headers3.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers3.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers3.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers3.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers3.at( head_block_num ) ) == get_block_id( *head_block_header2 ) );
+   BOOST_CHECK( !block_headers3.at( head_block_num )->witness_signature.valid() );
+   BOOST_REQUIRE( block_headers3.at( head_block_num - 1 ).valid() );
+   BOOST_CHECK( block_headers3.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers3.at( head_block_num - 1 ) )
+                   == get_block_id( *block_headers2.at( head_block_num - 1 ) ) );
+   BOOST_CHECK( !block_headers3.at( head_block_num - 1 )->witness_signature.valid() );
 
 } FC_LOG_AND_RETHROW() }
 
