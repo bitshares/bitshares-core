@@ -606,6 +606,25 @@ namespace graphene { namespace app {
        return result;
     }
 
+    vector<operation_history_object> history_api::get_block_operations_by_time(
+          const optional<fc::time_point_sec>& start ) const
+    {
+       FC_ASSERT( _app.chain_database(), "database unavailable" );
+       const auto& db = *_app.chain_database();
+       const auto& idx = db.get_index_type<operation_history_index>().indices().get<by_time>();
+       auto itr = start.valid() ? idx.lower_bound( *start ) : idx.begin();
+
+       vector<operation_history_object> result;
+       if( itr == idx.end() )
+          return result;
+
+       auto itr_end = idx.upper_bound( itr->block_time );
+
+       std::copy( itr, itr_end, std::back_inserter( result ) );
+
+       return result;
+    }
+
     flat_set<uint32_t> history_api::get_market_history_buckets()const
     {
        auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
