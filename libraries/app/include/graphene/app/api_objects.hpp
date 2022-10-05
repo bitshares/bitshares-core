@@ -177,6 +177,14 @@ namespace graphene { namespace app {
       optional<liquidity_pool_ticker_object> statistics;
    };
 
+   struct maybe_signed_block_header : block_header
+   {
+      maybe_signed_block_header() = default;
+      explicit maybe_signed_block_header( const signed_block_header& bh, bool with_witness_signature = true );
+
+      optional<signature_type> witness_signature;
+   };
+
 } }
 
 FC_REFLECT( graphene::app::more_data,
@@ -221,3 +229,5 @@ FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asse
 FC_REFLECT_DERIVED( graphene::app::extended_liquidity_pool_object, (graphene::chain::liquidity_pool_object),
                     (statistics) )
 
+FC_REFLECT_DERIVED( graphene::app::maybe_signed_block_header, (graphene::protocol::block_header),
+                    (witness_signature) )

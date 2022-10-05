@@ -227,31 +227,36 @@ void database_api_impl::cancel_all_subscriptions( bool reset_callback, bool rese
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-optional<signed_block_header> database_api::get_block_header(uint32_t block_num)const
+optional<maybe_signed_block_header> database_api::get_block_header(
+            uint32_t block_num, const optional<bool>& with_witness_signature )const
 {
-   return my->get_block_header( block_num );
+   bool with_signature = ( with_witness_signature.valid() && *with_witness_signature );
+   return my->get_block_header( block_num, with_signature );
 }
 
-optional<signed_block_header> database_api_impl::get_block_header(uint32_t block_num) const
+optional<maybe_signed_block_header> database_api_impl::get_block_header(
+            uint32_t block_num, bool with_witness_signature )const
 {
    auto result = _db.fetch_block_by_number(block_num);
    if(result)
-      return *result;
+      return maybe_signed_block_header( *result, with_witness_signature );
    return {};
 }
-map<uint32_t, optional<signed_block_header>> database_api::get_block_header_batch(
-      const vector<uint32_t>& block_nums) const
+
+map<uint32_t, optional<maybe_signed_block_header>> database_api::get_block_header_batch(
+            const vector<uint32_t>& block_nums, const optional<bool>& with_witness_signatures )const
 {
-   return my->get_block_header_batch( block_nums );
+   bool with_signatures = ( with_witness_signatures.valid() && *with_witness_signatures );
+   return my->get_block_header_batch( block_nums, with_signatures );
 }
 
-map<uint32_t, optional<signed_block_header>> database_api_impl::get_block_header_batch(
-      const vector<uint32_t>& block_nums) const
+map<uint32_t, optional<maybe_signed_block_header>> database_api_impl::get_block_header_batch(
+            const vector<uint32_t>& block_nums, bool with_witness_signatures )const
 {
-   map<uint32_t, optional<signed_block_header>> results;
+   map<uint32_t, optional<maybe_signed_block_header>> results;
    for (const uint32_t block_num : block_nums)
    {
-      results[block_num] = get_block_header(block_num);
+      results[block_num] = get_block_header( block_num, with_witness_signatures );
    }
    return results;
 }
