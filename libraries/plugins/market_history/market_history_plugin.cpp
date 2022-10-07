@@ -766,7 +766,8 @@ void market_history_plugin::plugin_set_program_options(
 
 void market_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
-   database().applied_block.connect( [this]( const signed_block& b){ my->update_market_histories(b); } );
+   // connect with group 0 to process before some special steps (e.g. snapshot or next_object_id)
+   database().applied_block.connect( 0, [this]( const signed_block& b){ my->update_market_histories(b); } );
 
    database().add_index< primary_index< bucket_index  > >();
    database().add_index< primary_index< history_index  > >();

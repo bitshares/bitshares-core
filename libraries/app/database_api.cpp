@@ -94,7 +94,7 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
       amount_in_collateral_index = &_db.get_index_type< primary_index< call_order_index > >()
                                     .get_secondary_index<graphene::api_helper_indexes::amount_in_collateral_index>();
    }
-   catch( fc::assert_exception& e )
+   catch( const fc::assert_exception& )
    {
       amount_in_collateral_index = nullptr;
    }
@@ -108,6 +108,17 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    {
       asset_in_liquidity_pools_index = nullptr;
    }
+
+   try
+   {
+      next_object_ids_index = &_db.get_index_type< primary_index< simple_index< chain_property_object > > >()
+                                    .get_secondary_index<graphene::api_helper_indexes::next_object_ids_index>();
+   }
+   catch( const fc::assert_exception& )
+   {
+      next_object_ids_index = nullptr;
+   }
+
 }
 
 database_api_impl::~database_api_impl()
@@ -347,6 +358,23 @@ dynamic_global_property_object database_api::get_dynamic_global_properties()cons
 dynamic_global_property_object database_api_impl::get_dynamic_global_properties()const
 {
    return _db.get(dynamic_global_property_id_type());
+}
+
+object_id_type database_api::get_next_object_id( uint8_t space_id, uint8_t type_id,
+                                                 bool with_pending_transactions )const
+{
+   return my->get_next_object_id( space_id, type_id, with_pending_transactions );
+}
+
+object_id_type database_api_impl::get_next_object_id( uint8_t space_id, uint8_t type_id,
+                                                      bool with_pending_transactions )const
+{
+   if( with_pending_transactions )
+      return _db.get_index( space_id, type_id ).get_next_id();
+
+   FC_ASSERT( next_object_ids_index, "api_helper_indexes plugin is not enabled on this server." );
+
+   return next_object_ids_index->get_next_id( space_id, type_id );
 }
 
 //////////////////////////////////////////////////////////////////////

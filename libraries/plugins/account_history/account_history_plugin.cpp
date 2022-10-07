@@ -457,7 +457,8 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
 {
    my->init_program_options( options );
 
-   database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
+   // connect with group 0 to process before some special steps (e.g. snapshot or next_object_id)
+   database().applied_block.connect( 0, [this]( const signed_block& b){ my->update_account_histories(b); } );
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_history_index > >();
 
