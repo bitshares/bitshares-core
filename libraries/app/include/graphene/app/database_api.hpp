@@ -153,18 +153,26 @@ class database_api
       /////////////////////////////
 
       /**
-       * @brief Retrieve a signed block header
+       * @brief Retrieve a block header
        * @param block_num Height of the block whose header should be returned
+       * @param with_witness_signature Whether to return witness signature. Optional.
+       *                               If omitted or is @a false, will not return witness signature.
        * @return header of the referenced block, or null if no matching block was found
        */
-      optional<signed_block_header> get_block_header(uint32_t block_num)const;
+      optional<maybe_signed_block_header> get_block_header(
+            uint32_t block_num,
+            const optional<bool>& with_witness_signature = optional<bool>() )const;
 
       /**
-      * @brief Retrieve multiple signed block headers by block numbers
-      * @param block_nums vector containing heights of the blocks whose headers should be returned
-      * @return array of headers of the referenced blocks, or null if no matching block was found
-      */
-      map<uint32_t, optional<signed_block_header>> get_block_header_batch(const vector<uint32_t>& block_nums)const;
+       * @brief Retrieve multiple block headers by block numbers
+       * @param block_nums vector containing heights of the blocks whose headers should be returned
+       * @param with_witness_signatures Whether to return witness signatures. Optional.
+       *                                If omitted or is @a false, will not return witness signatures.
+       * @return array of headers of the referenced blocks, or null if no matching block was found
+       */
+      map<uint32_t, optional<maybe_signed_block_header>> get_block_header_batch(
+            const vector<uint32_t>& block_nums,
+            const optional<bool>& with_witness_signatures = optional<bool>() )const;
 
       /**
        * @brief Retrieve a full, signed block
