@@ -575,7 +575,8 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
 
    if( my->_options.elasticsearch_mode != mode::only_query )
    {
-      database().applied_block.connect([this](const signed_block &b) {
+      // connect with group 0 to process before some special steps (e.g. snapshot or next_object_id)
+      database().applied_block.connect( 0, [this](const signed_block &b) {
          my->update_account_histories(b);
       });
    }

@@ -1985,10 +1985,22 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    opt.has_market_history_plugin = true;
    graphene::app::database_api db_api( db, &opt);
 
+   // check get_next_object_id
+   auto next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                             graphene::market_history::order_history_object_type,
+                                             false );
+   BOOST_CHECK( std::string(next_id) == "5.0.0" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.0" );
+
    ACTORS((bob)(alice));
 
    const auto& eur = create_user_issued_asset("EUR");
+   asset_id_type eur_id = eur.id;
    const auto& usd = create_user_issued_asset("USD");
+   asset_id_type usd_id = usd.id;
 
    issue_uia( bob_id, usd.amount(1000000) );
    issue_uia( alice_id, eur.amount(1000000) );
@@ -1996,8 +2008,28 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    // maker create an order
    create_sell_order(bob, usd.amount(200), eur.amount(210));
 
+   // btw check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.0" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.1" );
+
    // taker match it
    create_sell_order(alice, eur.amount(210), usd.amount(200));
+
+   // btw check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.0" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
 
    generate_block();
 
@@ -2039,6 +2071,56 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "buy", history[0].type );
    BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   // maker create an order
+   create_sell_order(bob, asset(200,usd_id), asset(210,eur_id));
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
+   BOOST_CHECK_THROW( db_api.get_next_object_id( 1,100,true ), fc::exception );
+   BOOST_CHECK_THROW( db_api.get_next_object_id( 10,0,false ), fc::exception );
+
+   generate_block();
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
 
 } FC_LOG_AND_RETHROW() }
 

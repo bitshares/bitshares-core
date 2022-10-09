@@ -228,6 +228,17 @@ class database_api
        */
       dynamic_global_property_object get_dynamic_global_properties()const;
 
+      /**
+       * @brief Get the next object ID in an object space
+       * @param space_id The space ID
+       * @param type_id The type ID
+       * @param with_pending_transactions Whether to include pending transactions
+       * @return The next object ID to be assigned
+       * @throw fc::exception If the object space does not exist, or @p with_pending_transactions is @a false but
+       *                      the api_helper_indexes plugin is not enabled
+       */
+      object_id_type get_next_object_id( uint8_t space_id, uint8_t type_id, bool with_pending_transactions )const;
+
       //////////
       // Keys //
       //////////
@@ -1475,6 +1486,7 @@ FC_API(graphene::app::database_api,
    (get_config)
    (get_chain_id)
    (get_dynamic_global_properties)
+   (get_next_object_id)
 
    // Keys
    (get_key_references)

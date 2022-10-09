@@ -62,6 +62,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       fc::variant_object get_config()const;
       chain_id_type get_chain_id()const;
       dynamic_global_property_object get_dynamic_global_properties()const;
+      object_id_type get_next_object_id( uint8_t space_id, uint8_t type_id, bool with_pending_transactions )const;
 
       // Keys
       vector<flat_set<account_id_type>> get_key_references( vector<public_key_type> key )const;
@@ -430,6 +431,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
       const graphene::api_helper_indexes::asset_in_liquidity_pools_index* asset_in_liquidity_pools_index;
+      const graphene::api_helper_indexes::next_object_ids_index* next_object_ids_index;
 };
 
 } } // graphene::app
