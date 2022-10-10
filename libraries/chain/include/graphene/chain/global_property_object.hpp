@@ -22,11 +22,9 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <fc/uint128.hpp>
 
-#include <graphene/chain/protocol/chain_parameters.hpp>
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/chain/database.hpp>
+#include <graphene/protocol/chain_parameters.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/object.hpp>
 
 namespace graphene { namespace chain {
@@ -42,8 +40,8 @@ namespace graphene { namespace chain {
    class global_property_object : public graphene::db::abstract_object<global_property_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_global_property_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_global_property_object_type;
 
          chain_parameters           parameters;
          optional<chain_parameters> pending_parameters;
@@ -66,16 +64,19 @@ namespace graphene { namespace chain {
    class dynamic_global_property_object : public abstract_object<dynamic_global_property_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_dynamic_global_property_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_dynamic_global_property_object_type;
 
          uint32_t          head_block_number = 0;
          block_id_type     head_block_id;
          time_point_sec    time;
          witness_id_type   current_witness;
          time_point_sec    next_maintenance_time;
+         time_point_sec    last_vote_tally_time; 
          time_point_sec    last_budget_time;
          share_type        witness_budget;
+         share_type        total_pob;
+         share_type        total_inactive;
          uint32_t          accounts_registered_this_interval = 0;
          /**
           *  Every time a block is missed this increases by
@@ -83,8 +84,6 @@ namespace graphene { namespace chain {
           *  every time a block is found it decreases by
           *  RECENTLY_MISSED_COUNT_DECREMENT.  It is
           *  never less than 0.
-          *
-          *  If the recently_missed_count hits 2*UNDO_HISTORY then no new blocks may be pushed.
           */
          uint32_t          recently_missed_count = 0;
 
@@ -124,26 +123,11 @@ namespace graphene { namespace chain {
    };
 }}
 
-FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::db::object),
-                    (head_block_number)
-                    (head_block_id)
-                    (time)
-                    (current_witness)
-                    (next_maintenance_time)
-                    (last_budget_time)
-                    (witness_budget)
-                    (accounts_registered_this_interval)
-                    (recently_missed_count)
-                    (current_aslot)
-                    (recent_slots_filled)
-                    (dynamic_flags)
-                    (last_irreversible_block_num)
-                  )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::dynamic_global_property_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::global_property_object)
 
-FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::object),
-                    (parameters)
-                    (pending_parameters)
-                    (next_available_vote_id)
-                    (active_committee_members)
-                    (active_witnesses)
-                  )
+FC_REFLECT_TYPENAME( graphene::chain::dynamic_global_property_object )
+FC_REFLECT_TYPENAME( graphene::chain::global_property_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::global_property_object )

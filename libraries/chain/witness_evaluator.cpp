@@ -26,7 +26,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/vote.hpp>
+#include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace chain {
 
@@ -38,12 +38,13 @@ void_result witness_create_evaluator::do_evaluate( const witness_create_operatio
 
 object_id_type witness_create_evaluator::do_apply( const witness_create_operation& op )
 { try {
+   database& _db = db();
    vote_id_type vote_id;
-   db().modify(db().get_global_properties(), [&vote_id](global_property_object& p) {
-      vote_id = get_next_vote_id(p, vote_id_type::witness);
+   _db.modify( _db.get_global_properties(), [&vote_id](global_property_object& p) {
+      vote_id = vote_id_type(vote_id_type::witness, p.next_available_vote_id++);
    });
 
-   const auto& new_witness_object = db().create<witness_object>( [&]( witness_object& obj ){
+   const auto& new_witness_object = _db.create<witness_object>( [&op,&vote_id]( witness_object& obj ){
          obj.witness_account  = op.witness_account;
          obj.signing_key      = op.block_signing_key;
          obj.vote_id          = vote_id;
@@ -63,7 +64,7 @@ void_result witness_update_evaluator::do_apply( const witness_update_operation& 
    database& _db = db();
    _db.modify(
       _db.get(op.witness),
-      [&]( witness_object& wit )
+      [&op]( witness_object& wit )
       {
          if( op.new_url.valid() )
             wit.url = *op.new_url;

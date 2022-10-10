@@ -22,9 +22,9 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/hardfork.hpp>
+
+#include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -36,10 +36,10 @@ share_type cut_fee(share_type a, uint16_t p)
    if( p == GRAPHENE_100_PERCENT )
       return a;
 
-   fc::uint128 r(a.value);
+   fc::uint128_t r = a.value;
    r *= p;
    r /= GRAPHENE_100_PERCENT;
-   return r.to_uint64();
+   return static_cast<uint64_t>(r);
 }
 
 void account_balance_object::adjust_balance(const asset& delta)
@@ -59,25 +59,18 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          // Check the referrer -- if he's no longer a member, pay to the lifetime referrer instead.
          // No need to check the registrar; registrars are required to be lifetime members.
          if( account.referrer(d).is_basic_account(d.head_block_time()) )
-            d.modify(account, [](account_object& a) {
-               a.referrer = a.lifetime_referrer;
+            d.modify( account, [](account_object& acc) {
+               acc.referrer = acc.lifetime_referrer;
             });
 
          share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
          assert( network_cut <= core_fee_total );
 
-#ifndef NDEBUG
-         const auto& props = d.get_global_properties();
-
-         share_type reserveed = cut_fee(network_cut, props.parameters.reserve_percent_of_fee);
-         share_type accumulated = network_cut - reserveed;
-         assert( accumulated + reserveed == network_cut );
-#endif
          share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
          share_type referral = core_fee_total - network_cut - lifetime_cut;
 
-         d.modify(asset_dynamic_data_id_type()(d), [network_cut](asset_dynamic_data_object& d) {
-            d.accumulated_fees += network_cut;
+         d.modify( d.get_core_dynamic_data(), [network_cut](asset_dynamic_data_object& addo) {
+            addo.accumulated_fees += network_cut;
          });
 
          // Potential optimization: Skip some of this math and object lookups by special casing on the account type.
@@ -90,7 +83,7 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          d.deposit_cashback(d.get(account.referrer), referrer_cut, require_vesting);
          d.deposit_cashback(d.get(account.registrar), registrar_cut, require_vesting);
 
-         assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
+         assert( referrer_cut + registrar_cut + network_cut + lifetime_cut == core_fee_total );
       };
 
       pay_out_fees(a, pending_fees, true);
@@ -121,9 +114,9 @@ set<account_id_type> account_member_index::get_account_members(const account_obj
       result.insert(auth.first);
    return result;
 }
-set<public_key_type> account_member_index::get_key_members(const account_object& a)const
+set<public_key_type, pubkey_comparator> account_member_index::get_key_members(const account_object& a)const
 {
-   set<public_key_type> result;
+   set<public_key_type, pubkey_comparator> result;
    for( auto auth : a.owner.key_auths )
       result.insert(auth.first);
    for( auto auth : a.active.key_auths )
@@ -214,7 +207,7 @@ void account_member_index::object_modified(const object& after)
 
 
     {
-       set<public_key_type> after_key_members = get_key_members(a);
+       set<public_key_type, pubkey_comparator> after_key_members = get_key_members(a);
 
        vector<public_key_type> removed; removed.reserve(before_key_members.size());
        std::set_difference(before_key_members.begin(), before_key_members.end(),
@@ -255,17 +248,94 @@ void account_member_index::object_modified(const object& after)
 
 }
 
-void account_referrer_index::object_inserted( const object& obj )
+const uint8_t  balances_by_account_index::bits = 20;
+const uint64_t balances_by_account_index::mask = (1ULL << balances_by_account_index::bits) - 1;
+
+void balances_by_account_index::object_inserted( const object& obj )
 {
+   const auto& abo = dynamic_cast< const account_balance_object& >( obj );
+   while( balances.size() < (abo.owner.instance.value >> bits) + 1 )
+   {
+      balances.reserve( (abo.owner.instance.value >> bits) + 1 );
+      balances.resize( balances.size() + 1 );
+      balances.back().resize( 1ULL << bits );
+   }
+   balances[abo.owner.instance.value >> bits][abo.owner.instance.value & mask][abo.asset_type] = &abo;
 }
-void account_referrer_index::object_removed( const object& obj )
+
+void balances_by_account_index::object_removed( const object& obj )
 {
+   const auto& abo = dynamic_cast< const account_balance_object& >( obj );
+   if( balances.size() < (abo.owner.instance.value >> bits) + 1 ) return;
+   balances[abo.owner.instance.value >> bits][abo.owner.instance.value & mask].erase( abo.asset_type );
 }
-void account_referrer_index::about_to_modify( const object& before )
+
+void balances_by_account_index::about_to_modify( const object& before )
 {
+   ids_being_modified.emplace( before.id );
 }
-void account_referrer_index::object_modified( const object& after  )
+
+void balances_by_account_index::object_modified( const object& after  )
 {
+   FC_ASSERT( ids_being_modified.top() == after.id, "Modification of ID is not supported!");
+   ids_being_modified.pop();
+}
+
+const map< asset_id_type, const account_balance_object* >& balances_by_account_index::get_account_balances( const account_id_type& acct )const
+{
+   static const map< asset_id_type, const account_balance_object* > _empty;
+
+   if( balances.size() < (acct.instance.value >> bits) + 1 ) return _empty;
+   return balances[acct.instance.value >> bits][acct.instance.value & mask];
+}
+
+const account_balance_object* balances_by_account_index::get_account_balance( const account_id_type& acct, const asset_id_type& asset )const
+{
+   if( balances.size() < (acct.instance.value >> bits) + 1 ) return nullptr;
+   const auto& mine = balances[acct.instance.value >> bits][acct.instance.value & mask];
+   const auto itr = mine.find( asset );
+   if( mine.end() == itr ) return nullptr;
+   return itr->second;
 }
 
 } } // graphene::chain
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
+                    (graphene::db::object),
+                    (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
+                    (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
+                    (name)(owner)(active)(options)(num_committee_voted)(statistics)
+                    (whitelisting_accounts)(blacklisting_accounts)
+                    (whitelisted_accounts)(blacklisted_accounts)
+                    (cashback_vb)
+                    (owner_special_authority)(active_special_authority)
+                    (top_n_control_flags)
+                    (allowed_assets)
+                    (creation_block_num)(creation_time)
+                    )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_balance_object,
+                    (graphene::db::object),
+                    (owner)(asset_type)(balance)(maintenance_flag) )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
+                    (graphene::chain::object),
+                    (owner)(name)
+                    (most_recent_op)
+                    (total_ops)(removed_ops)
+                    (total_core_in_orders)
+                    (total_core_inactive)(total_core_pob)(total_core_pol)
+                    (total_pob_value)(total_pol_value)
+                    (core_in_balance)
+                    (has_cashback_vb)
+                    (is_voting)
+                    (last_vote_time)
+                    (vp_all)(vp_active)(vp_committee)(vp_witness)(vp_worker)
+                    (vote_tally_time)
+                    (lifetime_fees_paid)
+                    (pending_fees)(pending_vested_fees)
+                  )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

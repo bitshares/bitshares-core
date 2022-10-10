@@ -1,0 +1,85 @@
+#!/bin/sh
+
+# Relevant variables set by travis:
+# TRAVIS_BRANCH:
+# * for push builds, or builds not triggered by a pull request, this is the
+#   name of the branch.
+# * for builds triggered by a pull request this is the name of the branch
+#   targeted by the pull request.
+# * for builds triggered by a tag, this is the same as the name of the tag
+#   (see TRAVIS_TAG).
+# TRAVIS_PULL_REQUEST: The pull request number if the current job is a pull
+#   request, “false” if it’s not a pull request.
+# TRAVIS_TAG: If the current build is for a git tag, this variable is set to
+#   the tag’s name.
+
+if [ "$#" != 1 ]; then
+    echo "Usage: $0 <sonar-properties-file>" 1>&2
+    exit 1
+fi
+
+clear_branch () {
+    sed -i '/sonar\.branch/d' "$1"
+}
+
+ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
+
+BRANCH=
+TARGET="$ORIGINAL_TARGET"
+
+if [ -n "$TRAVIS_PULL_REQUEST" -a "$TRAVIS_PULL_REQUEST" != "false" ]; then
+    # PRs work per default, remove sonar.branch.* since they only work with sonar.pullrequest.*
+    echo "Detected PR '$TRAVIS_PULL_REQUEST'"
+    TARGET=
+elif [ -n "$TRAVIS_TAG" ]; then
+    # Tag build is either master or testnet
+    echo "Detected tag '$TRAVIS_TAG'"
+    BRANCH="$TRAVIS_BRANCH"
+    case "$TRAVIS_TAG" in
+	*test*) TARGET=testnet; ;;
+	*)	TARGET=master; ;;
+    esac
+else
+    BRANCH="$TRAVIS_BRANCH"
+    case "$TRAVIS_BRANCH" in
+	master|develop|testnet|hardfork)
+	    # Long-lived branches stand for themselves, no target
+	    echo "Detected long-lived branch '$TRAVIS_BRANCH'"
+	    TARGET=
+	    ;;
+	*test*release*)
+	    # Testnet release branch will be merged into testnet
+	    echo "Detected testnet release branch '$TRAVIS_BRANCH'"
+	    TARGET=testnet
+	    ;;
+	*release*)
+	    # Release branch will be merged into default (master)
+	    echo "Detected release branch '$TRAVIS_BRANCH'"
+	    TARGET=master
+	    ;;
+	*)
+	    # All other branches should have sonar.branch.target in their
+	    # sonar.properties, leave it unchanged
+	    echo "Detected normal branch '$TRAVIS_BRANCH'"
+    esac
+fi
+
+echo "Branch '$BRANCH', target '$TARGET'"
+
+git fetch --no-tags --unshallow
+git fetch --no-tags origin +refs/heads/$TRAVIS_BRANCH:refs/remotes/origin/$TRAVIS_BRANCH
+if [ -n "$TARGET" ]; then
+    git fetch --no-tags origin +refs/heads/$TARGET:refs/remotes/origin/$TARGET
+fi
+
+if [ "x$TARGET" != "x$ORIGINAL_TARGET" ]; then
+    clear_branch "$1"
+    if [ -n "$TARGET" ]; then
+        echo "sonar.branch.target=$TARGET" >>"$1"
+    fi
+fi
+if [ -n "$BRANCH" ]; then
+    echo "sonar.branch.name=$BRANCH" >>"$1"
+fi
+
+exit 0

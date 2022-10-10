@@ -22,20 +22,18 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/db/object.hpp>
+
+#include <graphene/protocol/asset.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
 
-   class witness_object;
-
    class witness_object : public abstract_object<witness_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = witness_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id = witness_object_type;
 
          account_id_type  witness_account;
          uint64_t         last_aslot = 0;
@@ -70,14 +68,8 @@ namespace graphene { namespace chain {
    using witness_index = generic_index<witness_object, witness_multi_index_type>;
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
-                    (witness_account)
-                    (last_aslot)
-                    (signing_key)
-                    (pay_vb)
-                    (vote_id)
-                    (total_votes)
-                    (url) 
-                    (total_missed)
-                    (last_confirmed_block_num)
-                  )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::witness_object)
+
+FC_REFLECT_TYPENAME( graphene::chain::witness_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::witness_object )

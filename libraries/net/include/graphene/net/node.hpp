@@ -27,23 +27,18 @@
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
 
-#include <graphene/chain/protocol/types.hpp>
-
-#include <list>
+#include <graphene/protocol/types.hpp>
 
 namespace graphene { namespace net {
 
   using fc::variant_object;
-  using graphene::chain::chain_id_type;
+  using graphene::protocol::chain_id_type;
 
   namespace detail
   {
     class node_impl;
-    struct node_impl_deleter
-    {
-      void operator()(node_impl*);
-    };
   }
+  using node_impl_ptr = std::shared_ptr<detail::node_impl>;
 
   // during network development, we need to track message propagation across the network
   // using a structure like this:
@@ -61,7 +56,7 @@ namespace graphene { namespace net {
    class node_delegate
    {
       public:
-         virtual ~node_delegate(){}
+         virtual ~node_delegate() = default;
 
          /**
           *  If delegate has the item, the network has no need to fetch it.
@@ -71,15 +66,17 @@ namespace graphene { namespace net {
          /**
           *  @brief Called when a new block comes in from the network
           *
+          *  @param blk_msg the message which contains the block
           *  @param sync_mode true if the message was fetched through the sync process, false during normal operation
+          *  @param contained_transaction_msg_ids container for the transactions to write back into
           *  @returns true if this message caused the blockchain to switch forks, false if it did not
           *
           *  @throws exception if error validating the item, otherwise the item is
           *          safe to broadcast on.
           */
          virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
-                                    std::vector<fc::uint160_t>& contained_transaction_message_ids ) = 0;
-         
+                                    std::vector<message_hash_type>& contained_transaction_msg_ids ) = 0;
+
          /**
           *  @brief Called when a new transaction comes in from the network
           *
@@ -90,7 +87,7 @@ namespace graphene { namespace net {
 
          /**
           *  @brief Called when a new message comes in from the network other than a
-          *         block or a transaction.  Currently there are no other possible 
+          *         block or a transaction.  Currently there are no other possible
           *         messages, so this should never be called.
           *
           *  @throws exception if error validating the item, otherwise the item is
@@ -192,57 +189,84 @@ namespace graphene { namespace net {
    class node : public std::enable_shared_from_this<node>
    {
       public:
-        node(const std::string& user_agent);
-        ~node();
+        explicit node(const std::string& user_agent);
+        virtual ~node();
 
-        void close();
+        void close() const;
 
-        void      set_node_delegate( node_delegate* del );
+        void      set_node_delegate( std::shared_ptr<node_delegate> del ) const;
 
-        void      load_configuration( const fc::path& configuration_directory );
+        void      load_configuration( const fc::path& configuration_directory ) const;
 
-        virtual void      listen_to_p2p_network();
-        virtual void      connect_to_p2p_network();
+        virtual void      listen_to_p2p_network() const;
+        virtual void      connect_to_p2p_network() const;
 
         /**
          *  Add endpoint to internal level_map database of potential nodes
          *  to attempt to connect to.  This database is consulted any time
          *  the number connected peers falls below the target.
          */
-        void      add_node( const fc::ip::endpoint& ep );
+        void      add_node( const fc::ip::endpoint& ep ) const;
+
+        /*****
+         * @brief add a list of nodes to seed the p2p network
+         * @param seeds a vector of url strings
+         */
+        void add_seed_nodes( const std::vector<std::string>& seeds ) const;
+
+        /****
+         * @brief add a node to seed the p2p network
+         * @param in the url as a string
+         */
+        void add_seed_node( const std::string& in) const;
 
         /**
          *  Attempt to connect to the specified endpoint immediately.
          */
-        virtual void connect_to_endpoint( const fc::ip::endpoint& ep );
+        virtual void connect_to_endpoint( const fc::ip::endpoint& ep ) const;
 
-        /**
-         *  Specifies the network interface and port upon which incoming
-         *  connections should be accepted.
-         */
-        void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+         /**
+          * Specifies the IP address and port on the "local machine" that should accept incoming connections.
+          * @note To listen on all IPv4 addresses on the local machine, specify 0.0.0.0 as the address.
+          * @param ep the endpoint (IP address and port)
+          * @param wait_if_not_available keep retrying if port is not available
+          */
+         void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available ) const;
 
-        /**
-         *  Call with true to enable listening for incoming connections
-         */
-        void accept_incoming_connections(bool accept);
+         /**
+          * Specifies the IP address and port on the "external network" which other peers should connect to.
+          * @note If the address is unknown (E.G. dynamically allocated), specify 0.0.0.0 as the address.
+          * @param ep the endpoint (IP address and port)
+          */
+         void set_inbound_endpoint( const fc::ip::endpoint& ep ) const;
 
-        /**
-         *  Specifies the port upon which incoming connections should be accepted.
-         *  @param port the port to listen on
-         *  @param wait_if_not_available if true and the port is not available, enter a
-         *                               sleep and retry loop to wait for it to become
-         *                               available.  If false and the port is not available,
-         *                               just choose a random available port
-         */
-        void      listen_on_port(uint16_t port, bool wait_if_not_available);
+         /**
+          * Enable or disable listening for incoming connections
+          * @param accept set to true to listen for incoming connections, false otherwise
+          */
+         void set_accept_incoming_connections( bool accept ) const;
+
+         /***
+          * Enable or disable connection attempts when new connections are advertised
+          * @param connect true to attempt new connections, false otherwise
+          */
+         void set_connect_to_new_peers( bool connect ) const;
 
         /**
          * Returns the endpoint the node is listening on.  This is usually the same
-         * as the value previously passed in to listen_on_endpoint, unless we
+         * as the value previously passed in to set_listen_endpoint, unless we
          * were unable to bind to that port.
          */
         virtual fc::ip::endpoint get_actual_listening_endpoint() const;
+
+        /***
+         * Allows the caller to determine how to respond to requests for peers
+         * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
+         * @param advertise_or_exclude_list a list of nodes to
+         *     advertise (if algo is "list") or exclude (if algo is "exclude_list")
+         */
+        void set_advertise_algorithm( const std::string& algo,
+            const std::vector<std::string>& advertise_or_exclude_list = std::vector<std::string>() ) const;
 
         /**
          *  @return a list of peers that are currently connected.
@@ -256,8 +280,8 @@ namespace graphene { namespace net {
          *  Add message to outgoing inventory list, notify peers that
          *  I have a message ready.
          */
-        virtual void  broadcast( const message& item_to_broadcast );
-        virtual void  broadcast_transaction( const signed_transaction& trx )
+        virtual void  broadcast( const message& item_to_broadcast ) const;
+        virtual void  broadcast_transaction( const signed_transaction& trx ) const
         {
            broadcast( trx_message(trx) );
         }
@@ -266,61 +290,39 @@ namespace graphene { namespace net {
          *  Node starts the process of fetching all items after item_id of the
          *  given item_type.   During this process messages are not broadcast.
          */
-        virtual void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers);
+        virtual void sync_from( const item_id& current_head_block,
+                                const std::vector<uint32_t>& hard_fork_block_numbers ) const;
 
         bool      is_connected() const;
 
-        void set_advanced_node_parameters(const fc::variant_object& params);
-        fc::variant_object get_advanced_node_parameters();
-        message_propagation_data get_transaction_propagation_data(const graphene::chain::transaction_id_type& transaction_id);
-        message_propagation_data get_block_propagation_data(const graphene::chain::block_id_type& block_id);
+        void set_advanced_node_parameters(const fc::variant_object& params) const;
+        fc::variant_object get_advanced_node_parameters() const;
+        message_propagation_data get_tx_propagation_data(
+              const graphene::protocol::transaction_id_type& transaction_id) const;
+        message_propagation_data get_block_propagation_data(
+              const graphene::protocol::block_id_type& block_id) const;
         node_id_t get_node_id() const;
-        void set_allowed_peers(const std::vector<node_id_t>& allowed_peers);
+        void set_allowed_peers(const std::vector<node_id_t>& allowed_peers) const;
 
         /**
          * Instructs the node to forget everything in its peer database, mostly for debugging
          * problems where nodes are failing to connect to the network
          */
-        void clear_peer_database();
+        void clear_peer_database() const;
 
-        void set_total_bandwidth_limit(uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second);
+        void set_total_bandwidth_limit(uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second) const;
 
         fc::variant_object network_get_info() const;
         fc::variant_object network_get_usage_stats() const;
 
         std::vector<potential_peer_record> get_potential_peers() const;
 
-        void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
-      private:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+      protected:
+        node_impl_ptr my;
    };
 
-    class simulated_network : public node
-    {
-    public:
-      ~simulated_network();
-      simulated_network(const std::string& user_agent) : node(user_agent) {}
-      void      listen_to_p2p_network() override {}
-      void      connect_to_p2p_network() override {}
-      void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
-
-      fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
-
-      void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
-      void      broadcast(const message& item_to_broadcast) override;
-      void      add_node_delegate(node_delegate* node_delegate_to_add);
-
-      virtual uint32_t get_connection_count() const override { return 8; }
-    private:
-      struct node_info;
-      void message_sender(node_info* destination_node);
-      std::list<node_info*> network_nodes;
-    };
-
-
-   typedef std::shared_ptr<node> node_ptr;
-   typedef std::shared_ptr<simulated_network> simulated_network_ptr;
+   using node_ptr = std::shared_ptr<node>;
 
 } } // graphene::net
 

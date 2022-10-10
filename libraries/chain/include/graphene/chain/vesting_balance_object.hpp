@@ -23,21 +23,19 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/asset.hpp>
+
+#include <boost/multi_index/composite_key.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/identity.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
 
-#include <algorithm>
-
-
-
 namespace graphene { namespace chain {
    using namespace graphene::db;
-
-   class vesting_balance_object;
+   using namespace graphene::protocol;
 
    struct vesting_policy_context
    {
@@ -90,11 +88,11 @@ namespace graphene { namespace chain {
     */
    struct cdd_vesting_policy
    {
-      uint32_t                       vesting_seconds = 0;
-      fc::uint128_t                  coin_seconds_earned;
+      uint32_t                         vesting_seconds = 0;
+      fc::uint128_t                    coin_seconds_earned;
       /** while coindays may accrue over time, none may be claimed before first_claim date */
-      fc::time_point_sec             start_claim;
-      fc::time_point_sec             coin_seconds_earned_last_update;
+      fc::time_point_sec               start_claim;
+      fc::time_point_sec               coin_seconds_earned_last_update;
 
       /**
        * Compute coin_seconds_earned.  Used to
@@ -119,19 +117,42 @@ namespace graphene { namespace chain {
       void on_withdraw(const vesting_policy_context& ctx);
    };
 
+     /**
+    * @brief instant vesting policy
+    *
+    * This policy allows to withdraw everything that is on a balance immediately
+    *
+    */
+   struct instant_vesting_policy
+   {
+      asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
+      bool is_deposit_allowed(const vesting_policy_context& ctx)const;
+      bool is_deposit_vested_allowed(const vesting_policy_context&)const { return false; }
+      bool is_withdraw_allowed(const vesting_policy_context& ctx)const;
+      void on_deposit(const vesting_policy_context& ctx);
+      void on_deposit_vested(const vesting_policy_context&);
+      void on_withdraw(const vesting_policy_context& ctx);
+   };
+
    typedef fc::static_variant<
       linear_vesting_policy,
-      cdd_vesting_policy
+      cdd_vesting_policy,
+      instant_vesting_policy
       > vesting_policy;
 
+   enum class vesting_balance_type {   unspecified,
+                                       cashback,
+                                       worker,
+                                       witness,
+                                       market_fee_sharing };
    /**
     * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
    class vesting_balance_object : public abstract_object<vesting_balance_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = vesting_balance_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id = vesting_balance_object_type;
 
          /// Account which owns and may withdraw from this vesting balance
          account_id_type owner;
@@ -140,6 +161,8 @@ namespace graphene { namespace chain {
          asset balance;
          /// The vesting policy stores details on when funds vest, and controls when they may be withdrawn
          vesting_policy policy;
+         /// type of the vesting balance
+         vesting_balance_type balance_type = vesting_balance_type::unspecified;
 
          vesting_balance_object() {}
 
@@ -171,12 +194,75 @@ namespace graphene { namespace chain {
     * @ingroup object_index
     */
    struct by_account;
+   // by_vesting_type index MUST NOT be used for iterating because order is not well-defined.
+   struct by_vesting_type;
+
+namespace detail {
+
+   /**
+      Calculate a hash for account_id_type and asset_id.
+      Use 48 bit value (see object_id.hpp) for account_id and XOR it with 24 bit for asset_id
+   */
+   inline uint64_t vbo_mfs_hash(const account_id_type& account_id, const asset_id_type& asset_id)
+   {
+      return (asset_id.instance.value << 40) ^ account_id.instance.value;
+   }
+
+   /**
+    * Used as CompatibleHash
+      Calculate a hash vesting_balance_object
+      if vesting_balance_object.balance_type is market_fee_sharing
+         calculate has as vbo_mfs_hash(vesting_balance_object.owner, hash(vbo.balance.asset_id) (see vbo_mfs_hash)
+      otherwise: hash_value(vesting_balance_object.id);
+   */
+   struct vesting_balance_object_hash
+   {
+      uint64_t operator()(const vesting_balance_object& vbo) const
+      {
+         if ( vbo.balance_type == vesting_balance_type::market_fee_sharing )
+         {
+            return vbo_mfs_hash(vbo.owner, vbo.balance.asset_id);
+         }
+         return hash_value(vbo.id);
+      }
+   };
+
+   /**
+    * Used as CompatiblePred
+    * Compares two vesting_balance_objects
+    * if vesting_balance_object.balance_type is a market_fee_sharing
+    *    compare owners' ids and assets' ids
+    * otherwise: vesting_balance_object.id
+   */
+   struct vesting_balance_object_equal
+   {
+      bool operator() (const vesting_balance_object& lhs, const vesting_balance_object& rhs) const
+      {
+         if ( ( lhs.balance_type == vesting_balance_type::market_fee_sharing ) &&
+              ( lhs.balance_type == rhs.balance_type ) &&
+              ( lhs.owner == rhs.owner ) &&
+              ( lhs.balance.asset_id == rhs.balance.asset_id)
+            )
+         {
+               return true;
+         }
+         return ( lhs.id == rhs.id );
+      }
+   };
+} // detail
+
    typedef multi_index_container<
       vesting_balance_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id >
+         >,
          ordered_non_unique< tag<by_account>,
             member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>
+         >,
+         hashed_unique< tag<by_vesting_type>,
+            identity<vesting_balance_object>,
+            detail::vesting_balance_object_hash,
+            detail::vesting_balance_object_equal
          >
       >
    > vesting_balance_multi_index_type;
@@ -186,6 +272,8 @@ namespace graphene { namespace chain {
    typedef generic_index<vesting_balance_object, vesting_balance_multi_index_type> vesting_balance_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::vesting_balance_object)
 
 FC_REFLECT(graphene::chain::linear_vesting_policy,
            (begin_timestamp)
@@ -201,10 +289,19 @@ FC_REFLECT(graphene::chain::cdd_vesting_policy,
            (coin_seconds_earned_last_update)
           )
 
+FC_REFLECT_EMPTY( graphene::chain::instant_vesting_policy )
+
 FC_REFLECT_TYPENAME( graphene::chain::vesting_policy )
 
 FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::object),
                    (owner)
                    (balance)
                    (policy)
+                   (balance_type)
                   )
+
+FC_REFLECT_ENUM( graphene::chain::vesting_balance_type, (unspecified)(cashback)(worker)(witness)(market_fee_sharing) )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

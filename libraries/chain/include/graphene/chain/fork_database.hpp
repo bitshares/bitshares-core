@@ -22,14 +22,16 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/block.hpp>
+
+#include <graphene/protocol/block.hpp>
+
+#include <graphene/chain/types.hpp>
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
-
 
 namespace graphene { namespace chain {
    using boost::multi_index_container;
@@ -46,6 +48,11 @@ namespace graphene { namespace chain {
       uint32_t              num;    // initialized in ctor
       block_id_type         id;
       signed_block          data;
+
+      // contains witness block signing keys scheduled *after* the block has been applied
+      shared_ptr< vector< pair< witness_id_type, public_key_type > > > scheduled_witnesses;
+      uint64_t                                                         next_block_aslot = 0;
+      fc::time_point_sec                                               next_block_time;
    };
    typedef shared_ptr<fork_item> item_ptr;
 
@@ -93,12 +100,10 @@ namespace graphene { namespace chain {
 
          struct block_id;
          struct block_num;
-         struct by_previous;
          typedef multi_index_container<
             item_ptr,
             indexed_by<
                hashed_unique<tag<block_id>, member<fork_item, block_id_type, &fork_item::id>, std::hash<fc::ripemd160>>,
-               hashed_non_unique<tag<by_previous>, const_mem_fun<fork_item, block_id_type, &fork_item::previous_id>, std::hash<fc::ripemd160>>,
                ordered_non_unique<tag<block_num>, member<fork_item,uint32_t,&fork_item::num>>
             >
          > fork_multi_index_type;
@@ -112,7 +117,6 @@ namespace graphene { namespace chain {
 
          uint32_t                 _max_size = 1024;
 
-         fork_multi_index_type    _unlinked_index;
          fork_multi_index_type    _index;
          shared_ptr<fork_item>    _head;
    };

@@ -23,14 +23,14 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/transaction.hpp>
-#include <graphene/chain/transaction_evaluation_state.hpp>
-
+#include <graphene/protocol/types.hpp>
+#include <graphene/protocol/transaction.hpp>
 #include <graphene/db/generic_index.hpp>
+
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
-
+   class database;
 
 /**
  *  @brief tracks the approval of a partially approved transaction 
@@ -40,8 +40,8 @@ namespace graphene { namespace chain {
 class proposal_object : public abstract_object<proposal_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id = proposal_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id = proposal_object_type;
 
       time_point_sec                expiration_time;
       optional<time_point_sec>      review_period_time;
@@ -73,12 +73,17 @@ class required_approval_index : public secondary_index
    public:
       virtual void object_inserted( const object& obj ) override;
       virtual void object_removed( const object& obj ) override;
-      virtual void about_to_modify( const object& before ) override{};
-      virtual void object_modified( const object& after  ) override{};
-
-      void remove( account_id_type a, proposal_id_type p );
+      virtual void about_to_modify( const object& before ) override;
+      virtual void object_modified( const object& after  ) override;
 
       map<account_id_type, set<proposal_id_type> > _account_to_proposals;
+
+   private:
+      void remove( account_id_type a, proposal_id_type p );
+      void insert_or_remove_delta( proposal_id_type p, const flat_set<account_id_type>& before,
+                                   const flat_set<account_id_type>& after );
+      flat_set<account_id_type> available_active_before_modify;
+      flat_set<account_id_type> available_owner_before_modify;
 };
 
 struct by_expiration{};
@@ -99,7 +104,8 @@ typedef generic_index<proposal_object, proposal_multi_index_container> proposal_
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::proposal_object, (graphene::chain::object),
-                    (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)
-                    (available_active_approvals)(required_owner_approvals)(available_owner_approvals)
-                    (available_key_approvals)(proposer) )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::proposal_object)
+
+FC_REFLECT_TYPENAME( graphene::chain::proposal_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::proposal_object )

@@ -1,0 +1,5 @@
+// bitshares-core issue #2350 Liquidity pool exchange operation to comply with whitelist and blacklist market settings
+#ifndef HARDFORK_CORE_2350_TIME
+#define HARDFORK_CORE_2350_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_2350_PASSED(now) (now >= HARDFORK_CORE_2350_TIME)
+#endif

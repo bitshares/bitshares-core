@@ -121,11 +121,15 @@ namespace graphene { namespace db {
             return static_cast<const T*>(obj);
          }
 
-         template<uint8_t SpaceID, uint8_t TypeID, typename T>
-         const T* find( object_id<SpaceID,TypeID,T> id )const { return find<T>(id); }
+         template<uint8_t SpaceID, uint8_t TypeID>
+         auto find( object_id<SpaceID,TypeID> id )const -> const object_downcast_t<decltype(id)>* {
+             return find<object_downcast_t<decltype(id)>>(id);
+         }
 
-         template<uint8_t SpaceID, uint8_t TypeID, typename T>
-         const T& get( object_id<SpaceID,TypeID,T> id )const { return get<T>(id); }
+         template<uint8_t SpaceID, uint8_t TypeID>
+         auto get( object_id<SpaceID,TypeID> id )const -> const object_downcast_t<decltype(id)>& {
+             return get<object_downcast_t<decltype(id)>>(id);
+         }
 
          template<typename IndexType>
          IndexType* add_index()
@@ -134,7 +138,7 @@ namespace graphene { namespace db {
             if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
                 _index[ObjectType::space_id].resize( 255 );
             assert(!_index[ObjectType::space_id][ObjectType::type_id]);
-            unique_ptr<index> indexptr( new IndexType(*this) );
+            unique_ptr<index> indexptr( std::make_unique<IndexType>(*this) );
             _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
             return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
          }

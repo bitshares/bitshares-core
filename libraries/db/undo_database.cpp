@@ -30,6 +30,19 @@ namespace graphene { namespace db {
 void undo_database::enable()  { _disabled = false; }
 void undo_database::disable() { _disabled = true; }
 
+undo_database::session::~session()
+{
+   try {
+      if( _apply_undo ) _db.undo();
+   }
+   catch ( const fc::exception& e )
+   {
+      elog( "${e}", ("e",e.to_detail_string() ) );
+      std::terminate();
+   }
+   if( _disable_on_exit ) _db.disable();
+}
+
 undo_database::session undo_database::start_undo_session( bool force_enable )
 {
    if( _disabled && !force_enable ) return session(*this);
@@ -77,18 +90,18 @@ void undo_database::on_remove( const object& obj )
    if( _stack.empty() )
       _stack.emplace_back();
    undo_state& state = _stack.back();
-   if( state.new_ids.count(obj.id) )
+   if( state.new_ids.count(obj.id) > 0 )
    {
       state.new_ids.erase(obj.id);
       return;
    }
-   if( state.old_values.count(obj.id) )
+   if( state.old_values.count(obj.id) > 0 )
    {
       state.removed[obj.id] = std::move(state.old_values[obj.id]);
       state.old_values.erase(obj.id);
       return;
    }
-   if( state.removed.count(obj.id) ) return;
+   if( state.removed.count(obj.id) > 0 ) return;
    state.removed[obj.id] = obj.clone();
 }
 

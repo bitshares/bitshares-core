@@ -34,8 +34,6 @@
 
 #include <fc/crypto/digest.hpp>
 
-#include <locale>
-
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -56,8 +54,9 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
       creator.common_options.flags = charge_market_fee|white_list|override_authority|disable_confidential;
-      creator.common_options.core_exchange_rate = price({asset(2),asset(1,asset_id_type(1))});
+      creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       creator.common_options.whitelist_authorities = creator.common_options.blacklist_authorities = {account_id_type()};
+
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
 
@@ -73,6 +72,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       BOOST_CHECK(test_asset_dynamic_data.current_supply == 0);
       BOOST_CHECK(test_asset_dynamic_data.accumulated_fees == 0);
       BOOST_CHECK(test_asset_dynamic_data.fee_pool == 0);
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -93,6 +93,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    otrans.from = dan.id;
    otrans.to   = eric.id;
    otrans.amount = advanced.amount(100);
+   trx.operations.clear();
    trx.operations.push_back(otrans);
 
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
@@ -101,7 +102,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Pass with issuer's signature" );
-   trx.signatures.clear();
+   trx.clear_signatures();
    sign( trx,  sam_private_key  );
    PUSH_TX( db, trx, 0 );
 
@@ -130,12 +131,93 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
    BOOST_TEST_MESSAGE( "Fail because overide_authority flag is not set" );
-   trx.signatures.clear();
+   trx.clear_signatures();
    sign( trx,  sam_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception );
 
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
    BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 0 );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( override_transfer_whitelist_test )
+{ try {
+   ACTORS( (dan)(eric)(sam) );
+   const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, white_list | override_authority );
+   asset_id_type advanced_id = advanced.id;
+   BOOST_TEST_MESSAGE( "Issuing 1000 ADVANCED to dan" );
+   issue_uia( dan, advanced.amount( 1000 ) );
+   BOOST_TEST_MESSAGE( "Checking dan's balance" );
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
+
+   override_transfer_operation otrans;
+   otrans.issuer = advanced.issuer;
+   otrans.from = dan.id;
+   otrans.to   = eric.id;
+   otrans.amount = advanced.amount(100);
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+
+   PUSH_TX( db, trx, ~0 );
+
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 100 );
+
+   // Make a whitelist, now it should fail
+   {
+      BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+      asset_update_operation uop;
+      uop.issuer = advanced_id(db).issuer;
+      uop.asset_to_update = advanced_id;
+      uop.new_options = advanced_id(db).options;
+      // The whitelist is managed by dan
+      uop.new_options.whitelist_authorities.insert(dan_id);
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+      auto whitelist_auths = advanced_id(db).options.whitelist_authorities;
+      BOOST_CHECK( whitelist_auths.find(dan_id) != whitelist_auths.end() );
+
+      // Upgrade dan so that he can manage the whitelist
+      upgrade_to_lifetime_member( dan_id );
+
+      // Add eric to the whitelist, but do not add dan
+      account_whitelist_operation wop;
+      wop.authorizing_account = dan_id;
+      wop.account_to_list = eric_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   // Fail because there is a whitelist authority and dan is not whitelisted
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Balances did not change
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 100 );
+
+   // Apply core-2295 hardfork
+   generate_blocks( HARDFORK_CORE_2295_TIME );
+   set_expiration( db, trx );
+
+   // Now it's able to override-transfer from dan to eric
+   PUSH_TX( db, trx, ~0 );
+
+   // Check new balances
+   BOOST_REQUIRE_EQUAL( get_balance( dan_id, advanced_id ), 800 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric_id, advanced_id ), 200 );
+
+   // Still can not override-transfer to sam because he is not whitelisted
+   otrans.to = sam_id;
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
@@ -154,18 +236,13 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       op.issue_to_account = nathan_id;
       trx.operations.emplace_back(op);
       set_expiration( db, trx );
-      //Fail because nathan is not whitelisted, but only before hardfork time
-      if( db.head_block_time() <= HARDFORK_415_TIME )
-      {
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-         generate_blocks( HARDFORK_415_TIME );
-         generate_block();
-         set_expiration( db, trx );
-      }
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK(is_authorized_asset( db, nathan_id(db), uia_id(db) ));
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
+
+      // committee-account is free as well
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
 
       // Make a whitelist, now it should fail
       {
@@ -183,6 +260,9 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       // Fail because there is a whitelist authority and I'm not whitelisted
       trx.operations.back() = op;
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+      // committee-account is blocked as well
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
 
       account_whitelist_operation wop;
       wop.authorizing_account = izzy_id;
@@ -210,6 +290,11 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 2000);
 
+      // committee-account is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -221,6 +306,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
    try {
       INVOKE(issue_whitelist_uia);
       const asset_object& advanced = get_asset("ADVANCED");
+      const asset_id_type uia_id = advanced.id;
       const account_object& nathan = get_account("nathan");
       const account_object& dan = create_account("dan");
       account_id_type izzy_id = get_account("izzy").id;
@@ -273,17 +359,8 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
-      //Fail because nathan is blacklisted
-      if( db.head_block_time() <= HARDFORK_419_TIME )
-      {
-         // before the hardfork time, it fails because the whitelist check fails
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
-      }
-      else
-      {
-         // after the hardfork time, it fails because the fees are not in a whitelisted asset
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
-      }
+      // it fails because the fees are not in a whitelisted asset
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Attempting to burn from nathan after blacklisting, should fail" );
       asset_reserve_operation burn;
@@ -351,6 +428,20 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       trx.operations.back() = burn;
       PUSH_TX(db, trx, ~0);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 40);
+
+      // committee-account is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
+      // Pass BSIP 86 hardfork
+      generate_blocks( HARDFORK_BSIP_86_TIME );
+
+      // committee-account is now unblocked
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -377,7 +468,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       const asset_object& uia = create_user_issued_asset( "TXRX", sam, transfer_restricted );
@@ -396,7 +487,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       BOOST_TEST_MESSAGE( "Enable transfer_restricted, send fails" );
@@ -426,6 +517,73 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+/***
+ * Test to see if a asset name is valid
+ * @param db the database
+ * @param acct the account that will attempt to create the asset
+ * @param asset_name the asset_name
+ * @param allowed whether the creation should be successful
+ * @returns true if meets expectations
+ */
+bool test_asset_name(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, std::string asset_name, bool allowed)
+{
+   if (allowed)
+   {
+      try
+      {
+         db->create_user_issued_asset(asset_name, acct, 0);
+      } catch (...)
+      {
+         return false;
+      }
+   }
+   else
+   {
+      try
+      {
+         db->create_user_issued_asset(asset_name, acct, 0);
+         return false;
+      } catch (fc::exception& ex) 
+      {
+         return true;
+      } catch (...)
+      {
+         return false;
+      }
+   }
+   return true;
+}
+
+/***
+ * Test to see if an ascii character can be used in an asset name
+ * @param c the ascii character (NOTE: includes extended ascii up to 255)
+ * @param allowed_beginning true if it should be allowed as the first character of an asset name
+ * @param allowed_middle true if it should be allowed in the middle of an asset name
+ * @param allowed_end true if it should be allowed at the end of an asset name
+ * @returns true if tests met expectations
+ */
+bool test_asset_char(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, const unsigned char& c, bool allowed_beginning, bool allowed_middle, bool allowed_end)
+{
+   std::ostringstream asset_name;
+   // beginning
+   asset_name << c << "CHARLIE";
+   if (!test_asset_name(db, acct, asset_name.str(), allowed_beginning))
+      return false;
+
+   // middle
+   asset_name.str("");
+   asset_name.clear();
+   asset_name << "CHAR" << c << "LIE";
+   if (!test_asset_name(db, acct, asset_name.str(), allowed_middle))
+      return false;
+
+   // end
+   asset_name.str("");
+   asset_name.clear();
+   asset_name << "CHARLIE" << c;
+   return test_asset_name(db, acct, asset_name.str(), allowed_end);
 }
 
 BOOST_AUTO_TEST_CASE( asset_name_test )
@@ -462,11 +620,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
 
-      // Sam tries to create asset ending in a number but fails before hf_620
-      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::assert_exception );
-      BOOST_CHECK(  !has_asset("SP500") );
-
-      // create a proposal to create asset ending in a number, this will fail before hf_620
+      // create a proposal to create asset ending in a number
       auto& core = asset_id_type()(db);
       asset_create_operation op_p;
       op_p.issuer = alice_id;
@@ -474,7 +628,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
       op_p.fee = core.amount(0);
 
-      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& curfees = db.get_global_properties().parameters.get_current_fees();
       const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
       proposal_create_operation prop;
       prop.fee_paying_account = alice_id;
@@ -487,9 +641,8 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       db.current_fee_schedule().set_fee( tx.operations.back() );
       set_expiration( db, tx );
       sign( tx, alice_private_key );
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::assert_exception);
+      PUSH_TX( db, tx );
 
-      generate_blocks( HARDFORK_CORE_620_TIME + 1);
       generate_block();
 
       // Sam can create asset ending in number after hf_620
@@ -502,14 +655,6 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       BOOST_CHECK(  has_asset("ALPHA2") );
       BOOST_CHECK( has_asset("ALPHA2.ONE") );
 
-      // locales issue
-      std::locale loc1("en_US.UTF8");
-      static const std::locale& loc2 = std::locale::classic();
-      const wchar_t c = L'\u042f';
-      // isalpha will allow non ascii chars if locale is not C
-      BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
-      BOOST_CHECK_EQUAL( isalpha(c, loc2), false);
-
       // proposal to create asset ending in number will now be created successfully as we are in > hf_620 time
       prop.expiration_time =  db.head_block_time() + fc::days(3);
       signed_transaction tx_hf620;
@@ -519,6 +664,18 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       sign( tx_hf620, alice_private_key );
       PUSH_TX( db, tx_hf620 );
 
+      // assets with invalid characters should not be allowed
+      unsigned char c = 0;
+      do
+      {
+         if ( (c >= 48 && c <= 57) ) // numbers
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true), "Failed on good ASCII value " + std::to_string(c) );
+         else if ( c >= 65 && c <= 90) // letters
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true), "Failed on good ASCII value " + std::to_string(c) );
+         else                       // everything else
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false), "Failed on bad ASCII value " + std::to_string(c) );
+         c++;
+      } while (c != 0);
    }
    catch(fc::exception& e)
    {

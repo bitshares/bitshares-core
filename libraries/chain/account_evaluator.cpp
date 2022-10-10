@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <fc/smart_ref_impl.hpp>
-
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/buyback.hpp>
 #include <graphene/chain/buyback_object.hpp>
@@ -32,7 +30,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/internal_exceptions.hpp>
-#include <graphene/chain/special_authority.hpp>
+#include <graphene/chain/special_authority_evaluation.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
@@ -71,12 +69,15 @@ void verify_account_votes( const database& db, const account_options& options )
    FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
+   FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
+
    uint32_t max_vote_id = gpo.next_available_vote_id;
    bool has_worker_votes = false;
    for( auto id : options.votes )
    {
       FC_ASSERT( id < max_vote_id, "Can not vote for ${id} which does not exist.", ("id",id) );
-      has_worker_votes |= (id.type() == vote_id_type::worker);
+      if( id.type() == vote_id_type::worker )
+         has_worker_votes = true;
    }
 
    if( has_worker_votes && (db.head_block_time() >= HARDFORK_607_TIME) )
@@ -117,24 +118,10 @@ void verify_account_votes( const database& db, const account_options& options )
    }
 }
 
-
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-   }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.null_ext.valid() );
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.buyback_options.valid() );
-   }
 
-   FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
 
@@ -190,7 +177,8 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 
    const auto& global_properties = d.get_global_properties();
 
-   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]( account_object& obj )
+   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]
+                                                           ( account_object& obj )
    {
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
@@ -205,6 +193,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.owner            = o.owner;
          obj.active           = o.active;
          obj.options          = o.options;
+         obj.num_committee_voted = o.options.num_committee_voted();
          obj.statistics = d.create<account_statistics_object>([&obj](account_statistics_object& s){
                              s.owner = obj.id;
                              s.name = obj.name;
@@ -220,18 +209,10 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
             obj.allowed_assets = o.extensions.value.buyback_options->markets;
             obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
          }
-   });
 
-   /*
-   if( has_small_percent )
-   {
-      wlog( "Account affected by #453 registered in block ${n}:  ${na} reg=${reg} ref=${ref}:${refp} ltr=${ltr}:${ltrp}",
-         ("n", db().head_block_num()) ("na", new_acnt_object.id)
-         ("reg", o.registrar) ("ref", o.referrer) ("ltr", new_acnt_object.lifetime_referrer)
-         ("refp", new_acnt_object.referrer_rewards_percentage) ("ltrp", new_acnt_object.lifetime_referrer_fee_percentage) );
-      wlog( "Affected account object is ${o}", ("o", new_acnt_object) );
-   }
-   */
+         obj.creation_block_num = d._current_block_num;
+         obj.creation_time      = d._current_block_time;
+   });
 
    const auto& dynamic_properties = d.get_dynamic_global_properties();
    d.modify(dynamic_properties, [](dynamic_global_property_object& p) {
@@ -242,7 +223,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          && global_properties.parameters.account_fee_scale_bitshifts != 0 )
    {
       d.modify(global_properties, [](global_property_object& p) {
-         p.parameters.current_fees->get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
+         p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
       });
    }
 
@@ -277,17 +258,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.null_ext.valid() );
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
 
    try
    {
@@ -317,12 +287,17 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    bool sa_before = acnt->has_special_authority();
 
    // update account statistics
-   if( o.new_options.valid() && o.new_options->is_voting() != acnt->options.is_voting() )
+   if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), []( account_statistics_object& aso )
+      if ( o.new_options->voting_account != acnt->options.voting_account
+           || o.new_options->votes != acnt->options.votes )
       {
-         aso.is_voting = !aso.is_voting;
-      } );
+         d.modify( acnt->statistics( d ), [&d,&o]( account_statistics_object& aso )
+         {
+            aso.is_voting = o.new_options->is_voting();
+            aso.last_vote_time = d.head_block_time();
+         } );
+      }
    }
 
    // update account object
@@ -337,7 +312,11 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
          a.active = *o.active;
          a.top_n_control_flags = 0;
       }
-      if( o.new_options ) a.options = *o.new_options;
+      if( o.new_options )
+      {
+         a.options = *o.new_options;
+         a.num_committee_voted = a.options.num_committee_voted();
+      }
       if( o.extensions.value.owner_special_authority.valid() )
       {
          a.owner_special_authority = *(o.extensions.value.owner_special_authority);

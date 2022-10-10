@@ -23,8 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/db/object.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
@@ -44,8 +43,8 @@ namespace graphene { namespace chain {
 class buyback_object : public graphene::db::abstract_object< buyback_object >
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id = impl_buyback_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id = impl_buyback_object_type;
 
       asset_id_type asset_to_buy;
 };
@@ -64,4 +63,8 @@ typedef generic_index< buyback_object, buyback_multi_index_type > buyback_index;
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::buyback_object, (graphene::db::object), (asset_to_buy) )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::buyback_object)
+
+FC_REFLECT_TYPENAME( graphene::chain::buyback_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::buyback_object )

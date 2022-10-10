@@ -24,13 +24,14 @@
 #pragma once
 #include <boost/iterator/iterator_facade.hpp>
 
+#include <graphene/protocol/types.hpp>
+
 #include <fc/network/ip.hpp>
 #include <fc/time.hpp>
 #include <fc/io/enum_type.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
 #include <fc/exception/exception.hpp>
-#include <fc/io/raw.hpp>
 
 namespace graphene { namespace net {
 
@@ -78,7 +79,7 @@ namespace graphene { namespace net {
     public:
       peer_database_iterator();
       ~peer_database_iterator();
-      explicit peer_database_iterator(peer_database_iterator_impl* impl);
+      explicit peer_database_iterator( std::unique_ptr<peer_database_iterator_impl>&& impl );
       peer_database_iterator( const peer_database_iterator& c );
 
     private:
@@ -96,7 +97,7 @@ namespace graphene { namespace net {
   {
   public:
     peer_database();
-    ~peer_database();
+    virtual ~peer_database();
 
     void open(const fc::path& databaseFilename);
     void close();
@@ -105,10 +106,10 @@ namespace graphene { namespace net {
     void erase(const fc::ip::endpoint& endpointToErase);
 
     void update_entry(const potential_peer_record& updatedRecord);
-    potential_peer_record lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
-    fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
+    potential_peer_record lookup_or_create_entry_for_ep(const fc::ip::endpoint& endpointToLookup)const;
+    fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)const;
 
-    typedef detail::peer_database_iterator iterator;
+    using iterator = detail::peer_database_iterator;
     iterator begin() const;
     iterator end() const;
     size_t size() const;
@@ -118,5 +119,6 @@ namespace graphene { namespace net {
 
 } } // end namespace graphene::net
 
-FC_REFLECT_ENUM(graphene::net::potential_peer_last_connection_disposition, (never_attempted_to_connect)(last_connection_failed)(last_connection_rejected)(last_connection_handshaking_failed)(last_connection_succeeded))
-FC_REFLECT(graphene::net::potential_peer_record, (endpoint)(last_seen_time)(last_connection_disposition)(last_connection_attempt_time)(number_of_successful_connection_attempts)(number_of_failed_connection_attempts)(last_error) )
+FC_REFLECT_TYPENAME( graphene::net::potential_peer_record )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::net::potential_peer_record)

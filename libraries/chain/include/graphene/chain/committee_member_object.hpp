@@ -22,14 +22,12 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/db/object.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
-
-   class account_object;
 
    /**
     *  @brief tracks information about a committee_member account.
@@ -45,8 +43,8 @@ namespace graphene { namespace chain {
    class committee_member_object : public abstract_object<committee_member_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = committee_member_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id  = committee_member_object_type;
 
          account_id_type  committee_member_account;
          vote_id_type     vote_id;
@@ -73,5 +71,8 @@ namespace graphene { namespace chain {
    using committee_member_index = generic_index<committee_member_object, committee_member_multi_index_type>;
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::committee_member_object, (graphene::db::object),
-                    (committee_member_account)(vote_id)(total_votes)(url) )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::committee_member_object)
+
+FC_REFLECT_TYPENAME( graphene::chain::committee_member_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::committee_member_object )

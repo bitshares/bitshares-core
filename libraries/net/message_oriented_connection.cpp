@@ -32,6 +32,8 @@
 #include <graphene/net/stcp_socket.hpp>
 #include <graphene/net/config.hpp>
 
+#include <atomic>
+
 #ifdef DEFAULT_LOGGER
 # undef DEFAULT_LOGGER
 #endif
@@ -52,6 +54,7 @@ namespace graphene { namespace net {
       message_oriented_connection* _self;
       message_oriented_connection_delegate *_delegate;
       stcp_socket _sock;
+      fc::promise<void>::ptr _ready_for_sending;
       fc::future<void> _read_loop_done;
       uint64_t _bytes_received;
       uint64_t _bytes_sent;
@@ -60,8 +63,8 @@ namespace graphene { namespace net {
       fc::time_point _last_message_received_time;
       fc::time_point _last_message_sent_time;
 
-      bool _send_message_in_progress;
-
+      std::atomic_bool _send_message_in_progress;
+      std::atomic_bool _read_loop_in_progress;
 #ifndef NDEBUG
       fc::thread* _thread;
 #endif
@@ -95,9 +98,11 @@ namespace graphene { namespace net {
                                                                        message_oriented_connection_delegate* delegate)
     : _self(self),
       _delegate(delegate),
+      _ready_for_sending(fc::promise<void>::create()),
       _bytes_received(0),
       _bytes_sent(0),
-      _send_message_in_progress(false)
+      _send_message_in_progress(false),
+      _read_loop_in_progress(false)
 #ifndef NDEBUG
       ,_thread(&fc::thread::current())
 #endif
@@ -121,6 +126,7 @@ namespace graphene { namespace net {
       _sock.accept();
       assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
+      _ready_for_sending->set_value();
     }
 
     void message_oriented_connection_impl::connect_to(const fc::ip::endpoint& remote_endpoint)
@@ -129,6 +135,7 @@ namespace graphene { namespace net {
       _sock.connect_to(remote_endpoint);
       assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
+      _ready_for_sending->set_value();
     }
 
     void message_oriented_connection_impl::bind(const fc::ip::endpoint& local_endpoint)
@@ -137,6 +144,20 @@ namespace graphene { namespace net {
       _sock.bind(local_endpoint);
     }
 
+    class no_parallel_execution_guard final
+    {
+      std::atomic_bool* _flag;
+    public:
+      explicit no_parallel_execution_guard(std::atomic_bool* flag) : _flag(flag)
+      {
+         bool expected = false;
+         FC_ASSERT( flag->compare_exchange_strong( expected, true ), "Only one thread at time can visit it");
+      }
+      ~no_parallel_execution_guard()
+      {
+         *_flag = false;
+      }
+    };
 
     void message_oriented_connection_impl::read_loop()
     {
@@ -144,6 +165,8 @@ namespace graphene { namespace net {
       const int BUFFER_SIZE = 16;
       const int LEFTOVER = BUFFER_SIZE - sizeof(message_header);
       static_assert(BUFFER_SIZE >= sizeof(message_header), "insufficient buffer");
+
+      no_parallel_execution_guard guard( &_read_loop_in_progress );
 
       _connected_time = fc::time_point::now();
 
@@ -153,16 +176,15 @@ namespace graphene { namespace net {
       try
       {
         message m;
+        char buffer[BUFFER_SIZE];
         while( true )
         {
-          char buffer[BUFFER_SIZE];
           _sock.read(buffer, BUFFER_SIZE);
           _bytes_received += BUFFER_SIZE;
           memcpy((char*)&m, buffer, sizeof(message_header));
+          FC_ASSERT( m.size.value() <= MAX_MESSAGE_SIZE, "", ("m.size",m.size.value())("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
 
-          FC_ASSERT( m.size <= MAX_MESSAGE_SIZE, "", ("m.size",m.size)("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
-
-          size_t remaining_bytes_with_padding = 16 * ((m.size - LEFTOVER + 15) / 16);
+          size_t remaining_bytes_with_padding = 16 * ((m.size.value() - LEFTOVER + 15) / 16);
           m.data.resize(LEFTOVER + remaining_bytes_with_padding); //give extra 16 bytes to allow for padding added in send call
           std::copy(buffer + sizeof(message_header), buffer + sizeof(buffer), m.data.begin());
           if (remaining_bytes_with_padding)
@@ -170,7 +192,7 @@ namespace graphene { namespace net {
             _sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
             _bytes_received += remaining_bytes_with_padding;
           }
-          m.data.resize(m.size); // truncate off the padding bytes
+          m.data.resize(m.size.value()); // truncate off the padding bytes
 
           _last_message_received_time = fc::time_point::now();
 
@@ -241,33 +263,28 @@ namespace graphene { namespace net {
       } send_message_scope_logger(remote_endpoint);
 #endif
 #endif
-      struct verify_no_send_in_progress {
-        bool& var;
-        verify_no_send_in_progress(bool& var) : var(var)
-        {
-          if (var)
-            elog("Error: two tasks are calling message_oriented_connection::send_message() at the same time");
-          assert(!var);
-          var = true;
-        }
-        ~verify_no_send_in_progress() { var = false; }
-      } _verify_no_send_in_progress(_send_message_in_progress);
+      no_parallel_execution_guard guard( &_send_message_in_progress );
+      _ready_for_sending->wait();
 
       try
       {
-        size_t size_of_message_and_header = sizeof(message_header) + message_to_send.size;
-        if( message_to_send.size > MAX_MESSAGE_SIZE )
+        size_t size_of_message_and_header = sizeof(message_header) + message_to_send.size.value();
+        if( message_to_send.size.value() > MAX_MESSAGE_SIZE )
            elog("Trying to send a message larger than MAX_MESSAGE_SIZE. This probably won't work...");
         //pad the message we send to a multiple of 16 bytes
         size_t size_with_padding = 16 * ((size_of_message_and_header + 15) / 16);
-        std::unique_ptr<char[]> padded_message(new char[size_with_padding]);
-        memcpy(padded_message.get(), (char*)&message_to_send, sizeof(message_header));
-        memcpy(padded_message.get() + sizeof(message_header), message_to_send.data.data(), message_to_send.size );
-        _sock.write(padded_message.get(), size_with_padding);
+        std::vector<char> padded_message( size_with_padding );
+
+        memcpy( padded_message.data(), (const char*)&message_to_send, sizeof(message_header) );
+        memcpy( padded_message.data() + sizeof(message_header), message_to_send.data.data(),
+                message_to_send.size.value() );
+        char* padding_space = padded_message.data() + sizeof(message_header) + message_to_send.size.value();
+        memset(padding_space, 0, size_with_padding - size_of_message_and_header);
+        _sock.write( padded_message.data(), size_with_padding );
         _sock.flush();
         _bytes_sent += size_with_padding;
         _last_message_sent_time = fc::time_point::now();
-      } FC_RETHROW_EXCEPTIONS( warn, "unable to send message" );
+      } FC_RETHROW_EXCEPTIONS( warn, "unable to send message" )
     }
 
     void message_oriented_connection_impl::close_connection()
@@ -302,6 +319,7 @@ namespace graphene { namespace net {
       {
         wlog( "Exception thrown while canceling message_oriented_connection's read_loop, ignoring" );
       }
+      _ready_for_sending->set_exception( std::make_shared<fc::canceled_exception>() );
     }
 
     uint64_t message_oriented_connection_impl::get_total_bytes_sent() const
@@ -338,7 +356,7 @@ namespace graphene { namespace net {
 
 
   message_oriented_connection::message_oriented_connection(message_oriented_connection_delegate* delegate) :
-    my(new detail::message_oriented_connection_impl(this, delegate))
+    my( std::make_unique<detail::message_oriented_connection_impl>(this, delegate) )
   {
   }
 

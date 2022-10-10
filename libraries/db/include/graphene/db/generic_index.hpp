@@ -28,12 +28,12 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
 
-namespace graphene { namespace chain {
+namespace graphene { namespace db {
 
    using boost::multi_index_container;
    using namespace boost::multi_index;
 
-   struct by_id{};
+   struct by_id;
    /**
     *  Almost all objects can be tracked and managed via a boost::multi_index container that uses
     *  an unordered_unique key on the object ID.  This template class adapts the generic index interface
@@ -67,10 +67,25 @@ namespace graphene { namespace chain {
 
          virtual void modify( const object& obj, const std::function<void(object&)>& m )override
          {
-            assert( nullptr != dynamic_cast<const ObjectType*>(&obj) );
-            auto ok = _indices.modify( _indices.iterator_to( static_cast<const ObjectType&>(obj) ),
-                                       [&m]( ObjectType& o ){ m(o); } );
-            FC_ASSERT( ok, "Could not modify object, most likely a index constraint was violated" );
+            assert(nullptr != dynamic_cast<const ObjectType*>(&obj));
+            std::exception_ptr exc;
+            auto ok = _indices.modify(_indices.iterator_to(static_cast<const ObjectType&>(obj)),
+                                       [&m, &exc](ObjectType& o) mutable {
+                                          try {
+                                             m(o);
+                                          } catch (fc::exception& e) {
+                                             exc = std::current_exception();
+                                             elog("Exception while modifying object: ${e} -- object may be corrupted",
+                                                  ("e", e));
+                                          } catch (...) {
+                                             exc = std::current_exception();
+                                             elog("Unknown exception while modifying object");
+                                          }
+                                       }
+                      );
+            if (exc)
+                std::rethrow_exception(exc);
+            FC_ASSERT(ok, "Could not modify object, most likely an index constraint was violated");
          }
 
          virtual void remove( const object& obj )override
@@ -97,18 +112,7 @@ namespace graphene { namespace chain {
 
          const index_type& indices()const { return _indices; }
 
-         virtual fc::uint128 hash()const override {
-            fc::uint128 result;
-            for( const auto& ptr : _indices )
-            {
-               result += ptr.hash();
-            }
-
-            return result;
-         }
-
       private:
-         fc::uint128 _current_hash;
          index_type  _indices;
    };
 
