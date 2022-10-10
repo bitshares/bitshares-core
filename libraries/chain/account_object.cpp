@@ -131,7 +131,6 @@ set<address> account_member_index::get_address_members(const account_object& a)c
       result.insert(auth.first);
    for( auto auth : a.active.address_auths )
       result.insert(auth.first);
-   result.insert( a.options.memo_key );
    return result;
 }
 
