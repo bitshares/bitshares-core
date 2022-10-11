@@ -331,7 +331,7 @@ namespace graphene { namespace wallet { namespace detail {
                continue;
             for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
             {
-               addrs.push_back( pub );
+               addrs.push_back( address(pub) );
                auto it = _keys.find( pub );
                if( it != _keys.end() )
                {
@@ -351,16 +351,16 @@ namespace graphene { namespace wallet { namespace detail {
             optional< private_key_type > key = wif_to_key( wif_key );
             FC_ASSERT( key.valid(), "Invalid private key" );
             fc::ecc::public_key pk = key->get_public_key();
-            addrs.push_back( pk );
+            addrs.push_back( address(pk) );
             keys[addrs.back()] = *key;
             // see chain/balance_evaluator.cpp
-            addrs.push_back( pts_address( pk, false, 56 ) );
+            addrs.push_back( address( pts_address( pk, false, 56 ) ) );
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, true, 56 ) );
+            addrs.push_back( address( pts_address( pk, true, 56 ) ) );
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, false, 0 ) );
+            addrs.push_back( address( pts_address( pk, false, 0 ) ) );
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, true, 0 ) );
+            addrs.push_back( address( pts_address( pk, true, 0 ) ) );
             keys[addrs.back()] = *key;
          }
       }
