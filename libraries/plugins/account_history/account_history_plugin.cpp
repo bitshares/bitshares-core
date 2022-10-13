@@ -161,7 +161,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
                                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
 
       if( op.op.is_type< account_create_operation >() )
-         impacted.insert( op.result.get<object_id_type>() );
+         impacted.insert( account_id_type( op.result.get<object_id_type>() ) );
 
       // https://github.com/bitshares/bitshares-core/issues/265
       if( HARDFORK_CORE_265_PASSED(b.timestamp) || !op.op.is_type< account_create_operation >() )
@@ -306,7 +306,7 @@ void account_history_plugin_impl::check_and_remove_op_history_obj( const operati
       graphene::chain::database& db = database();
       const auto& his_idx = db.get_index_type<account_history_index>();
       const auto& by_opid_idx = his_idx.indices().get<by_opid>();
-      if( by_opid_idx.find( op.id ) == by_opid_idx.end() )
+      if( by_opid_idx.find( op.get_id() ) == by_opid_idx.end() )
       {
          // if no reference, remove
          db.remove( op );

@@ -61,15 +61,16 @@ void required_approval_index::object_inserted( const object& obj )
 {
     assert( dynamic_cast<const proposal_object*>(&obj) );
     const proposal_object& p = static_cast<const proposal_object&>(obj);
+    const proposal_id_type proposal_id = p.get_id();
 
     for( const auto& a : p.required_active_approvals )
-       _account_to_proposals[a].insert( p.id );
+       _account_to_proposals[a].insert( proposal_id );
     for( const auto& a : p.required_owner_approvals )
-       _account_to_proposals[a].insert( p.id );
+       _account_to_proposals[a].insert( proposal_id );
     for( const auto& a : p.available_active_approvals )
-       _account_to_proposals[a].insert( p.id );
+       _account_to_proposals[a].insert( proposal_id );
     for( const auto& a : p.available_owner_approvals )
-       _account_to_proposals[a].insert( p.id );
+       _account_to_proposals[a].insert( proposal_id );
 }
 
 void required_approval_index::remove( account_id_type a, proposal_id_type p )
@@ -87,15 +88,16 @@ void required_approval_index::object_removed( const object& obj )
 {
     assert( dynamic_cast<const proposal_object*>(&obj) );
     const proposal_object& p = static_cast<const proposal_object&>(obj);
+    const proposal_id_type proposal_id = p.get_id();
 
     for( const auto& a : p.required_active_approvals )
-       remove( a, p.id );
+       remove( a, proposal_id );
     for( const auto& a : p.required_owner_approvals )
-       remove( a, p.id );
+       remove( a, proposal_id );
     for( const auto& a : p.available_active_approvals )
-       remove( a, p.id );
+       remove( a, proposal_id );
     for( const auto& a : p.available_owner_approvals )
-       remove( a, p.id );
+       remove( a, proposal_id );
 }
 
 void required_approval_index::insert_or_remove_delta( proposal_id_type p,
@@ -134,8 +136,9 @@ void required_approval_index::about_to_modify( const object& before )
 void required_approval_index::object_modified( const object& after )
 {
     const proposal_object& p = static_cast<const proposal_object&>(after);
-    insert_or_remove_delta( p.id, available_active_before_modify, p.available_active_approvals );
-    insert_or_remove_delta( p.id, available_owner_before_modify,  p.available_owner_approvals );
+    const proposal_id_type proposal_id = p.get_id();
+    insert_or_remove_delta( proposal_id, available_active_before_modify, p.available_active_approvals );
+    insert_or_remove_delta( proposal_id, available_owner_before_modify,  p.available_owner_approvals );
 }
 
 } } // graphene::chain

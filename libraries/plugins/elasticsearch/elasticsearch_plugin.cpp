@@ -101,7 +101,7 @@ class elasticsearch_plugin_impl
       void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const;
       void doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs) const;
       void checkState(const fc::time_point_sec& block_time);
-      void cleanObjects(const account_history_id_type& ath, const account_id_type& account_id);
+      void cleanObjects(const account_history_object& ath, const account_id_type& account_id);
 
       void init_program_options(const boost::program_options::variables_map& options);
 };
@@ -181,7 +181,7 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
                                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
 
       if( op.op.is_type< account_create_operation >() )
-         impacted.insert( op.result.get<object_id_type>() );
+         impacted.insert( account_id_type( op.result.get<object_id_type>() ) );
 
       // https://github.com/bitshares/bitshares-core/issues/265
       if( HARDFORK_CORE_265_PASSED(b.timestamp) || !op.op.is_type< account_create_operation >() )
@@ -438,10 +438,10 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
       if( bulk_lines.size() >= limit_documents )
          send_bulk();
    }
-   cleanObjects(ath.id, account_id);
+   cleanObjects(ath, account_id);
 }
 
-void elasticsearch_plugin_impl::cleanObjects( const account_history_id_type& ath_id,
+void elasticsearch_plugin_impl::cleanObjects( const account_history_object& ath,
                                               const account_id_type& account_id )
 {
    graphene::chain::database& db = database();
@@ -449,7 +449,7 @@ void elasticsearch_plugin_impl::cleanObjects( const account_history_id_type& ath
    const auto &his_idx = db.get_index_type<account_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
    auto itr = by_seq_idx.lower_bound(boost::make_tuple(account_id, 0));
-   if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath_id) {
+   if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath.id) {
       // if found, remove the entry
       const auto remove_op_id = itr->operation_id;
       const auto itr_remove = itr;
@@ -459,7 +459,7 @@ void elasticsearch_plugin_impl::cleanObjects( const account_history_id_type& ath
       // this should be always true, but just have a check here
       if( itr != by_seq_idx.end() && itr->account == account_id )
       {
-         db.modify( *itr, [&]( account_history_object& obj ){
+         db.modify( *itr, []( account_history_object& obj ){
             obj.next = account_history_id_type();
          });
       }

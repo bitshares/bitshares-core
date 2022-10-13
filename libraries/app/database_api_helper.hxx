@@ -29,7 +29,7 @@ class database_api_helper
 {
 public:
    database_api_helper( graphene::chain::database& db, const application_options* app_options );
-   explicit database_api_helper( graphene::app::application& app );
+   explicit database_api_helper( const graphene::app::application& app );
 
    // Member variables
    graphene::chain::database& _db;
@@ -78,15 +78,17 @@ public:
 
       vector<OBJ_TYPE> results;
 
-      OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+      OBJ_ID_TYPE start_obj_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+      object_id_type start_id { start_obj_id };
 
       auto lower_itr = idx.lower_bound( make_tuple_if_multiple( x..., start_id ) );
       auto upper_itr = call_end_or_upper_bound( idx, x... );
 
       results.reserve( limit );
-      for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+      while( lower_itr != upper_itr && results.size() < limit )
       {
          results.emplace_back( *lower_itr );
+         ++lower_itr;
       }
 
       return results;

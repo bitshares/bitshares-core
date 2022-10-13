@@ -220,9 +220,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
-      d.get_object(id);
+      d.get(id);
    for( auto id : op.common_options.blacklist_authorities )
-      d.get_object(id);
+      d.get(id);
 
    auto& asset_indx = d.get_index_type<asset_index>().indices().get<by_symbol>();
    auto asset_symbol_itr = asset_indx.find( op.symbol );
@@ -428,7 +428,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
 
 static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
 { try {
-   FC_ASSERT(d.find_object(new_issuer));
+   FC_ASSERT(d.find(new_issuer), "New issuer account does not exist");
    if( a.is_market_issued() && new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
    {
       const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
@@ -587,10 +587,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    FC_ASSERT( o.new_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.whitelist_authorities )
-      d.get_object(id);
+      d.get(id);
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
-      d.get_object(id);
+      d.get(id);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -1064,7 +1064,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 
    // Make sure all producers exist. Check these after asset because account lookup is more expensive
    for( auto id : o.new_feed_producers )
-      d.get_object(id);
+      d.get(id);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

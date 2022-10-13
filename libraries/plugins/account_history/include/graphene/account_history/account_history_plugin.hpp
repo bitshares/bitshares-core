@@ -50,11 +50,9 @@ enum account_history_object_type
 };
 
 /// This struct tracks accounts that have exceeded the max-ops-per-account limit
-struct exceeded_account_object : public abstract_object<exceeded_account_object>
+struct exceeded_account_object : public abstract_object<exceeded_account_object,
+                                           ACCOUNT_HISTORY_SPACE_ID, exceeded_account_object_type>
 {
-   static constexpr uint8_t space_id = ACCOUNT_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = exceeded_account_object_type;
-
    /// The ID of the account
    account_id_type account_id;
    /// The height of the block containing the oldest (not yet removed) operation related to this account

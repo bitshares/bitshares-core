@@ -595,7 +595,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
       const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
-      total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
+      total_balances[asset_obj.get_id()] += dasset_obj.accumulated_fees;
       total_balances[asset_id_type()] += dasset_obj.fee_pool;
       if( asset_obj.is_market_issued() )
       {
@@ -606,7 +606,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
          if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
             total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
-      total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
+      total_balances[asset_obj.get_id()] += dasset_obj.confidential_supply.value;
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
@@ -686,7 +686,8 @@ void database_fixture_base::verify_asset_supplies( const database& db )
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
+      BOOST_CHECK_EQUAL( total_balances[asset_obj.get_id()].value,
+                         asset_obj.dynamic_asset_data_id(db).current_supply.value );
    }
 
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
@@ -1360,7 +1361,7 @@ const call_order_object* database_fixture_base::borrow( const account_object& wh
    verify_asset_supplies(db);
 
    auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
-   auto itr = call_idx.find( boost::make_tuple(who.id, what.asset_id) );
+   auto itr = call_idx.find( boost::make_tuple(who.get_id(), what.asset_id) );
    const call_order_object* call_obj = nullptr;
 
    if( itr != call_idx.end() )
@@ -2225,7 +2226,7 @@ void database_fixture_base::set_htlc_committee_parameters()
    trx.operations.push_back(cop);
    graphene::chain::processed_transaction proc_trx = db.push_transaction(trx);
    trx.clear();
-   proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
+   proposal_id_type good_proposal_id { proc_trx.operation_results[0].get<object_id_type>() };
 
    proposal_update_operation puo;
    puo.proposal = good_proposal_id;

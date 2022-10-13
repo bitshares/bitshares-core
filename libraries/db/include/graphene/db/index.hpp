@@ -34,7 +34,6 @@
 
 namespace graphene { namespace db {
    class object_database;
-   using fc::path;
 
    /**
     * @class index_observer
@@ -126,14 +125,15 @@ namespace graphene { namespace db {
           */
          template<typename Object, typename Lambda>
          void modify( const Object& obj, const Lambda& l ) {
-            modify( static_cast<const object&>(obj), std::function<void(object&)>( [&]( object& o ){ l( static_cast<Object&>(o) ); } ) );
+            modify( static_cast<const object&>(obj),
+                    std::function<void(object&)>( [&l]( object& o ){ l( static_cast<Object&>(o) ); } ) );
          }
 
-         virtual void               inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
-         virtual void               add_observer( const shared_ptr<index_observer>& ) = 0;
+         virtual void inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
+         virtual void add_observer( const std::shared_ptr<index_observer>& ) = 0;
 
-         virtual void               object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
-         virtual void               object_default( object& obj )const = 0;
+         virtual void object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
+         virtual void object_default( object& obj )const = 0;
    };
 
    class secondary_index
@@ -185,8 +185,8 @@ namespace graphene { namespace db {
          }
 
       protected:
-         vector< shared_ptr<index_observer> >   _observers;
-         vector< unique_ptr<secondary_index> >  _sindex;
+         std::vector< std::shared_ptr<index_observer> >   _observers;
+         std::vector< std::unique_ptr<secondary_index> >  _sindex;
 
       private:
          object_database& _db;
@@ -210,7 +210,7 @@ namespace graphene { namespace db {
          static const size_t MAX_HOLE = 100;
          static const size_t _mask = ((1ULL << chunkbits) - 1);
          uint64_t next = 0;
-         vector< vector< const Object* > > content;
+         std::vector< std::vector< const Object* > > content;
          std::stack< object_id_type > ids_being_modified;
 
       public:
@@ -233,10 +233,12 @@ namespace graphene { namespace db {
                next++;
             }
             else if( instance < next )
-               FC_ASSERT( !content[instance >> chunkbits][instance & _mask], "Overwriting insert at {id}!", ("id",obj.id) );
+               FC_ASSERT( !content[instance >> chunkbits][instance & _mask],
+                          "Overwriting insert at {id}!", ("id",obj.id) );
             else // instance > next, allow small "holes"
             {
-               FC_ASSERT( instance <= next + MAX_HOLE, "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
+               FC_ASSERT( instance <= next + MAX_HOLE,
+                          "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
                if( 0 == (next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
                {
                   content.resize((instance >> chunkbits) + 1);
@@ -257,7 +259,8 @@ namespace graphene { namespace db {
             FC_ASSERT( nullptr != dynamic_cast<const Object*>(&obj), "Wrong object type!" );
             uint64_t instance = obj.id.instance();
             FC_ASSERT( instance < next, "Removing out-of-range object: {id} > {next}!", ("id",obj.id)("next",next) );
-            FC_ASSERT( content[instance >> chunkbits][instance & _mask], "Removing non-existent object {id}!", ("id",obj.id) );
+            FC_ASSERT( content[instance >> chunkbits][instance & _mask],
+                       "Removing non-existent object {id}!", ("id",obj.id) );
             content[instance >> chunkbits][instance & _mask] = nullptr;
          }
 
@@ -342,8 +345,8 @@ namespace graphene { namespace db {
             return fc::sha256::hash(desc);
          }
 
-         virtual void open( const path& db )override
-         { 
+         virtual void open( const fc::path& db )override
+         {
             if( !fc::exists( db ) ) return;
             fc::file_mapping fm( db.generic_string().c_str(), fc::read_only );
             fc::mapped_region mr( fm, fc::read_only, 0, fc::file_size(db) );
@@ -352,8 +355,9 @@ namespace graphene { namespace db {
 
             fc::raw::unpack(ds, _next_id);
             fc::raw::unpack(ds, open_ver);
-            FC_ASSERT( open_ver == get_object_version(), "Incompatible Version, the serialization of objects in this index has changed" );
-            vector<char> tmp;
+            FC_ASSERT( open_ver == get_object_version(),
+                       "Incompatible Version, the serialization of objects in this index has changed" );
+            std::vector<char> tmp;
             while( ds.remaining() > 0 )
             {
                fc::raw::unpack( ds, tmp );
@@ -361,15 +365,15 @@ namespace graphene { namespace db {
             }
          }
 
-         virtual void save( const path& db ) override 
+         virtual void save( const fc::path& db ) override
          {
-            std::ofstream out( db.generic_string(), 
+            std::ofstream out( db.generic_string(),
                                std::ofstream::binary | std::ofstream::out | std::ofstream::trunc );
             FC_ASSERT( out );
             auto ver  = get_object_version();
             fc::raw::pack( out, _next_id );
             fc::raw::pack( out, ver );
-            this->inspect_all_objects( [&]( const object& o ) {
+            this->inspect_all_objects( [&out]( const object& o ) {
                 auto vec = fc::raw::pack( static_cast<const object_type&>(o) );
                 auto packed_vec = fc::raw::pack( vec );
                 out.write( packed_vec.data(), packed_vec.size() );
@@ -422,7 +426,7 @@ namespace graphene { namespace db {
             on_modify( obj );
          }
 
-         virtual void add_observer( const shared_ptr<index_observer>& o ) override
+         virtual void add_observer( const std::shared_ptr<index_observer>& o ) override
          {
             _observers.emplace_back( o );
          }

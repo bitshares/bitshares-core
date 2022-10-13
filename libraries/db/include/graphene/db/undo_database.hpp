@@ -28,16 +28,14 @@
 
 namespace graphene { namespace db {
 
-   using std::unordered_map;
-   using fc::flat_set;
    class object_database;
 
    struct undo_state
    {
-      unordered_map<object_id_type, unique_ptr<object> > old_values;
-      unordered_map<object_id_type, object_id_type>      old_index_next_ids;
-      std::unordered_set<object_id_type>                 new_ids;
-      unordered_map<object_id_type, unique_ptr<object> > removed;
+      std::unordered_map<object_id_type, std::unique_ptr<object> > old_values;
+      std::unordered_map<object_id_type, object_id_type>           old_index_next_ids;
+      std::unordered_set<object_id_type>                           new_ids;
+      std::unordered_map<object_id_type, std::unique_ptr<object> > removed;
    };
 
 

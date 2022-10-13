@@ -279,7 +279,7 @@ class wallet_api
        * @param htlc_id the id of the HTLC object.
        * @returns the information about the HTLC object
        */
-      fc::optional<fc::variant>             get_htlc(string htlc_id) const;
+      fc::optional<fc::variant>             get_htlc(const htlc_id_type& htlc_id) const;
 
       /** Lookup the id of a named account.
        * @param account_name_or_id the name or ID of the account to look up
@@ -1062,7 +1062,7 @@ class wallet_api
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction canceling the order
        */
-      signed_transaction cancel_order(object_id_type order_id, bool broadcast = false);
+      signed_transaction cancel_order(const limit_order_id_type& order_id, bool broadcast = false);
 
       /** Creates a new user-issued or market-issued asset.
        *
@@ -1477,9 +1477,10 @@ class wallet_api
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction
        */
-      signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol_or_id,
-            string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-            const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
+      signed_transaction htlc_create( const string& source, const string& destination,
+            const string& amount, const string& asset_symbol_or_id, const string& hash_algorithm,
+            const string& preimage_hash, uint32_t preimage_size,
+            uint32_t claim_period_seconds, const string& memo, bool broadcast = false);
 
       /****
        * Update a hashed time lock contract
@@ -1489,7 +1490,7 @@ class wallet_api
        * @param preimage the preimage that should evaluate to the preimage_hash
        * @return the signed transaction
        */
-      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::string& preimage,
+      signed_transaction htlc_redeem( const htlc_id_type& htlc_id, const string& issuer, const std::string& preimage,
             bool broadcast = false );
 
       /*****
@@ -1501,7 +1502,7 @@ class wallet_api
        * @param broadcast true to broadcast to the network
        * @return the signed transaction
        */
-      signed_transaction htlc_extend(string htlc_id, string issuer, const uint32_t seconds_to_add,
+      signed_transaction htlc_extend( const htlc_id_type& htlc_id, const string& issuer, uint32_t seconds_to_add,
             bool broadcast = false);
 
       /**

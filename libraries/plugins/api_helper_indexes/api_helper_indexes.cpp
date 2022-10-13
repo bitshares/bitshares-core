@@ -97,15 +97,17 @@ share_type amount_in_collateral_index::get_backing_collateral( const asset_id_ty
 void asset_in_liquidity_pools_index::object_inserted( const object& objct )
 { try {
    const auto& o = static_cast<const liquidity_pool_object&>( objct );
-   asset_in_pools_map[ o.asset_a ].insert( o.id ); // Note: [] operator will create an entry if not found
-   asset_in_pools_map[ o.asset_b ].insert( o.id );
+   const liquidity_pool_id_type pool_id = o.get_id();
+   asset_in_pools_map[ o.asset_a ].insert( pool_id ); // Note: [] operator will create an entry if not found
+   asset_in_pools_map[ o.asset_b ].insert( pool_id );
 } FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void asset_in_liquidity_pools_index::object_removed( const object& objct )
 { try {
    const auto& o = static_cast<const liquidity_pool_object&>( objct );
-   asset_in_pools_map[ o.asset_a ].erase( o.id );
-   asset_in_pools_map[ o.asset_b ].erase( o.id );
+   const liquidity_pool_id_type pool_id = o.get_id();
+   asset_in_pools_map[ o.asset_a ].erase( pool_id );
+   asset_in_pools_map[ o.asset_b ].erase( pool_id );
    // Note: do not erase entries with an empty set from the map in order to avoid read/write race conditions
 } FC_CAPTURE_AND_RETHROW( (objct) ) }
 

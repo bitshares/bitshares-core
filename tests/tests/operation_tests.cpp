@@ -85,12 +85,12 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
    try {
 
       ACTORS((dan)(sam));
-      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id());
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
       transfer(committee_account, sam_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -192,12 +192,12 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
       set_expiration( db, trx );
 
       ACTORS((dan)(sam));
-      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id());
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
       transfer(committee_account, sam_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -296,15 +296,15 @@ BOOST_AUTO_TEST_CASE( call_order_update_asset_auth_test )
       ACTORS((dan)(sam));
 
       const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
-      asset_id_type back_id = backasset.id;
+      asset_id_type back_id = backasset.get_id();
 
-      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
-      asset_id_type usd_id = bitusd.id;
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id(), 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.get_id();
 
       issue_uia( dan_id, backasset.amount(10000000) );
       issue_uia( sam_id, backasset.amount(10000000) );
 
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed;
       current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
@@ -453,15 +453,15 @@ BOOST_AUTO_TEST_CASE( asset_settle_operation_asset_auth_test )
       ACTORS((dan)(sam));
 
       const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
-      asset_id_type back_id = backasset.id;
+      asset_id_type back_id = backasset.get_id();
 
-      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
-      asset_id_type usd_id = bitusd.id;
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id(), 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.get_id();
 
       issue_uia( dan_id, backasset.amount(10000000) );
       issue_uia( sam_id, backasset.amount(10000000) );
 
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed;
       current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
@@ -619,15 +619,15 @@ BOOST_AUTO_TEST_CASE( bid_collateral_operation_asset_auth_test )
       ACTORS((dan)(sam));
 
       const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
-      asset_id_type back_id = backasset.id;
+      asset_id_type back_id = backasset.get_id();
 
-      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
-      asset_id_type usd_id = bitusd.id;
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id(), 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.get_id();
 
       issue_uia( dan_id, backasset.amount(10000000) );
       issue_uia( sam_id, backasset.amount(10000000) );
 
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed;
       current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
@@ -859,9 +859,9 @@ BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_and_param_valid_range_test )
                                           GRAPHENE_MAX_SHARE_SUPPLY, 32001 ), fc::exception );
 
       // Can create a bitasset without ICR
-      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+      const auto& bitusd = create_bitasset( "USDBIT", sam.get_id(), 100, charge_market_fee, 2, {},
                                             GRAPHENE_MAX_SHARE_SUPPLY );
-      asset_id_type usd_id = bitusd.id;
+      asset_id_type usd_id = bitusd.get_id();
 
       // helper function for setting ICR for an asset
       auto set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
@@ -958,15 +958,15 @@ BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_and_param_valid_range_test )
       BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 32001, charge_market_fee, 2, {},
                                           GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
       // Able to create a bitasset with a valid ICR
-      asset_id_type usdc_id = create_bitasset( "USDBITC", sam.id, 100, charge_market_fee, 2, {},
-                                               GRAPHENE_MAX_SHARE_SUPPLY, 1001 ).id;
-      asset_id_type usdd_id = create_bitasset( "USDBITD", sam.id, 100, charge_market_fee, 2, {},
-                                               GRAPHENE_MAX_SHARE_SUPPLY, 1750 ).id;
-      asset_id_type usde_id = create_bitasset( "USDBITE", sam.id, 100, charge_market_fee, 2, {},
-                                               GRAPHENE_MAX_SHARE_SUPPLY, 32000 ).id;
+      asset_id_type usdc_id = create_bitasset( "USDBITC", sam.get_id(), 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1001 ).get_id();
+      asset_id_type usdd_id = create_bitasset( "USDBITD", sam.get_id(), 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1750 ).get_id();
+      asset_id_type usde_id = create_bitasset( "USDBITE", sam.get_id(), 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 32000 ).get_id();
       // Able to create a bitasset without ICR
-      asset_id_type usdf_id = create_bitasset( "USDBITF", sam.id, 100, charge_market_fee, 2, {},
-                                               GRAPHENE_MAX_SHARE_SUPPLY, {} ).id;
+      asset_id_type usdf_id = create_bitasset( "USDBITF", sam.get_id(), 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, {} ).get_id();
 
       BOOST_CHECK( usdc_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1001 );
       BOOST_CHECK( usdd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1750 );
@@ -1030,14 +1030,14 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
    try {
 
       ACTORS((dan)(sam)(alice)(bob));
-      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id());
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
       transfer(committee_account, sam_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -1055,7 +1055,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
       BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
-      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -1070,7 +1070,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
 
       BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
-      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
 
@@ -1083,7 +1083,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
-      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+      BOOST_CHECK( !db.find( bob_call_id ) );
 
       BOOST_TEST_MESSAGE( "alice cancel sell order" );
       cancel_limit_order( alice_sell_id(db) );
@@ -1140,14 +1140,14 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       set_expiration( db, trx );
 
       ACTORS((dan)(sam)(alice)(bob));
-      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& bitusd = create_bitasset("USDBIT", sam.get_id());
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
       transfer(committee_account, sam_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -1165,7 +1165,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
       BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
-      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -1180,7 +1180,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
 
       BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
-      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
 
@@ -1193,7 +1193,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
-      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+      BOOST_CHECK( !db.find( bob_call_id ) );
 
       BOOST_TEST_MESSAGE( "alice cancel sell order" );
       cancel_limit_order( alice_sell_id(db) );
@@ -1260,11 +1260,11 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       set_expiration( db, trx );
 
       ACTORS((dan)(sam)(alice)(bob));
-      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+      const auto& bitusd = create_bitasset( "USDBIT", sam.get_id(), 100, charge_market_fee, 2, {},
                                             GRAPHENE_MAX_SHARE_SUPPLY, 1050 ); // ICR = 1.05
       const auto& core   = asset_id_type()(db);
 
-      asset_id_type usd_id = bitusd.id;
+      asset_id_type usd_id = bitusd.get_id();
 
       // helper function for setting ICR for an asset
       auto set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
@@ -1286,7 +1286,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       transfer(committee_account, sam_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -1342,7 +1342,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 4.0000" );
 
       BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
-      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -1357,7 +1357,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
 
       BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
-      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
 
@@ -1370,7 +1370,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
-      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+      BOOST_CHECK( !db.find( bob_call_id ) );
 
       BOOST_TEST_MESSAGE( "alice cancel sell order" );
       cancel_limit_order( alice_sell_id(db) );
@@ -1419,7 +1419,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222222" );
 
       BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
-      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->id;
+      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->get_id();
       BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 400000 + 1 );
       BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222228" );
@@ -1461,7 +1461,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       set_expiration( db, trx );
 
       ACTORS((dan)(sam)(alice)(bob));
-      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+      const auto& bitusd = create_bitasset( "USDBIT", sam.get_id(), 100, charge_market_fee, 2, {},
                                             GRAPHENE_MAX_SHARE_SUPPLY, {} ); // ICR is not set
       const auto& core   = asset_id_type()(db);
 
@@ -1469,7 +1469,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       transfer(committee_account, sam_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -1525,7 +1525,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 4.0000" );
 
       BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
-      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -1540,7 +1540,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
 
       BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
-      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->get_id();
       BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
 
@@ -1553,7 +1553,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
-      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+      BOOST_CHECK( !db.find( bob_call_id ) );
 
       BOOST_TEST_MESSAGE( "alice cancel sell order" );
       cancel_limit_order( alice_sell_id(db) );
@@ -1602,7 +1602,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222222" );
 
       BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
-      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->id;
+      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->get_id();
       BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 400000 + 1 );
       BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
       BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222228" );
@@ -1694,7 +1694,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       transfer(committee_account, buyer_id, asset(init_balance));
       transfer(committee_account, borrower_id, asset(init_balance));
       transfer(committee_account, borrower2_id, asset(init_balance));
-      update_feed_producers( bitusd, {feedproducer.id} );
+      update_feed_producers( bitusd, {feedproducer.get_id()} );
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
@@ -1765,7 +1765,7 @@ BOOST_AUTO_TEST_CASE( prediction_market )
 
       update_feed_producers( pmark, { judge_id });
       price_feed feed;
-      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      feed.settlement_price = asset( 1, pmark.get_id() ) / asset( 1 );
       publish_feed( pmark, judge, feed );
 
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
@@ -1823,7 +1823,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
 
       update_feed_producers( pmark, { judge_id });
       price_feed feed;
-      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      feed.settlement_price = asset( 1, pmark.get_id() ) / asset( 1 );
       publish_feed( pmark, judge, feed );
 
       borrow( dan, pmark.amount(1000), asset(1000) );
@@ -1866,13 +1866,13 @@ BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
 
       update_feed_producers( pmark, { judge_id });
       price_feed feed;
-      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      feed.settlement_price = asset( 1, pmark.get_id() ) / asset( 1 );
       publish_feed( pmark, judge, feed );
 
       borrow( dan, pmark.amount(1000), asset(1000) );
 
       // feed a price that will cause a black swan
-      feed.settlement_price = asset( 1, pmark.id ) / asset( 1000 );
+      feed.settlement_price = asset( 1, pmark.get_id() ) / asset( 1000 );
       publish_feed( pmark, judge, feed );
 
       // verify a black swan happened
@@ -1887,13 +1887,13 @@ BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
       const auto& pmark2 = create_prediction_market("PMARKII", judge_id);
       update_feed_producers( pmark2, { judge_id });
       price_feed feed2;
-      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1 );
+      feed2.settlement_price = asset( 1, pmark2.get_id() ) / asset( 1 );
       publish_feed( pmark2, judge, feed2 );
 
       borrow( dan, pmark2.amount(1000), asset(1000) );
 
       // feed a price that would have caused a black swan
-      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1000 );
+      feed2.settlement_price = asset( 1, pmark2.get_id() ) / asset( 1000 );
       publish_feed( pmark2, judge, feed2 );
 
       // verify a black swan did not happen
@@ -1975,7 +1975,7 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(statistics.id.space() == implementation_ids);
       BOOST_CHECK(statistics.id.type() == impl_account_statistics_object_type);
 
-      account_id_type nathan_id = nathan_account.id;
+      account_id_type nathan_id = nathan_account.get_id();
 
       generate_block();
 
@@ -2098,7 +2098,7 @@ BOOST_AUTO_TEST_CASE( create_committee_member )
       REQUIRE_THROW_WITH_VALUE(op, fee, asset(-600));
       trx.operations.back() = op;
 
-      committee_member_id_type committee_member_id = db.get_index_type<committee_member_index>().get_next_id();
+      committee_member_id_type committee_member_id { db.get_index_type<committee_member_index>().get_next_id() };
       PUSH_TX( db, trx, ~0 );
       const committee_member_object& d = committee_member_id(db);
 
@@ -2182,7 +2182,7 @@ BOOST_AUTO_TEST_CASE( update_mia )
 BOOST_AUTO_TEST_CASE( create_uia )
 {
    try {
-      asset_id_type test_asset_id = db.get_index<asset_object>().get_next_id();
+      asset_id_type test_asset_id { db.get_index<asset_object>().get_next_id() };
       asset_create_operation creator;
       creator.issuer = account_id_type();
       creator.fee = asset();
@@ -2413,12 +2413,12 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       // Create accounts
       const auto& alice = create_account_2_keys("alice", alice_active, alice_owner);
       const auto& bob = create_account_2_keys("bob", bob_active, bob_owner);
-      const account_id_type alice_id = alice.id;
-      const account_id_type bob_id = bob.id;
+      const account_id_type alice_id = alice.get_id();
+      const account_id_type bob_id = bob.get_id();
 
       // Create asset
       const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
 
       // Fast Forward to Hardfork time
       generate_blocks( HARDFORK_CORE_199_TIME );
@@ -2532,9 +2532,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
 
-   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->id;
-   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->id;
-   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->id;
+   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->get_id();
+   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->get_id();
+   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->get_id();
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
@@ -2572,9 +2572,9 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
 
-   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->id;
-   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->id;
-   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->id;
+   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->get_id();
+   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->get_id();
+   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->get_id();
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
@@ -2613,9 +2613,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
 
-   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->id;
-   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->id;
-   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->id;
+   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(100) )->get_id();
+   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(200) )->get_id();
+   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(300) )->get_id();
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
@@ -2655,9 +2655,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
    BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 0 );
    BOOST_CHECK_EQUAL( get_balance( seller_account, core_asset ), 30 );
 
-   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(10) )->id;
-   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(20) )->id;
-   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(30) )->id;
+   limit_order_id_type first_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(10) )->get_id();
+   limit_order_id_type second_id = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(20) )->get_id();
+   limit_order_id_type third_id  = create_sell_order( buyer_account, test_asset.amount(100), core_asset.amount(30) )->get_id();
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
@@ -3033,7 +3033,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
 
       BOOST_TEST_MESSAGE( "Test reserve operation on market issued asset" );
       transfer( committee_account, alice_id, casset.amount( init_balance*100 ) );
-      update_feed_producers( basset, {sam.id} );
+      update_feed_producers( basset, {sam.get_id()} );
       price_feed current_feed;
       current_feed.settlement_price = basset.amount( 2 ) / casset.amount(100);
       current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
@@ -3095,7 +3095,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitjmj.options.max_supply + 1, bitjmj.id );
+         op.delta_debt = asset( bitjmj.options.max_supply + 1, bitjmj.get_id() );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -3128,7 +3128,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply + 1, bitusd.id );
+         op.delta_debt = asset( bitusd.options.max_supply + 1, bitusd.get_id() );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -3140,12 +3140,12 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 100 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( 2, bitusd.id );
+         op.delta_debt = asset( 2, bitusd.get_id() );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
-         transfer( alice_id(db), bob_id(db), asset( 2, bitusd.id ) );
+         transfer( alice_id(db), bob_id(db), asset( 2, bitusd.get_id() ) );
       }
 
       {
@@ -3153,7 +3153,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply - 1, bitusd.id );
+         op.delta_debt = asset( bitusd.options.max_supply - 1, bitusd.get_id() );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -3165,7 +3165,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply - 2, bitusd.id );
+         op.delta_debt = asset( bitusd.options.max_supply - 2, bitusd.get_id() );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -3188,7 +3188,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
 
       BOOST_TEST_MESSAGE( "Setting price feed to $0.02 / 100" );
       transfer(committee_account, alice_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
+      update_feed_producers( bitusd, {sam.get_id()} );
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 2 ) / core.amount(100);
@@ -3229,7 +3229,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
       BOOST_TEST_MESSAGE( "Bob offers to sell most of the BitUSD at the feed" );
       const limit_order_object* order = create_sell_order( bob_id, bitusd.amount(99), asset(4950) );
       BOOST_REQUIRE( order != nullptr );
-      limit_order_id_type order1_id = order->id;
+      limit_order_id_type order1_id = order->get_id();
       BOOST_CHECK_EQUAL( order->for_sale.value, 99 );
       // wdump( (*call_order) );
 
@@ -3240,7 +3240,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
       BOOST_TEST_MESSAGE( "Bob offers to sell the last of his BitUSD in another order" );
       order = create_sell_order( bob_id, bitusd.amount(1), asset(50) );
       BOOST_REQUIRE( order != nullptr );
-      limit_order_id_type order2_id = order->id;
+      limit_order_id_type order2_id = order->get_id();
       BOOST_CHECK_EQUAL( order->for_sale.value, 1 );
       // wdump( (*call_order) );
 
@@ -3532,7 +3532,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    {
       // Try withdrawing a single satoshi
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 0);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 0);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 
@@ -3559,7 +3559,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    // Make sure we can withdraw the correct amount after 999 seconds
    {
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 999);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 999);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 
@@ -3576,7 +3576,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    // Make sure we can withdraw the whole thing after 1000 seconds
    {
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 1000);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 1000);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 
@@ -3592,7 +3592,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    // Make sure that we can't withdraw a single extra satoshi no matter how old it is
    {
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 123456);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 123456);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 
@@ -3611,7 +3611,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    //   3000 after 1000 more seconds
    {
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 0);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 0);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 
@@ -3648,7 +3648,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    //
    {
       const vesting_balance_object& vbo = create_vbo(
-         alice_account.id, alice_account.id, core.amount( 10000 ), 1000, 0);
+         alice_account.get_id(), alice_account.get_id(), core.amount( 10000 ), 1000, 0);
 
       FC_ASSERT( db.get_balance( alice_account,       core ).amount ==  990000 );
 

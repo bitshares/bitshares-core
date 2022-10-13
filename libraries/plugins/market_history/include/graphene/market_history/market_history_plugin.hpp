@@ -81,11 +81,8 @@ struct bucket_key
    }
 };
 
-struct bucket_object : public abstract_object<bucket_object>
+struct bucket_object : public abstract_object<bucket_object, MARKET_HISTORY_SPACE_ID, bucket_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = bucket_object_type;
-
    price high()const { return asset( high_base, key.base ) / asset( high_quote, key.quote ); }
    price low()const { return asset( low_base, key.base ) / asset( low_quote, key.quote ); }
 
@@ -114,11 +111,9 @@ struct history_key {
     return std::tie( a.base, a.quote, a.sequence ) == std::tie( b.base, b.quote, b.sequence );
   }
 };
-struct order_history_object : public abstract_object<order_history_object>
+struct order_history_object : public abstract_object<order_history_object,
+                                        MARKET_HISTORY_SPACE_ID, order_history_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = order_history_object_type;
-
    history_key          key;
    fc::time_point_sec   time;
    fill_order_operation op;
@@ -139,11 +134,9 @@ struct order_history_object_key_sequence_extractor
    result_type operator()(const order_history_object& o)const { return o.key.sequence; }
 };
 
-struct market_ticker_object : public abstract_object<market_ticker_object>
+struct market_ticker_object : public abstract_object<market_ticker_object,
+                                        MARKET_HISTORY_SPACE_ID, market_ticker_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = market_ticker_object_type;
-
    asset_id_type       base;
    asset_id_type       quote;
    share_type          last_day_base;
@@ -154,11 +147,9 @@ struct market_ticker_object : public abstract_object<market_ticker_object>
    fc::uint128_t       quote_volume;
 };
 
-struct market_ticker_meta_object : public abstract_object<market_ticker_meta_object>
+struct market_ticker_meta_object : public abstract_object<market_ticker_meta_object,
+                                             MARKET_HISTORY_SPACE_ID, market_ticker_meta_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = market_ticker_meta_object_type;
-
    object_id_type      rolling_min_order_his_id;
    bool                skip_min_order_his_id = false;
 };
@@ -222,11 +213,9 @@ typedef generic_index<market_ticker_object, market_ticker_object_multi_index_typ
 
 
 /** Stores operation histories related to liquidity pools */
-struct liquidity_pool_history_object : public abstract_object<liquidity_pool_history_object>
+struct liquidity_pool_history_object : public abstract_object<liquidity_pool_history_object,
+                                                 MARKET_HISTORY_SPACE_ID, liquidity_pool_history_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = liquidity_pool_history_object_type;
-
    liquidity_pool_id_type   pool;
    uint64_t                 sequence = 0;
    fc::time_point_sec       time;
@@ -299,11 +288,9 @@ typedef generic_index< liquidity_pool_history_object,
 
 
 /// Stores meta data for liquidity pool tickers
-struct liquidity_pool_ticker_meta_object : public abstract_object<liquidity_pool_ticker_meta_object>
+struct liquidity_pool_ticker_meta_object : public abstract_object<liquidity_pool_ticker_meta_object,
+                                                     MARKET_HISTORY_SPACE_ID, liquidity_pool_ticker_meta_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = liquidity_pool_ticker_meta_object_type;
-
    object_id_type      rolling_min_lp_his_id;
    bool                skip_min_lp_his_id = false;
 };
@@ -311,11 +298,9 @@ struct liquidity_pool_ticker_meta_object : public abstract_object<liquidity_pool
 using liquidity_pool_ticker_id_type = object_id<MARKET_HISTORY_SPACE_ID, liquidity_pool_ticker_object_type>;
 
 /// Stores ticker data for liquidity pools
-struct liquidity_pool_ticker_object : public abstract_object<liquidity_pool_ticker_object>
+struct liquidity_pool_ticker_object : public abstract_object<liquidity_pool_ticker_object,
+                                                MARKET_HISTORY_SPACE_ID, liquidity_pool_ticker_object_type>
 {
-   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
-   static constexpr uint8_t type_id  = liquidity_pool_ticker_object_type;
-
    uint32_t            _24h_deposit_count = 0;
    fc::uint128_t       _24h_deposit_amount_a = 0;
    fc::uint128_t       _24h_deposit_amount_b = 0;
@@ -401,6 +386,9 @@ class market_history_plugin : public graphene::app::plugin
 };
 
 } } //graphene::market_history
+
+// Other objects aren't mapped here because they are not used
+MAP_OBJECT_ID_TO_TYPE( graphene::market_history::liquidity_pool_ticker_object )
 
 FC_REFLECT( graphene::market_history::history_key, (base)(quote)(sequence) )
 FC_REFLECT_DERIVED( graphene::market_history::order_history_object, (graphene::db::object), (key)(time)(op) )

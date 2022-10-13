@@ -306,7 +306,8 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       BOOST_TEST_MESSAGE( "Creating transfer tx" );
       graphene::chain::precomputable_transaction trx;
       {
-         account_id_type nathan_id = db2->get_index_type<account_index>().indices().get<by_name>().find( "nathan" )->id;
+         account_id_type nathan_id = db2->get_index_type<account_index>().indices().get<by_name>().find( "nathan" )
+                                        ->get_id();
          fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
          balance_claim_operation claim_op;

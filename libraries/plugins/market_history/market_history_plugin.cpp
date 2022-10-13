@@ -407,7 +407,7 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
          else
          {
             liquidity_pool_ticker_id_type ticker_id( history_itr->pool.instance );
-            const liquidity_pool_ticker_object* ticker = db.find<liquidity_pool_ticker_object>( ticker_id );
+            const liquidity_pool_ticker_object* ticker = db.find( ticker_id );
             if( ticker != nullptr ) // should always be true
             {
                const operation_history_object& oho = history_itr->op;
@@ -632,7 +632,7 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
       else
       {
          liquidity_pool_ticker_id_type ticker_id( pool->instance );
-         const liquidity_pool_ticker_object* ticker = db.find<liquidity_pool_ticker_object>( ticker_id );
+         const liquidity_pool_ticker_object* ticker = db.find( ticker_id );
          if( ticker != nullptr )
          {
             if( oho.op.is_type< liquidity_pool_deposit_operation >() )

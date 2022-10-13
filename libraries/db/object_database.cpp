@@ -42,11 +42,11 @@ void object_database::close()
 {
 }
 
-const object* object_database::find_object( object_id_type id )const
+const object* object_database::find_object( const object_id_type& id )const
 {
    return get_index(id.space(),id.type()).find( id );
 }
-const object& object_database::get_object( object_id_type id )const
+const object& object_database::get_object( const object_id_type& id )const
 {
    return get_index(id.space(),id.type()).get( id );
 }

@@ -38,12 +38,10 @@ namespace graphene { namespace chain {
  * @ingroup object
  * @ingroup protocol
  */
-class blinded_balance_object : public graphene::db::abstract_object<blinded_balance_object>
+class blinded_balance_object : public graphene::db::abstract_object<blinded_balance_object,
+                                         implementation_ids, impl_blinded_balance_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id  = impl_blinded_balance_object_type;
-
       fc::ecc::commitment_type                commitment;
       asset_id_type                           asset_id;
       authority                               owner;

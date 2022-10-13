@@ -38,11 +38,9 @@ enum class custom_operations_object_types {
    account_map = 0
 };
 
-struct account_storage_object : public abstract_object<account_storage_object>
+struct account_storage_object : public abstract_object<account_storage_object, CUSTOM_OPERATIONS_SPACE_ID,
+                                          static_cast<uint8_t>( custom_operations_object_types::account_map )>
 {
-   static constexpr uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static constexpr uint8_t type_id  = static_cast<uint8_t>( custom_operations_object_types::account_map );
-
    account_id_type account;
    string catalog;
    string key;

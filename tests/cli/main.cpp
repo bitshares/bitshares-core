@@ -665,7 +665,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
 
       {
          // Play with asset fee pool
-         auto objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+         auto objs = con.wallet_api_ptr->get_object( object_id_type( bobcoin.dynamic_asset_data_id ) )
                         .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
          idump( (objs) );
          BOOST_REQUIRE_EQUAL( objs.size(), 1u );
@@ -675,7 +675,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
 
          BOOST_TEST_MESSAGE("Fund fee pool");
          con.wallet_api_ptr->fund_asset_fee_pool("nathan", "BOBCOIN", "2", true);
-         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+         objs = con.wallet_api_ptr->get_object( object_id_type( bobcoin.dynamic_asset_data_id ) )
                    .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
          BOOST_REQUIRE_EQUAL( objs.size(), 1u );
          bobcoin_dyn = objs[0];
@@ -687,7 +687,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
 
          BOOST_TEST_MESSAGE("Claim fee pool");
          con.wallet_api_ptr->claim_asset_fee_pool("BOBCOIN", "1", true);
-         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+         objs = con.wallet_api_ptr->get_object( object_id_type( bobcoin.dynamic_asset_data_id ) )
                    .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
          BOOST_REQUIRE_EQUAL( objs.size(), 1u );
          bobcoin_dyn = objs[0];
@@ -708,7 +708,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          asset_update_feed_producers_operation aufp_op;
          aufp_op.issuer = nathan_acct.id;
          aufp_op.asset_to_update = bobcoin.id;
-         aufp_op.new_feed_producers = { nathan_acct.id };
+         aufp_op.new_feed_producers = { nathan_acct.get_id() };
          con.wallet_api_ptr->add_operation_to_builder_transaction( handle, aufp_op );
          con.wallet_api_ptr->set_fees_on_builder_transaction( handle, "1.3.0" );
          con.wallet_api_ptr->sign_builder_transaction( handle, true );
@@ -725,8 +725,8 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          // Publish price feed
          BOOST_TEST_MESSAGE("Publish price feed");
          price_feed feed;
-         feed.settlement_price = price( asset(1,bobcoin.id), asset(2) );
-         feed.core_exchange_rate = price( asset(1,bobcoin.id), asset(1) );
+         feed.settlement_price = price( asset(1,bobcoin.get_id()), asset(2) );
+         feed.core_exchange_rate = price( asset(1,bobcoin.get_id()), asset(1) );
          con.wallet_api_ptr->publish_asset_feed( "nathan", "BOBCOIN", feed, true );
          asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
          BOOST_CHECK( bob_bitasset.current_feed.settlement_price == feed.settlement_price );
@@ -815,7 +815,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
          BOOST_REQUIRE_EQUAL( orders.size(), 1u );
          BOOST_CHECK_EQUAL( orders.front().for_sale.value, 100 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         limit_order_id_type nathan_order_id = orders.front().id;
+         limit_order_id_type nathan_order_id = orders.front().get_id();
 
          BOOST_CHECK(generate_block(app1));
          check_nathan_bobcoin_balance( 3000 );
@@ -944,7 +944,7 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
 
       const auto &test_acc = con.wallet_api_ptr->get_account("test");
       flat_set<public_key_type> expected_signers = {test_bki.pub_key};
-      vector<flat_set<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
+      vector<flat_set<account_id_type> > expected_key_refs{{test_acc.get_id(), test_acc.get_id()}};
 
       auto signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
       BOOST_CHECK(signers == expected_signers);
@@ -1116,7 +1116,7 @@ BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
       vector<flat_set<account_id_type> > expected_key_refs;
       expected_key_refs.push_back(flat_set<account_id_type>());
       expected_key_refs.push_back(flat_set<account_id_type>());
-      expected_key_refs.push_back({test_acc.id});
+      expected_key_refs.push_back({test_acc.get_id()});
 
       auto key_refs = con.wallet_api_ptr->get_key_references({expected_signers.begin(), expected_signers.end()});
       std::sort(key_refs.begin(), key_refs.end());
@@ -1650,6 +1650,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string alice_htlc_id_as_string;
+      htlc_id_type alice_htlc_id;
       {
          BOOST_TEST_MESSAGE("The system is generating a block");
          graphene::chain::signed_block result_block;
@@ -1657,14 +1658,15 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
          // get the ID:
          auto tmp_hist = con.wallet_api_ptr->get_account_history("alice", 1);
-         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
+         htlc_id_type htlc_id { tmp_hist[0].op.result.get<object_id_type>() };
+         alice_htlc_id = htlc_id;
          alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
 
       // Bob can now look over Alice's HTLC, to see if it is what was agreed to.
       BOOST_TEST_MESSAGE("Bob retrieves the HTLC Object by ID to examine it.");
-      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id_as_string);
+      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
@@ -1673,6 +1675,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;
+      htlc_id_type bob_htlc_id;
       {
          BOOST_TEST_MESSAGE("The system is generating a block");
          graphene::chain::signed_block result_block;
@@ -1680,21 +1683,22 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
          // get the ID:
          auto tmp_hist = con.wallet_api_ptr->get_account_history("bob", 1);
-         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
+         htlc_id_type htlc_id { tmp_hist[0].op.result.get<object_id_type>() };
+         bob_htlc_id = htlc_id;
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
       BOOST_TEST_MESSAGE("Alice retrieves the HTLC Object by ID to examine it.");
-      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id_as_string);
+      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(bob_htlc));
 
       // Alice likes what she sees, so uses her preimage to get her BOBCOIN
       {
          BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
-         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret, true);
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id, "alice", secret, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -1704,7 +1708,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
-         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret, true);
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id, "bob", secret, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -2197,6 +2201,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string alice_htlc_id_as_string;
+      htlc_id_type alice_htlc_id;
       {
          BOOST_TEST_MESSAGE("The system is generating a block");
          graphene::chain::signed_block result_block;
@@ -2204,14 +2209,15 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
          // get the ID:
          auto tmp_hist = con.wallet_api_ptr->get_account_history("alice", 1);
-         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
+         htlc_id_type htlc_id { tmp_hist[0].op.result.get<object_id_type>() };
+         alice_htlc_id = htlc_id;
          alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
 
       // Bob can now look over Alice's HTLC, to see if it is what was agreed to.
       BOOST_TEST_MESSAGE("Bob retrieves the HTLC Object by ID to examine it.");
-      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id_as_string);
+      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
@@ -2221,6 +2227,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;
+      htlc_id_type bob_htlc_id;
       {
          BOOST_TEST_MESSAGE("The system is generating a block");
          graphene::chain::signed_block result_block;
@@ -2228,20 +2235,21 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
          // get the ID:
          auto tmp_hist = con.wallet_api_ptr->get_account_history("bob", 1);
-         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
+         htlc_id_type htlc_id { tmp_hist[0].op.result.get<object_id_type>() };
+         bob_htlc_id = htlc_id;
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
       BOOST_TEST_MESSAGE("Alice retrieves the HTLC Object by ID to examine it.");
-      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id_as_string);
+      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(bob_htlc));
 
       // Alice likes what she sees, so uses her preimage to get her BOBCOIN
       {
          BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
-         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", preimage_string, true);
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id, "alice", preimage_string, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -2263,7 +2271,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       // Bob can use the preimage to retrieve his BTS
       {
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
-         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", preimage_string, true);
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id, "bob", preimage_string, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }

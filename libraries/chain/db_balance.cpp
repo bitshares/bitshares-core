@@ -207,9 +207,11 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
    if( amount == 0 )
       return;
 
-   if( acct.get_id() == GRAPHENE_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_WITNESS_ACCOUNT ||
-       acct.get_id() == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_NULL_ACCOUNT ||
-       acct.get_id() == GRAPHENE_TEMP_ACCOUNT )
+   account_id_type acct_id = acct.get_id();
+
+   if( acct_id == GRAPHENE_COMMITTEE_ACCOUNT || acct_id == GRAPHENE_WITNESS_ACCOUNT ||
+       acct_id == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT || acct_id == GRAPHENE_NULL_ACCOUNT ||
+       acct_id == GRAPHENE_TEMP_ACCOUNT )
    {
       // The blockchain's accounts do not get cashback; it simply goes to the reserve pool.
       modify( get_core_dynamic_data(), [amount](asset_dynamic_data_object& d) {
@@ -223,7 +225,7 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
       amount,
       get_global_properties().parameters.cashback_vesting_period_seconds,
       vesting_balance_type::cashback,
-      acct.id,
+      acct_id,
       require_vesting );
 
    if( new_vbid.valid() )

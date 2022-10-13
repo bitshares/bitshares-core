@@ -36,12 +36,9 @@ namespace graphene { namespace chain {
  *  @ingroup protocol
  *
  */
-class credit_offer_object : public abstract_object<credit_offer_object>
+class credit_offer_object : public abstract_object<credit_offer_object, protocol_ids, credit_offer_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id  = credit_offer_object_type;
-
       account_id_type owner_account;            ///< Owner of the fund
       asset_id_type   asset_type;               ///< Asset type in the fund
       share_type      total_balance;            ///< Total size of the fund
@@ -104,12 +101,9 @@ using credit_offer_index = generic_index<credit_offer_object, credit_offer_multi
  *  @ingroup protocol
  *
  */
-class credit_deal_object : public abstract_object<credit_deal_object>
+class credit_deal_object : public abstract_object<credit_deal_object, protocol_ids, credit_deal_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id  = credit_deal_object_type;
-
       account_id_type      borrower;           ///< Borrower
       credit_offer_id_type offer_id;           ///< ID of the credit offer
       account_id_type      offer_owner;        ///< Owner of the credit offer, redundant info for ease of querying
@@ -186,12 +180,10 @@ using credit_deal_index = generic_index<credit_deal_object, credit_deal_multi_in
  *  @ingroup implementation
  *
  */
-class credit_deal_summary_object : public abstract_object<credit_deal_summary_object>
+class credit_deal_summary_object : public abstract_object<credit_deal_summary_object,
+                                             implementation_ids, impl_credit_deal_summary_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id  = impl_credit_deal_summary_object_type;
-
       account_id_type      borrower;           ///< Borrower
       credit_offer_id_type offer_id;           ///< ID of the credit offer
       account_id_type      offer_owner;        ///< Owner of the credit offer, redundant info for ease of querying

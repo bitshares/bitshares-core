@@ -30,7 +30,6 @@
 #define MAX_NESTING (200)
 
 namespace graphene { namespace db {
-
    /**
     *  @brief base for all database objects
     *
@@ -62,51 +61,66 @@ namespace graphene { namespace db {
    class object
    {
       public:
-         object(){}
-         virtual ~object(){}
+         object() = default;
+         object( uint8_t space_id, uint8_t type_id ) : id( space_id, type_id, 0 ) {}
+         virtual ~object() = default;
 
          // serialized
          object_id_type          id;
 
-         /// these methods are implemented for derived classes by inheriting abstract_object<DerivedClass>
-         virtual unique_ptr<object> clone()const = 0;
-         virtual void               move_from( object& obj ) = 0;
-         virtual variant            to_variant()const  = 0;
-         virtual vector<char>       pack()const = 0;
+         /// these methods are implemented for derived classes by inheriting base_abstract_object<DerivedClass>
+         /// @{
+         virtual std::unique_ptr<object> clone()const = 0;
+         virtual void                    move_from( object& obj ) = 0;
+         virtual fc::variant             to_variant()const  = 0;
+         virtual std::vector<char>       pack()const = 0;
+         /// @}
    };
 
    /**
-    * @class abstract_object
+    * @class base_abstract_object
     * @brief   Use the Curiously Recurring Template Pattern to automatically add the ability to
     *  clone, serialize, and move objects polymorphically.
     *
     *  http://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
     */
    template<typename DerivedClass>
-   class abstract_object : public object
+   class base_abstract_object : public object
    {
       public:
-         virtual unique_ptr<object> clone()const
+         using object::object; // constructors
+         virtual std::unique_ptr<object> clone()const
          {
-            return unique_ptr<object>( std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) ) );
+            return std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) );
          }
 
          virtual void    move_from( object& obj )
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
-         virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
-         virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
+         virtual fc::variant to_variant()const
+         { return fc::variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
+         virtual std::vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
    };
 
-   typedef flat_map<uint8_t, object_id_type> annotation_map;
+   template<typename DerivedClass, uint8_t SpaceID, uint8_t TypeID>
+   class abstract_object : public base_abstract_object<DerivedClass>
+   {
+   public:
+      static constexpr uint8_t space_id = SpaceID;
+      static constexpr uint8_t type_id = TypeID;
+      abstract_object() : base_abstract_object<DerivedClass>( space_id, type_id ) {}
+      object_id<SpaceID,TypeID> get_id() const { return object_id<SpaceID,TypeID>( this->id ); }
+   };
+
+   using annotation_map = fc::flat_map<uint8_t, object_id_type>;
 
    /**
     *  @class annotated_object
     *  @brief An object that is easily extended by providing pointers to other objects, one for each space.
     */
    template<typename DerivedClass>
-   class annotated_object : public abstract_object<DerivedClass>
+   class annotated_object : public base_abstract_object<DerivedClass>
    {
       public:
          /** return object_id_type() if no anotation is found for id_space */
@@ -139,4 +153,5 @@ struct is_restricted_conversion<graphene::db::object,To> : public mpl::true_ {};
 
 FC_REFLECT_TYPENAME( graphene::db::annotation_map )
 FC_REFLECT( graphene::db::object, (id) )
-FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object), (annotations) )
+FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object),
+                             (annotations) )

@@ -729,7 +729,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    PUSH_TX(db, trx);
 
    custom_authority_id_type auth_id =
-           db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
+           db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->get_id();
 
    //////
    // Bob attempts to transfer 99 CORE from Alice's account
@@ -915,7 +915,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          PUSH_TX(db, trx);
 
          custom_authority_id_type ca_bob_transfers_from_alice_to_charlie =
-                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
+                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)
+                    ->get_id();
 
          //////
          // Bob attempts to transfer 100 CORE from Alice's account to Charlie
@@ -996,8 +997,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          auto iter = ca_alice_range.first;
          custom_authority_id_type *ca_charlie_transfers_from_alice_to_diana = nullptr;
          while (iter != ca_index.end()) {
-            custom_authority_id_type ca_id = iter->id;
-            const custom_authority_object *ca = db.find<custom_authority_object>(ca_id);
+            custom_authority_id_type ca_id = iter->get_id();
+            const custom_authority_object *ca = db.find(ca_id);
             flat_map<account_id_type, weight_type> ca_authorities = ca->auth.account_auths;
             BOOST_CHECK_EQUAL(1, ca_authorities.size());
             if (ca_authorities.find(charlie.get_id()) != ca_authorities.end()) {
@@ -1124,7 +1125,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          generate_blocks(1);
          const auto& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
          const auto &core = asset_id_type()(db);
-         update_feed_producers(bitusd, {feedproducer.id});
+         update_feed_producers(bitusd, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
@@ -1180,7 +1181,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          auto caa =
                  db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice.get_id());
-         custom_authority_id_type auth_id = caa->id;
+         custom_authority_id_type auth_id = caa->get_id();
 
          custom_authority_create_operation authorize_limit_order_cancellations;
          authorize_limit_order_cancellations.account = alice.get_id();
@@ -1364,11 +1365,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          // assetissuer issues A1, B1, and C1 to alice
          asset_issue_operation issue_a1_to_alice_op
-                 = issue_amount_to(assetissuer.get_id(), asset(1000, acoin1.id), alice.get_id());
+                 = issue_amount_to(assetissuer.get_id(), asset(1000, acoin1.get_id()), alice.get_id());
          asset_issue_operation issue_b1_to_alice_op
-                 = issue_amount_to(assetissuer.get_id(), asset(2000, bcoin1.id), alice.get_id());
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, bcoin1.get_id()), alice.get_id());
          asset_issue_operation issue_c1_to_alice_op
-                 = issue_amount_to(assetissuer.get_id(), asset(2000, ccoin1.id), alice.get_id());
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, ccoin1.get_id()), alice.get_id());
          trx.clear();
          trx.operations = {issue_a1_to_alice_op, issue_b1_to_alice_op, issue_c1_to_alice_op};
          sign(trx, assetissuer_private_key);
@@ -1414,9 +1415,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          // Define the two set of assets: ACOINs and BCOINs
          restriction is_acoin_rx = restriction(asset_id_index, FUNC(in),
-                                               flat_set<asset_id_type>{acoin1.id});
+                                               flat_set<asset_id_type>{acoin1.get_id()});
          restriction is_bcoin_rx = restriction(asset_id_index, FUNC(in),
-                                               flat_set<asset_id_type>{bcoin1.id, bcoin2.id, bcoin3.id});
+                                               flat_set<asset_id_type>{bcoin1.get_id(), bcoin2.get_id(), bcoin3.get_id()});
 
          // Custom Authority 1: Sell ACOINs to buy BCOINs
          restriction sell_acoin_rx = restriction(amount_to_sell_index, FUNC(attr), vector<restriction>{is_acoin_rx});
@@ -1773,7 +1774,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          generate_blocks(1);
          const auto& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
          const auto &core = asset_id_type()(db);
-         update_feed_producers(bitusd, {feedproducer.id});
+         update_feed_producers(bitusd, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
@@ -1827,7 +1828,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          PUSH_TX(db, trx);
 
          custom_authority_id_type auth_id =
-                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(feedproducer.id)->id;
+                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(feedproducer.get_id())
+                    ->get_id();
 
          //////
          // Bob attempts to publish feed of USDBIT on behalf of feedproducer
@@ -1945,7 +1947,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          ACTORS((feedproducer));
          const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
          const auto &core = asset_id_type()(db);
-         update_feed_producers(bitusd, {feedproducer.id});
+         update_feed_producers(bitusd, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
@@ -2201,7 +2203,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          generate_blocks(1);
          const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
          const asset_object &specialcoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
-         const asset_id_type alicecoin_id = alicecoin.id;
+         const asset_id_type alicecoin_id = alicecoin.get_id();
 
 
          //////
@@ -2304,7 +2306,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the special coin to an allowed account
          // This should fail because Bob is not authorized to issue SPECIALCOIN to any account
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, specialcoin.id), allowed3.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, specialcoin.get_id()), allowed3.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2385,7 +2387,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          generate_blocks(1);
          const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
          const asset_object &specialcoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
-         const asset_id_type alicecoin_id = alicecoin.id;
+         const asset_id_type alicecoin_id = alicecoin.get_id();
 
 
          //////
@@ -2494,7 +2496,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the special coin to an allowed account
          // This should fail because Bob is not authorized to issue SPECIALCOIN to any account
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, specialcoin.id), allowed3.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, specialcoin.get_id()), allowed3.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2511,7 +2513,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the UIA to a banned account with the Bob's key
          // This should fail because Bob is not authorized to issue ALICECOIN to banned account (banned1)
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), banned1.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), banned1.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2527,7 +2529,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the UIA to a banned account with the Bob's key
          // This should fail because Bob is not authorized to issue ALICECOIN to banned account (banned2)
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), banned2.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), banned2.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2543,7 +2545,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the UIA to a banned account with the Bob's key
          // This should fail because Bob is not authorized to issue ALICECOIN to banned account (banned3)
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), banned3.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), banned3.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2559,7 +2561,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to issue the UIA to an allowed account
          // This should succeed because Bob is authorized to issue ALICECOIN to any account
          //////
-         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), allowed3.get_id());
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), allowed3.get_id());
          trx.clear();
          trx.operations = {issue_op};
          sign(trx, bob_private_key);
@@ -2633,26 +2635,26 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Alice issues her two coins to different accounts
          //////
          asset_issue_operation issue_alice_to_allowed1_op
-                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), allowed1.get_id());
+                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), allowed1.get_id());
          asset_issue_operation issue_alice_to_allowed2_op
-                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.id), allowed2.get_id());
+                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.get_id()), allowed2.get_id());
          asset_issue_operation issue_alice_to_allowed3_op
-                 = issue_amount_to(alice.get_id(), asset(300, alicecoin.id), allowed3.get_id());
+                 = issue_amount_to(alice.get_id(), asset(300, alicecoin.get_id()), allowed3.get_id());
          asset_issue_operation issue_alice_to_suspicious1_op
-                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), suspicious1.get_id());
+                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.get_id()), suspicious1.get_id());
          asset_issue_operation issue_alice_to_suspicious2_op
-                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.id), suspicious2.get_id());
+                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.get_id()), suspicious2.get_id());
 
          asset_issue_operation issue_special_to_allowed1_op
-                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.id), allowed1.get_id());
+                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.get_id()), allowed1.get_id());
          asset_issue_operation issue_special_to_allowed2_op
-                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.id), allowed2.get_id());
+                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.get_id()), allowed2.get_id());
          asset_issue_operation issue_special_to_allowed3_op
-                 = issue_amount_to(alice.get_id(), asset(3000, specialcoin.id), allowed3.get_id());
+                 = issue_amount_to(alice.get_id(), asset(3000, specialcoin.get_id()), allowed3.get_id());
          asset_issue_operation issue_special_to_suspicious1_op
-                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.id), suspicious1.get_id());
+                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.get_id()), suspicious1.get_id());
          asset_issue_operation issue_special_to_suspicious2_op
-                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.id), suspicious2.get_id());
+                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.get_id()), suspicious2.get_id());
          trx.clear();
          trx.operations = {issue_alice_to_allowed1_op, issue_alice_to_allowed2_op, issue_alice_to_allowed3_op,
                  issue_alice_to_suspicious1_op, issue_alice_to_suspicious2_op,
@@ -2667,7 +2669,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should succeed because Alice is the issuer
          //////
          override_transfer_operation override_op
-                 = create_override(alice.get_id(), allowed1.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+                 = create_override(alice.get_id(), allowed1.get_id(), asset(20, alicecoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, alice_private_key);
@@ -2676,7 +2678,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          BOOST_CHECK_EQUAL(allowed1_balance_alicecoin_after_override1, 80);
 
          override_op
-                 = create_override(alice.get_id(), suspicious1.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+                 = create_override(alice.get_id(), suspicious1.get_id(), asset(20, alicecoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, alice_private_key);
@@ -2686,21 +2688,21 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          BOOST_CHECK_EQUAL(suspicious1_balance_alicecoin_after_override1, 80);
 
          override_op
-                 = create_override(alice.get_id(), allowed1.get_id(), asset(200, specialcoin.id), arbitrator.get_id());
+                 = create_override(alice.get_id(), allowed1.get_id(), asset(200, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, alice_private_key);
          PUSH_TX(db, trx);
-         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(allowed1.get_id(), specialcoin.id);
+         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(allowed1.get_id(), specialcoin.get_id());
          BOOST_CHECK_EQUAL(allowed1_balance_specialcoin_after_override1, 800);
 
          override_op
-                 = create_override(alice.get_id(), suspicious1.get_id(), asset(200, specialcoin.id), arbitrator.get_id());
+                 = create_override(alice.get_id(), suspicious1.get_id(), asset(200, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, alice_private_key);
          PUSH_TX(db, trx);
-         int64_t suspicious1_balance_specialcoin_after_override1 = get_balance(suspicious1.get_id(), specialcoin.id);
+         int64_t suspicious1_balance_specialcoin_after_override1 = get_balance(suspicious1.get_id(), specialcoin.get_id());
          BOOST_CHECK_EQUAL(suspicious1_balance_specialcoin_after_override1, 800);
 
 
@@ -2708,7 +2710,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to override some ALICECOIN and SPECIAL from some accounts
          // This should fail because Bob is not authorized to override any ALICECOIN nor SPECIALCOIN
          //////
-         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, alicecoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, alicecoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2717,7 +2719,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // "rejected_custom_auths":[]
          EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
-         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, specialcoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2798,7 +2800,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to override transfer some ALICECOIN from a suspicious account
          // This should succeed because Bob is now authorized to override ALICECOIN from some accounts
          //////
-         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(25, alicecoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(25, alicecoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2812,7 +2814,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to override transfer some SPECIALCOIN from a suspicious account
          // This should fail because Bob is not authorized to override SPECIALCOIN from any accounts
          //////
-         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(250, specialcoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(250, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2829,7 +2831,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to override transfer some SPECIALCOIN from an allowed account
          // This should fail because Bob is not authorized to override SPECIALCOIN from any accounts
          //////
-         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(250, specialcoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(250, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2846,7 +2848,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Bob attempts to override transfer some ALICECOIN from an allowed account
          // This should fail because Bob is only authorized to override ALICECOIN from suspicious accounts
          //////
-         override_op = create_override(alice.get_id(), allowed2.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), allowed2.get_id(), asset(20, alicecoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, bob_private_key);
@@ -2868,7 +2870,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Alice attempts to override transfer of SPECIAL COIN from an allowed account
          // This should succeed because Alice has not revoked her own authorities as issuer
          //////
-         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(500, specialcoin.id), arbitrator.get_id());
+         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(500, specialcoin.get_id()), arbitrator.get_id());
          trx.clear();
          trx.operations = {override_op};
          sign(trx, alice_private_key);
@@ -2911,12 +2913,12 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          // Define core asset
          const auto &core = asset_id_type()(db);
-         asset_id_type core_id = core.id;
+         asset_id_type core_id = core.get_id();
 
          // Create a smart asset
          const asset_object &bitusd = create_bitasset("USDBIT", feedproducer_id);
-         asset_id_type usd_id = bitusd.id;
-         update_feed_producers(bitusd, {feedproducer.id});
+         asset_id_type usd_id = bitusd.get_id();
+         update_feed_producers(bitusd, {feedproducer.get_id()});
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
          current_feed.maximum_short_squeeze_ratio = 1100;
@@ -3650,7 +3652,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          flat_set<account_id_type> new_producers = {trusted1.get_id(), trusted2.get_id()};
          asset_update_feed_producers_operation producers_op
-                 = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+                 = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, alice_private_key);
@@ -3668,7 +3670,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail because Bob is not authorized to update feed producers for ALICECOIN
          //////
          new_producers = {trusted3.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3739,7 +3741,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // when an untrusted account is included
          //////
          new_producers = {trusted4.get_id(), untrusted1.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3757,7 +3759,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // when an untrusted account is included
          //////
          new_producers = {trusted4.get_id(), untrusted1.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3775,7 +3777,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // when an untrusted account is included
          //////
          new_producers = {untrusted2.get_id(), untrusted3.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3847,7 +3849,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          flat_set<account_id_type> new_producers = {trusted1.get_id(), trusted2.get_id(), trusted3.get_id()};
          asset_update_feed_producers_operation producers_op
-                 = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+                 = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, alice_private_key);
@@ -3866,7 +3868,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail because Bob is not authorized to update feed producers for ALICECOIN
          //////
          new_producers = {trusted1.get_id(), trusted2.get_id(), trusted3.get_id(), unknown1.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3936,7 +3938,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail not all of the required feed producers are included
          //////
          new_producers = {unknown2.get_id(), unknown3.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3954,7 +3956,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail not all of the required feed producers are included
          //////
          new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3972,7 +3974,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail not all of the required feed producers are included
          //////
          new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id(), trusted2.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -3991,7 +3993,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // and because the all of the required feed producers are included
          //////
          new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id(), trusted2.get_id(), trusted3.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -4004,7 +4006,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // and because the all of the required feed producers are included
          //////
          new_producers = {trusted3.get_id(), trusted2.get_id(), trusted1.get_id()};
-         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         producers_op = create_producers_op(alice.get_id(), alicecoin.get_id(), new_producers);
          trx.clear();
          trx.operations = {producers_op};
          sign(trx, bob_private_key);
@@ -4337,7 +4339,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          generate_blocks(1);
          graphene::chain::htlc_id_type alice_htlc_id =
-                 db.get_index_type<htlc_index>().indices().get<by_from_id>().find(alice.get_id())->id;
+                 db.get_index_type<htlc_index>().indices().get<by_from_id>().find(alice.get_id())->get_id();
 
 
          //////
@@ -4399,7 +4401,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          generate_blocks(1);
          auto caa = db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(gateway.get_id());
-         custom_authority_id_type caa_id = caa->id;
+         custom_authority_id_type caa_id = caa->get_id();
 
 
          //////
@@ -4535,7 +4537,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          generate_blocks(1);
          graphene::chain::htlc_id_type alice_htlc_id =
-                 db.get_index_type<htlc_index>().indices().get<by_from_id>().find(alice.get_id())->id;
+                 db.get_index_type<htlc_index>().indices().get<by_from_id>().find(alice.get_id())->get_id();
 
 
          //////
@@ -4922,8 +4924,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          generate_blocks(1);
          set_expiration(db, trx);
-         vesting_balance_id_type vesting_balance_id =
-                 db.get_index_type<vesting_balance_index>().indices().get<by_account>().find(alice.get_id())->id;
+         vesting_balance_id_type vesting_balance_id {
+                 db.get_index_type<vesting_balance_index>().indices().get<by_account>().find(alice.get_id())->id };
 
 
          //////
@@ -5061,17 +5063,17 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          // Define core asset
          const auto &core = asset_id_type()(db);
-         asset_id_type core_id = core.id;
+         asset_id_type core_id = core.get_id();
 
          // Create a smart asset
          create_bitasset("USDBIT", feedproducer_id);
          generate_blocks(1);
          const asset_object &bitusd
                  = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
-         asset_id_type usd_id = bitusd.id;
+         asset_id_type usd_id = bitusd.get_id();
 
          // Configure the smart asset
-         update_feed_producers(bitusd, {feedproducer.id});
+         update_feed_producers(bitusd, {feedproducer.get_id()});
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
          current_feed.maximum_short_squeeze_ratio = 1100;
@@ -5308,9 +5310,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: assetissuer issues SPECIALCOIN to different accounts
          //////
          asset_issue_operation issue_special_to_alice_op
-                 = issue_amount_to(assetissuer.get_id(), asset(1000, specialcoin.id), alice.get_id());
+                 = issue_amount_to(assetissuer.get_id(), asset(1000, specialcoin.get_id()), alice.get_id());
          asset_issue_operation issue_special_to_charlie_op
-                 = issue_amount_to(assetissuer.get_id(), asset(2000, specialcoin.id), charlie.get_id());
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, specialcoin.get_id()), charlie.get_id());
          trx.clear();
          trx.operations = {issue_special_to_alice_op, issue_special_to_charlie_op};
          sign(trx, assetissuer_private_key);
@@ -5320,24 +5322,24 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          // Alice reserves some SPECIALCOIN from her account
          //////
-         asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+         asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.get_id()));
          trx.clear();
          trx.operations = {reserve_op};
          sign(trx, alice_private_key);
          PUSH_TX(db, trx);
-         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(alice.get_id(), specialcoin.id);
+         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(alice.get_id(), specialcoin.get_id());
          BOOST_CHECK_EQUAL(allowed1_balance_specialcoin_after_override1, 800);
 
 
          //////
          // Charlie reserves some SPECIALCOIN from his account
          //////
-         reserve_op = reserve_asset(charlie.get_id(), asset(200, specialcoin.id));
+         reserve_op = reserve_asset(charlie.get_id(), asset(200, specialcoin.get_id()));
          trx.clear();
          trx.operations = {reserve_op};
          sign(trx, charlie_private_key);
          PUSH_TX(db, trx);
-         int64_t charlie_balance_specialcoin_after_override1 = get_balance(charlie.get_id(), specialcoin.id);
+         int64_t charlie_balance_specialcoin_after_override1 = get_balance(charlie.get_id(), specialcoin.get_id());
          BOOST_CHECK_EQUAL(charlie_balance_specialcoin_after_override1, 1800);
 
 
@@ -5425,7 +5427,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          generate_blocks(1);
          const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
-         proposal_id_type proposal_id = prop.id;
+         proposal_id_type proposal_id = prop.get_id();
 
          // Alice approves the proposal
          proposal_update_operation approve_proposal;
@@ -5450,7 +5452,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This attempt should fail because Bob the Alice authorization is not yet active
          //////
          {
-            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.get_id()));
             trx.clear();
             trx.operations = {reserve_op};
             sign(trx, bob_private_key);
@@ -5473,7 +5475,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should succeed because the authorization is active
          //////
          {
-            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.get_id()));
             trx.clear();
             trx.operations = {reserve_op};
             sign(trx, bob_private_key);
@@ -5493,7 +5495,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should succeed because the authorization is active
          //////
          {
-            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.get_id()));
             trx.clear();
             trx.operations = {reserve_op};
             sign(trx, bob_private_key);
@@ -5513,7 +5515,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // This should fail because Bob the authorization has expired
          //////
          {
-            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.get_id()));
             trx.clear();
             trx.operations = {reserve_op};
             sign(trx, bob_private_key);
@@ -5789,7 +5791,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          auto itr_witnesses = witnesses.begin();
          witness_id_type witness0_id = itr_witnesses[0];
          const auto& idx = db.get_index_type<witness_index>().indices().get<by_id>();
-         witness_object witness0_obj = *idx.find(witness0_id);
+         witness_object witness0_obj = *idx.find(object_id_type(witness0_id));
 
 
          //////
@@ -6132,13 +6134,13 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Create a new witness account (witness0)
          ACTORS((witness0));
          // Upgrade witness account to LTM
-         upgrade_to_lifetime_member(witness0.id);
+         upgrade_to_lifetime_member(witness0.get_id());
          generate_block();
 
          // Create the witnesses
          // Get the witness0 identifier after a block has been generated
          // to be sure of using the most up-to-date identifier for the account
-         const account_id_type witness0_identifier = get_account("witness0").id;
+         const account_id_type witness0_identifier = get_account("witness0").get_id();
          create_witness(witness0_identifier, witness0_private_key);
 
          generate_block();

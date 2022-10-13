@@ -442,7 +442,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       _wallet.update_account(account);
 
-      _wallet.extra_keys[account.id].insert(wif_pub_key);
+      _wallet.extra_keys[account.get_id()].insert(wif_pub_key);
 
       return all_keys_for_account.find(wif_pub_key) != all_keys_for_account.end();
    }
@@ -496,13 +496,13 @@ namespace graphene { namespace wallet { namespace detail {
       get_object( update_op.proposal );
 
       for( const std::string& name : delta.active_approvals_to_add )
-         update_op.active_approvals_to_add.insert( get_account( name ).id );
+         update_op.active_approvals_to_add.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.active_approvals_to_remove )
-         update_op.active_approvals_to_remove.insert( get_account( name ).id );
+         update_op.active_approvals_to_remove.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.owner_approvals_to_add )
-         update_op.owner_approvals_to_add.insert( get_account( name ).id );
+         update_op.owner_approvals_to_add.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.owner_approvals_to_remove )
-         update_op.owner_approvals_to_remove.insert( get_account( name ).id );
+         update_op.owner_approvals_to_remove.insert( get_account( name ).get_id() );
       for( const std::string& k : delta.key_approvals_to_add )
          update_op.key_approvals_to_add.insert( public_key_type( k ) );
       for( const std::string& k : delta.key_approvals_to_remove )

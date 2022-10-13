@@ -166,7 +166,7 @@ struct wallet_data
    bool update_account(const account_object& acct)
    {
       auto& idx = my_accounts.get<by_id>();
-      auto itr = idx.find(acct.get_id());
+      auto itr = idx.find(acct.id);
       if( itr != idx.end() )
       {
          idx.replace(itr, acct);

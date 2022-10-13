@@ -126,10 +126,10 @@ public:
    bool is_locked()const;
 
    template<typename ID>
-   graphene::db::object_downcast_t<ID> get_object(ID id)const
+   graphene::db::object_downcast_t<const ID&> get_object(const ID& id)const
    {
-      auto ob = _remote_db->get_objects({id}, {}).front();
-      return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
+      auto ob = _remote_db->get_objects({object_id_type(id)}, {}).front();
+      return ob.template as<graphene::db::object_downcast_t<const ID&>>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
    /***
@@ -167,7 +167,7 @@ public:
 
    extended_asset_object get_asset(string asset_symbol_or_id)const;
 
-   fc::optional<htlc_object> get_htlc(string htlc_id) const;
+   fc::optional<htlc_object> get_htlc(const htlc_id_type& htlc_id) const;
 
    asset_id_type get_asset_id(const string& asset_symbol_or_id) const;
 
@@ -297,14 +297,16 @@ public:
 
    signed_transaction update_worker_votes( string account, worker_vote_delta delta, bool broadcast );
 
-   signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
+   signed_transaction htlc_create( const string& source, const string& destination,
+         const string& amount, const string& asset_symbol, const string& hash_algorithm,
+         const string& preimage_hash, uint32_t preimage_size,
+         uint32_t claim_period_seconds, const string& memo, bool broadcast = false);
 
-   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, 
-         bool broadcast );
+   signed_transaction htlc_redeem( const htlc_id_type& htlc_id, const string& issuer,
+         const std::vector<char>& preimage, bool broadcast );
 
-   signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast);
+   signed_transaction htlc_extend( const htlc_id_type& htlc_id, const string& issuer,
+         uint32_t seconds_to_add, bool broadcast);
 
    signed_transaction account_store_map(string account, string catalog, bool remove,
          flat_map<string, optional<string>> key_values, bool broadcast);
@@ -360,7 +362,7 @@ public:
          string amount_of_collateral, call_order_update_operation::extensions_type extensions,
          bool broadcast = false);
 
-   signed_transaction cancel_order(limit_order_id_type order_id, bool broadcast = false);
+   signed_transaction cancel_order(const limit_order_id_type& order_id, bool broadcast = false);
 
    signed_transaction transfer(string from, string to, string amount,
          string asset_symbol, string memo, bool broadcast = false);

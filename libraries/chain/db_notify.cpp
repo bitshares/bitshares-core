@@ -414,7 +414,7 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
         case base_object_type:
            return;
         case account_object_type:
-           accounts.insert( obj->id );
+           accounts.insert( account_id_type(obj->id) );
            break;
         case asset_object_type:{
            const auto* aobj = dynamic_cast<const asset_object*>(obj);

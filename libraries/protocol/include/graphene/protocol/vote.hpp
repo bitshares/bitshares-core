@@ -50,8 +50,9 @@ namespace graphene { namespace protocol {
  */
 struct vote_id_type
 {
-   /// Lower 8 bits are type; upper 24 bits are instance
-   uint32_t content;
+   /// Lower 8 bits are type; upper 24 bits are instance.
+   /// By default type and instance are both set to 0.
+   uint32_t content = 0;
 
    friend size_t hash_value( vote_id_type v ) { return std::hash<uint32_t>()(v.content); }
    enum vote_type
@@ -62,10 +63,9 @@ struct vote_id_type
       VOTE_TYPE_COUNT
    };
 
-   /// Default constructor. Sets type and instance to 0
-   vote_id_type():content(0){}
+   vote_id_type() = default;
    /// Construct this vote_id_type with provided type and instance
-   vote_id_type(vote_type type, uint32_t instance = 0)
+   explicit vote_id_type(vote_type type, uint32_t instance = 0)
       : content(instance<<8 | type)
    {}
    /// Construct this vote_id_type from a serial string in the form "type:instance"
