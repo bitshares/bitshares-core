@@ -235,7 +235,7 @@ struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const cha
     FC_ASSERT( space_id <= vo.one_byte_mask, "space overflow" );
     auto type_id =  fc::to_uint64( s.substr( first_dot+1, (second_dot-first_dot)-1 ) );
     FC_ASSERT( type_id <= vo.one_byte_mask, "type overflow");
-    vo.reset( space_id, type_id, instance );
+    vo.reset( static_cast<uint8_t>(space_id), static_cast<uint8_t>(type_id), instance );
  } FC_CAPTURE_AND_RETHROW( (var) ) }
  template<uint8_t SpaceID, uint8_t TypeID>
  void to_variant( const graphene::db::object_id<SpaceID,TypeID>& var,  fc::variant& vo, uint32_t max_depth = 1 )

@@ -89,18 +89,18 @@ namespace graphene { namespace db {
    {
       public:
          using object::object; // constructors
-         virtual std::unique_ptr<object> clone()const
+         std::unique_ptr<object> clone()const override
          {
             return std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) );
          }
 
-         virtual void    move_from( object& obj )
+         void    move_from( object& obj ) override
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
-         virtual fc::variant to_variant()const
+         fc::variant to_variant()const override
          { return fc::variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
-         virtual std::vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
+         std::vector<char> pack()const override { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
    };
 
    template<typename DerivedClass, uint8_t SpaceID, uint8_t TypeID>

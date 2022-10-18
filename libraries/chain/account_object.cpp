@@ -191,7 +191,8 @@ void account_member_index::object_modified(const object& after)
 
     {
        set<account_id_type> after_account_members = get_account_members(a);
-       vector<account_id_type> removed; removed.reserve(before_account_members.size());
+       vector<account_id_type> removed;
+       removed.reserve(before_account_members.size());
        std::set_difference(before_account_members.begin(), before_account_members.end(),
                            after_account_members.begin(), after_account_members.end(),
                            std::inserter(removed, removed.end()));
@@ -199,7 +200,8 @@ void account_member_index::object_modified(const object& after)
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
           account_to_account_memberships[*itr].erase(account_id);
 
-       vector<account_id_type> added; added.reserve(after_account_members.size());
+       vector<account_id_type> added;
+       added.reserve(after_account_members.size());
        std::set_difference(after_account_members.begin(), after_account_members.end(),
                            before_account_members.begin(), before_account_members.end(),
                            std::inserter(added, added.end()));
@@ -212,7 +214,8 @@ void account_member_index::object_modified(const object& after)
     {
        set<public_key_type, pubkey_comparator> after_key_members = get_key_members(a);
 
-       vector<public_key_type> removed; removed.reserve(before_key_members.size());
+       vector<public_key_type> removed;
+       removed.reserve(before_key_members.size());
        std::set_difference(before_key_members.begin(), before_key_members.end(),
                            after_key_members.begin(), after_key_members.end(),
                            std::inserter(removed, removed.end()));
@@ -220,7 +223,8 @@ void account_member_index::object_modified(const object& after)
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
           account_to_key_memberships[*itr].erase(account_id);
 
-       vector<public_key_type> added; added.reserve(after_key_members.size());
+       vector<public_key_type> added;
+       added.reserve(after_key_members.size());
        std::set_difference(after_key_members.begin(), after_key_members.end(),
                            before_key_members.begin(), before_key_members.end(),
                            std::inserter(added, added.end()));
@@ -232,7 +236,8 @@ void account_member_index::object_modified(const object& after)
     {
        set<address> after_address_members = get_address_members(a);
 
-       vector<address> removed; removed.reserve(before_address_members.size());
+       vector<address> removed;
+       removed.reserve(before_address_members.size());
        std::set_difference(before_address_members.begin(), before_address_members.end(),
                            after_address_members.begin(), after_address_members.end(),
                            std::inserter(removed, removed.end()));
@@ -240,7 +245,8 @@ void account_member_index::object_modified(const object& after)
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
           account_to_address_memberships[*itr].erase(account_id);
 
-       vector<address> added; added.reserve(after_address_members.size());
+       vector<address> added;
+       added.reserve(after_address_members.size());
        std::set_difference(after_address_members.begin(), after_address_members.end(),
                            before_address_members.begin(), before_address_members.end(),
                            std::inserter(added, added.end()));

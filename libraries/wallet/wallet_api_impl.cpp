@@ -188,7 +188,7 @@ namespace graphene { namespace wallet { namespace detail {
       fc::async([this]{resync();}, "Resync after block");
    }
 
-   void wallet_api_impl::set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
+   void wallet_api_impl::set_operation_fees( signed_transaction& tx, const fee_schedule& s ) const
    {
       for( auto& op : tx.operations )
          s.set_fee(op);

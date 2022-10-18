@@ -1062,7 +1062,7 @@ class wallet_api
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction canceling the order
        */
-      signed_transaction cancel_order(const limit_order_id_type& order_id, bool broadcast = false);
+      signed_transaction cancel_order(const limit_order_id_type& order_id, bool broadcast = false) const;
 
       /** Creates a new user-issued or market-issued asset.
        *
@@ -1480,7 +1480,7 @@ class wallet_api
       signed_transaction htlc_create( const string& source, const string& destination,
             const string& amount, const string& asset_symbol_or_id, const string& hash_algorithm,
             const string& preimage_hash, uint32_t preimage_size,
-            uint32_t claim_period_seconds, const string& memo, bool broadcast = false);
+            uint32_t claim_period_seconds, const string& memo, bool broadcast = false) const;
 
       /****
        * Update a hashed time lock contract
@@ -1491,7 +1491,7 @@ class wallet_api
        * @return the signed transaction
        */
       signed_transaction htlc_redeem( const htlc_id_type& htlc_id, const string& issuer, const std::string& preimage,
-            bool broadcast = false );
+            bool broadcast = false ) const;
 
       /*****
        * Increase the timelock on an existing HTLC
@@ -1503,7 +1503,7 @@ class wallet_api
        * @return the signed transaction
        */
       signed_transaction htlc_extend( const htlc_id_type& htlc_id, const string& issuer, uint32_t seconds_to_add,
-            bool broadcast = false);
+            bool broadcast = false) const;
 
       /**
        * Get information about a vesting balance object or vesting balance objects owned by an account.

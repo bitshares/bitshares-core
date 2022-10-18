@@ -137,7 +137,7 @@ public:
     * @param tx the transaction
     * @param s the fee schedule
     */
-   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  );
+   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  ) const;
 
    /***
     * @brief return basic info about the chain

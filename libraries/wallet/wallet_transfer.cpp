@@ -148,8 +148,8 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_extend ( const htlc_id_type& htlc_id, const string& issuer,
-         uint32_t seconds_to_add, bool broadcast)
+   signed_transaction wallet_api_impl::htlc_extend( const htlc_id_type& htlc_id, const string& issuer,
+         uint32_t seconds_to_add, bool broadcast )
    {
       try
       {
