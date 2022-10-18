@@ -396,17 +396,8 @@ namespace graphene { namespace chain {
                                  bool mute_exceptions = false,
                                  bool skip_matching_settle_orders = false );
 
-         /**
-          * Matches the two orders, the first parameter is taker, the second is maker.
-          *
-          * @return a bit field indicating which orders were filled (and thus removed)
-          *
-          * 0 - no orders were matched
-          * 1 - only taker was filled
-          * 2 - only maker was filled
-          * 3 - both were filled
-          */
-         ///@{
+         // Note: Ideally this should be private.
+         //       Now it is public because we use it in a non-member function in db_market.cpp .
          enum class match_result_type
          {
             none_filled = 0,
@@ -416,6 +407,12 @@ namespace graphene { namespace chain {
          };
 
       private:
+         /**
+          * Matches the two orders, the first parameter is taker, the second is maker.
+          *
+          * @return which orders were filled (and thus removed)
+          */
+         ///@{
          match_result_type match( const limit_order_object& taker, const limit_order_object& maker,
                                   const price& trade_price );
          match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
@@ -589,7 +586,7 @@ namespace graphene { namespace chain {
           *  as any implied/virtual operations that resulted, such as filling an order.  The
           *  applied operations is cleared after applying each block and calling the block
           *  observers which may want to index these operations.
-          *  @param The operation to push
+          *  @param op The operation to push
           *  @param is_virtual Whether the operation is a virtual operation
           *
           *  @return the op_id which can be used to set the result after it has finished being applied.
