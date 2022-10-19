@@ -144,12 +144,15 @@ namespace graphene { namespace db {
          IndexType* add_index()
          {
             using ObjectType = typename IndexType::object_type;
-            if( _index[ObjectType::space_id].size() <= ObjectType::type_id )
-                _index[ObjectType::space_id].resize( _index_size );
-            assert(!_index[ObjectType::space_id][ObjectType::type_id]);
-            std::unique_ptr<index> indexptr( std::make_unique<IndexType>(*this) );
-            _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
-            return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
+            const auto space_id = ObjectType::space_id;
+            const auto type_id = ObjectType::type_id;
+            FC_ASSERT( space_id < _index.size(), "Space ID ${s} overflow", ("s",space_id) );
+            if( _index[space_id].size() <= type_id )
+                _index[space_id].resize( _index_size );
+            FC_ASSERT( type_id < _index[space_id].size(), "Type ID ${t} overflow", ("t",type_id) );
+            FC_ASSERT( !_index[space_id][type_id], "Index ${s}.${t} already exists", ("s",space_id)("t",type_id) );
+            _index[space_id][type_id] = std::make_unique<IndexType>(*this);
+            return static_cast<IndexType*>(_index[space_id][type_id].get());
          }
 
          template<typename IndexType, typename SecondaryIndexType, typename... Args>
