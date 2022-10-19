@@ -40,9 +40,15 @@ namespace graphene { namespace db {
    {
       public:
          object_database();
-         ~object_database();
+         virtual ~object_database() = default;
 
-         void reset_indexes() { _index.clear(); _index.resize(255); }
+         static constexpr uint8_t _index_size = 255;
+
+         void reset_indexes()
+         {
+            _index.clear();
+            _index.resize(_index_size);
+         }
 
          void open(const fc::path& data_dir );
 
@@ -137,9 +143,9 @@ namespace graphene { namespace db {
          template<typename IndexType>
          IndexType* add_index()
          {
-            typedef typename IndexType::object_type ObjectType;
-            if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
-                _index[ObjectType::space_id].resize( 255 );
+            using ObjectType = typename IndexType::object_type;
+            if( _index[ObjectType::space_id].size() <= ObjectType::type_id )
+                _index[ObjectType::space_id].resize( _index_size );
             assert(!_index[ObjectType::space_id][ObjectType::type_id]);
             std::unique_ptr<index> indexptr( std::make_unique<IndexType>(*this) );
             _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);

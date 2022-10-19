@@ -234,8 +234,12 @@ namespace graphene { namespace chain {
          template<typename EvaluatorType>
          void register_evaluator()
          {
-            _operation_evaluators[operation::tag<typename EvaluatorType::operation_type>::value]
-                  = std::make_unique<op_evaluator_impl<EvaluatorType>>();
+            const auto op_type = operation::tag<typename EvaluatorType::operation_type>::value;
+            FC_ASSERT( op_type >= 0, "Negative operation type" );
+            FC_ASSERT( op_type < _operation_evaluators.size(),
+                       "The operation type (${a}) must be smaller than the size of _operation_evaluators (${b})",
+                       ("a", op_type)("b", _operation_evaluators.size()) );
+            _operation_evaluators[op_type] = std::make_unique<op_evaluator_impl<EvaluatorType>>();
          }
          ///@}
 

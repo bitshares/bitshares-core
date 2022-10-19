@@ -47,7 +47,7 @@ namespace graphene { namespace db {
    class undo_database
    {
       public:
-         undo_database( object_database& db ):_db(db){}
+         explicit undo_database( object_database& db ):_db(db){}
 
          class session
          {
@@ -73,7 +73,10 @@ namespace graphene { namespace db {
 
             private:
                friend class undo_database;
-               session(undo_database& db, bool disable_on_exit = false): _db(db),_disable_on_exit(disable_on_exit) {}
+
+               explicit session(undo_database& db, bool disable_on_exit = false)
+               : _db(db),_disable_on_exit(disable_on_exit) {}
+
                undo_database& _db;
                bool _apply_undo = true;
                bool _disable_on_exit = false;

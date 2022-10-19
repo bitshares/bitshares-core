@@ -226,12 +226,11 @@ void api_helper_indexes::refresh_next_ids()
 
    // Assuming that all indexes have been created when processing the first block,
    // for better performance, only do this twice, one on plugin startup, the other on the first block.
-   constexpr uint8_t max = 255;
    size_t count = 0;
    size_t failed_count = 0;
-   for( uint8_t space = 0; space < max; ++space )
+   for( uint8_t space = 0; space < db._index_size; ++space )
    {
-      for( uint8_t type = 0; type < max; ++type )
+      for( uint8_t type = 0; type < db._index_size; ++type )
       {
          try
          {

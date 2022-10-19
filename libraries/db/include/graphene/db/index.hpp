@@ -152,7 +152,7 @@ namespace graphene { namespace db {
    class base_primary_index
    {
       public:
-         base_primary_index( object_database& db ):_db(db){}
+         explicit base_primary_index( object_database& db ):_db(db){}
 
          virtual ~base_primary_index() = default;
 
@@ -314,7 +314,7 @@ namespace graphene { namespace db {
       public:
          using object_type = typename DerivedIndex::object_type;
 
-         primary_index( object_database& db )
+         explicit primary_index( object_database& db )
          :base_primary_index(db),_next_id(object_type::space_id,object_type::type_id,0)
          {
             if( DirectBits > 0 )
@@ -341,7 +341,7 @@ namespace graphene { namespace db {
 
          fc::sha256 get_object_version()const
          {
-            std::string desc = "1.0";//get_type_description<object_type>();
+            std::string desc = "1.0";
             return fc::sha256::hash(desc);
          }
 
