@@ -341,7 +341,7 @@ namespace graphene { namespace wallet { namespace detail {
          for( const fc::optional<graphene::chain::account_object>& optional_account : owner_account_objects )
             if (optional_account)
             {
-               std::string account_id = account_id_to_string(optional_account->get_id());
+               auto account_id = std::string(optional_account->id);
                fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(account_id);
                if (witness_obj)
                   claim_registered_witness(optional_account->name);
@@ -386,7 +386,7 @@ namespace graphene { namespace wallet { namespace detail {
          {
             assert( it != _wallet.my_accounts.end() );
             old_accounts.push_back( *it );
-            std::string account_id = account_id_to_string(old_accounts.back().get_id());
+            auto account_id = std::string(old_accounts.back().id);
             account_ids_to_send.push_back( account_id );
             ++it;
          }

@@ -140,7 +140,7 @@ namespace graphene { namespace wallet { namespace detail {
             // then maybe it's the owner account
             try
             {
-               std::string owner_account_id = account_id_to_string(get_account_id(owner_account));
+               auto owner_account_id = std::string(get_account_id(owner_account));
                fc::optional<witness_object> witness = _remote_db->get_witness_by_account(owner_account_id);
                if (witness)
                   return *witness;
@@ -208,7 +208,7 @@ namespace graphene { namespace wallet { namespace detail {
       witness_create_op.block_signing_key = witness_public_key;
       witness_create_op.url = url;
 
-      if (_remote_db->get_witness_by_account(account_id_to_string(witness_create_op.witness_account)))
+      if (_remote_db->get_witness_by_account(std::string(witness_create_op.witness_account)))
          FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
 
       signed_transaction tx;

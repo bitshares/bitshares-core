@@ -425,8 +425,6 @@ public:
    static_variant_map _operation_which_map = create_static_variant_map< operation >();
 
 private:
-   std::string account_id_to_string(account_id_type id) const;
-
    static htlc_hash do_hash( const string& algorithm, const std::string& hash );
 
    void enable_umask_protection();
