@@ -8,7 +8,7 @@ if(MSVC)
   set_source_files_properties(es_objects.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
 
-target_link_libraries( graphene_es_objects graphene_chain graphene_app )
+target_link_libraries( graphene_es_objects graphene_app graphene_chain )
 target_include_directories( graphene_es_objects
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
