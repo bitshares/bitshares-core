@@ -22,17 +22,11 @@
  * THE SOFTWARE.
  */
 #include <graphene/app/application.hpp>
-#include <graphene/app/plugin.hpp>
 #include <graphene/app/config_util.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
-
-#include <graphene/account_history/account_history_plugin.hpp>
-#include <graphene/market_history/market_history_plugin.hpp>
-#include <graphene/witness/witness.hpp>
-#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/log/appender.hpp>
@@ -240,10 +234,6 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       auto genesis_file = create_genesis_file(app_dir);
 
       graphene::app::application app1;
-      app1.register_plugin< graphene::account_history::account_history_plugin>();
-      app1.register_plugin< graphene::market_history::market_history_plugin >();
-      app1.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
       auto& cfg = *sharable_cfg;
       fc::set_option( cfg, "p2p-endpoint", app1_p2p_endpoint_str );
@@ -265,10 +255,6 @@ BOOST_AUTO_TEST_CASE( three_node_network )
 
       fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
       graphene::app::application app2;
-      app2.register_plugin<account_history::account_history_plugin>();
-      app2.register_plugin< graphene::market_history::market_history_plugin >();
-      app2.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg2 = std::make_shared<boost::program_options::variables_map>();
       auto& cfg2 = *sharable_cfg2;
       fc::set_option( cfg2, "genesis-json", genesis_file );
