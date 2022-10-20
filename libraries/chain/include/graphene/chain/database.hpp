@@ -72,7 +72,7 @@ namespace graphene { namespace chain {
          //////////////////// db_management.cpp ////////////////////
       public:
          database();
-         virtual ~database();
+         ~database() override;
 
          enum validation_steps
          {

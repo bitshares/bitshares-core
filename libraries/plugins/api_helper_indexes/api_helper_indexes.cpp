@@ -228,9 +228,9 @@ void api_helper_indexes::refresh_next_ids()
    // for better performance, only do this twice, one on plugin startup, the other on the first block.
    size_t count = 0;
    size_t failed_count = 0;
-   for( uint8_t space = 0; space < db._index_size; ++space )
+   for( uint8_t space = 0; space < chain::database::_index_size; ++space )
    {
-      for( uint8_t type = 0; type < db._index_size; ++type )
+      for( uint8_t type = 0; type < chain::database::_index_size; ++type )
       {
          try
          {

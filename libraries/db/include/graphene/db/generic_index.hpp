@@ -43,29 +43,31 @@ namespace graphene { namespace db {
    class generic_index : public index
    {
       public:
-         typedef MultiIndexType index_type;
-         typedef ObjectType     object_type;
+         using index_type = MultiIndexType;
+         using object_type = ObjectType;
 
-         virtual const object& insert( object&& obj )override
+         const object& insert( object&& obj )override
          {
             assert( nullptr != dynamic_cast<ObjectType*>(&obj) );
             auto insert_result = _indices.insert( std::move( static_cast<ObjectType&>(obj) ) );
-            FC_ASSERT( insert_result.second, "Could not insert object, most likely a uniqueness constraint was violated" );
+            FC_ASSERT( insert_result.second,
+                       "Could not insert object, most likely a uniqueness constraint was violated" );
             return *insert_result.first;
          }
 
-         virtual const object&  create(const std::function<void(object&)>& constructor )override
+         const object&  create(const std::function<void(object&)>& constructor )override
          {
             ObjectType item;
             item.id = get_next_id();
             constructor( item );
             auto insert_result = _indices.insert( std::move(item) );
-            FC_ASSERT(insert_result.second, "Could not create object! Most likely a uniqueness constraint is violated.");
+            FC_ASSERT( insert_result.second,
+                       "Could not create object! Most likely a uniqueness constraint is violated.");
             use_next_id();
             return *insert_result.first;
          }
 
-         virtual void modify( const object& obj, const std::function<void(object&)>& m )override
+         void modify( const object& obj, const std::function<void(object&)>& m )override
          {
             assert(nullptr != dynamic_cast<const ObjectType*>(&obj));
             std::exception_ptr exc;
@@ -88,12 +90,12 @@ namespace graphene { namespace db {
             FC_ASSERT(ok, "Could not modify object, most likely an index constraint was violated");
          }
 
-         virtual void remove( const object& obj )override
+         void remove( const object& obj )override
          {
             _indices.erase( _indices.iterator_to( static_cast<const ObjectType&>(obj) ) );
          }
 
-         virtual const object* find( object_id_type id )const override
+         const object* find( object_id_type id )const override
          {
             static_assert(std::is_same<typename MultiIndexType::key_type, object_id_type>::value,
                           "First index of MultiIndexType MUST be object_id_type!");
@@ -102,7 +104,7 @@ namespace graphene { namespace db {
             return &*itr;
          }
 
-         virtual void inspect_all_objects(std::function<void (const object&)> inspector)const override
+         void inspect_all_objects(std::function<void (const object&)> inspector)const override
          {
             try {
                for( const auto& ptr : _indices )
