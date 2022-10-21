@@ -119,16 +119,21 @@ namespace graphene { namespace db {
       object_id() = default;
       explicit object_id( const fc::unsigned_int& i ):instance(i)
       {
-         FC_ASSERT( (i.value >> instance_bits) == 0, "instance overflow", ("instance",i) );
+         validate();
       }
       explicit object_id( uint64_t i ):instance(i)
       {
-         FC_ASSERT( (i >> instance_bits) == 0, "instance overflow", ("instance",i) );
+         validate();
       }
       explicit object_id( const object_id_type& id ):instance(id.instance())
       {
          // Won't overflow, but need to check space and type
          FC_ASSERT( id.is<std::remove_reference_t<decltype(*this)>>(), "space or type mismatch" );
+      }
+
+      void validate()const
+      {
+         FC_ASSERT( (instance.value >> instance_bits) == 0, "instance overflow", ("instance",instance) );
       }
 
       object_id& operator=( const object_id_type& o )
@@ -229,12 +234,11 @@ struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const cha
     auto second_dot = s.find('.',first_dot+1);
     FC_ASSERT( second_dot != std::string::npos, "Missing the second dot" );
     FC_ASSERT( second_dot != first_dot+1, "Missing the type part" );
-    auto instance = fc::to_uint64(s.substr( second_dot+1 ));
-    FC_ASSERT( instance <= vo.max_instance, "instance overflow" );
     auto space_id = fc::to_uint64( s.substr( 0, first_dot ) );
-    FC_ASSERT( space_id <= vo.one_byte_mask, "space overflow" );
+    FC_ASSERT( space_id <= graphene::db::object_id_type::one_byte_mask, "space overflow" );
     auto type_id =  fc::to_uint64( s.substr( first_dot+1, (second_dot-first_dot)-1 ) );
-    FC_ASSERT( type_id <= vo.one_byte_mask, "type overflow");
+    FC_ASSERT( type_id <= graphene::db::object_id_type::one_byte_mask, "type overflow");
+    auto instance = fc::to_uint64(s.substr( second_dot+1 ));
     vo.reset( static_cast<uint8_t>(space_id), static_cast<uint8_t>(type_id), instance );
  } FC_CAPTURE_AND_RETHROW( (var) ) }
  template<uint8_t SpaceID, uint8_t TypeID>
@@ -256,7 +260,8 @@ struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const cha
                fc::to_uint64( s.substr( first_dot+1, (second_dot-first_dot)-1 ) ) == TypeID,
                "Space.Type.0 (${SpaceID}.${TypeID}.0) doesn't match expected value ${var}",
                ("TypeID",TypeID)("SpaceID",SpaceID)("var",var) );
-    vo.instance = fc::to_uint64(s.substr( second_dot+1 ));
+    graphene::db::object_id<SpaceID,TypeID> tmp { fc::to_uint64(s.substr( second_dot+1 )) };
+    vo = tmp;
  } FC_CAPTURE_AND_RETHROW( (var) ) }
 
 } // namespace fc
