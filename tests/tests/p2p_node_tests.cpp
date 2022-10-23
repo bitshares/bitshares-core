@@ -60,7 +60,7 @@ public:
    {
    }
    void on_message( graphene::net::peer_connection* originating_peer,
-         const graphene::net::message& received_message )
+         const graphene::net::message& received_message ) override
    {
       ilog( "on_message was called with ${msg}", ("msg",received_message) );
       try {
