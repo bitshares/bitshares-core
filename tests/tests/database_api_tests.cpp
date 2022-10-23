@@ -148,9 +148,9 @@ BOOST_AUTO_TEST_CASE( get_signatures_non_immediate_owner )
       const account_object& nathan = create_account("nathan", nathan_key1.get_public_key() );
       const account_object& ashley = create_account("ashley", ashley_key1.get_public_key() );
       const account_object& oliver = create_account("oliver", oliver_key1.get_public_key() );
-      account_id_type nathan_id = nathan.id;
-      account_id_type ashley_id = ashley.id;
-      account_id_type oliver_id = oliver.id;
+      account_id_type nathan_id = nathan.get_id();
+      account_id_type ashley_id = ashley.get_id();
+      account_id_type oliver_id = oliver.get_id();
 
       try {
          account_update_operation op;
@@ -759,8 +759,8 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
 }
 
 BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
-{
-   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).get_id();
+{ try {
+   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).id;
 
    uint32_t objects_changed = 0;
    auto callback = [&]( const variant& v )
@@ -773,7 +773,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
 
    // subscribe to an account which has same instance ID as UIATEST
    vector<string> collision_ids;
-   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id ) ) ) );
+   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id.instance() ) ) ) );
    db_api.get_accounts( collision_ids );
 
    generate_block();
@@ -789,7 +789,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
    fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
    BOOST_CHECK_EQUAL( objects_changed, 0 ); // UIATEST did not change in this block, so no notification
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
@@ -901,7 +901,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 #undef SUB_NOTIF_TEST_START_ID_DISABLE_AUTO_SUB
 
       vector<object_id_type> account_ids;
-      account_ids.push_back( alice_id );
+      account_ids.push_back( alice.id );
       db_api1.get_objects( account_ids );         // db_api1  subscribe to Alice
       db_api11.get_objects( account_ids, true );  // db_api11 subscribe to Alice
       db_api21.get_objects( account_ids, false ); // db_api21 doesn't subscribe to Alice
@@ -1105,7 +1105,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    vector<worker_object> results;
 
    const auto& worker1 = create_worker( connie_id, 1000, fc::days(10) );
-   worker_id_type worker1_id = worker1.id;
+   worker_id_type worker1_id { worker1.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 1 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 0 );
@@ -1123,7 +1123,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
 
    const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
-   worker_id_type worker2_id = worker2.id;
+   worker_id_type worker2_id { worker2.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 2 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
@@ -1134,7 +1134,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    BOOST_CHECK( db_api.get_all_workers(false).front().id == worker2_id );
 
    const auto& worker3 = create_worker( wolverine_id, 1000, fc::days(100) );
-   worker_id_type worker3_id = worker3.id;
+   worker_id_type worker3_id { worker3.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 3 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
@@ -1185,13 +1185,13 @@ BOOST_AUTO_TEST_CASE( get_workers_by_account )
    vector<worker_object> results;
 
    const auto& worker1 = create_worker( connie_id );
-   worker_id_type worker1_id = worker1.id;
+   worker_id_type worker1_id { worker1.id };
 
    const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
-   worker_id_type worker2_id = worker2.id;
+   worker_id_type worker2_id { worker2.id };
 
    const auto& worker3 = create_worker( whitney_id, 1000, fc::days(100) );
-   worker_id_type worker3_id = worker3.id;
+   worker_id_type worker3_id { worker3.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("connie").size(), 1 );
    BOOST_CHECK( db_api.get_workers_by_account("connie").front().id == worker1_id );
@@ -1290,7 +1290,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    o = results.back();
 
    // Get the No. 101-201 orders
-   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 101 );
    for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
@@ -1301,7 +1301,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    o = results.back();
 
    // Get the No. 201- orders
-   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 50 );
    for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
@@ -1311,7 +1311,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(150)));
 
    // Get the No. 201-210 orders
-   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.id );
+   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.get_id() );
    BOOST_CHECK_EQUAL( results2.size(), 10 );
    for (size_t i = 0 ; i < results2.size() - 1 ; ++i)
    {
@@ -1322,12 +1322,12 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    BOOST_CHECK(results2.back().sell_price == price(core.amount(100), bitcny.amount(170)));
 
    // Buyer has 70 orders, all IDs are greater than sellers
-   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.id );
+   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 70 );
    o = results.back();
 
    // All seller's order IDs are smaller, so querying with a buyer's ID will get nothing
-   results = db_api.get_limit_orders_by_account( seller.name, 90, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, 90, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 0 );
 
    // Watcher has no order
@@ -1692,7 +1692,7 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       try {
          account_update_operation op;
          op.account = nathan.id;
-         op.active = authority(3, nathan_public_key, 1, alice.id, 1, bob.id, 1);
+         op.active = authority(3, nathan_public_key, 1, alice.get_id(), 1, bob.get_id(), 1);
          op.owner = *op.active;
          trx.operations.push_back(op);
          sign(trx, nathan_private_key);
@@ -1764,8 +1764,8 @@ BOOST_AUTO_TEST_CASE( get_call_orders_by_account ) {
       int64_t init_balance(1000000);
       transfer(committee_account, caller_id, asset(init_balance));
 
-      update_feed_producers(usd, {feedproducer.id});
-      update_feed_producers(cny, {feedproducer.id});
+      update_feed_producers(usd, {feedproducer.get_id()});
+      update_feed_producers(cny, {feedproducer.get_id()});
 
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
@@ -1803,13 +1803,13 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
 
       const auto &usd = create_bitasset("USD", creator_id);
       const auto &core = asset_id_type()(db);
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
 
       int64_t init_balance(1000000);
       transfer(committee_account, settler_id, asset(init_balance));
       transfer(committee_account, caller_id, asset(init_balance));
 
-      update_feed_producers(usd, {feedproducer.id});
+      update_feed_producers(usd, {feedproducer.get_id()});
 
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
@@ -1820,7 +1820,7 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
       borrow(caller, usd.amount(1000), asset(15000));
       generate_block();
 
-      transfer(caller.id, settler.id, asset(200, usd_id));
+      transfer(caller.get_id(), settler.get_id(), asset(200, usd_id));
 
       auto result = force_settle( settler, usd_id(db).amount(4));
       generate_block();
@@ -1854,11 +1854,11 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
    BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
 
-   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).id;
+   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).get_id();
    update_feed_producers( bitusd_id, { nathan_id } );
-   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).id;
+   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).get_id();
    update_feed_producers( bitdan_id, { nathan_id } );
-   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).id;
+   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).get_id();
    update_feed_producers( btc_id, { nathan_id } );
 
    oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
@@ -1998,9 +1998,9 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    ACTORS((bob)(alice));
 
    const auto& eur = create_user_issued_asset("EUR");
-   asset_id_type eur_id = eur.id;
+   asset_id_type eur_id = eur.get_id();
    const auto& usd = create_user_issued_asset("USD");
-   asset_id_type usd_id = usd.id;
+   asset_id_type usd_id = usd.get_id();
 
    issue_uia( bob_id, usd.amount(1000000) );
    issue_uia( alice_id, eur.amount(1000000) );

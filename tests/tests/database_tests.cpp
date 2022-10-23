@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    const auto& obj = db.create<account_balance_object>([](account_balance_object& obj) {
                      obj.owner = account_id_type(123);
                   });
-   account_balance_id_type obj_id = obj.id;
+   account_balance_id_type obj_id { obj.id };
    BOOST_CHECK_EQUAL(obj.owner.instance.value, 123u);
 
    // Modify dummy object, check that changes stick
@@ -86,15 +86,15 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
       throw 5;
    }), int);
-   BOOST_CHECK(db.find_object(obj_id));
+   BOOST_CHECK(db.find(obj_id));
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( flat_index_test )
 { try {
    ACTORS((sam));
-   const auto& bitusd = create_bitasset("USDBIT", sam.id);
-   const asset_id_type bitusd_id = bitusd.id;
-   update_feed_producers(bitusd, {sam.id});
+   const auto& bitusd = create_bitasset("USDBIT", sam.get_id());
+   const asset_id_type bitusd_id = bitusd.get_id();
+   update_feed_producers(bitusd, {sam.get_id()});
    price_feed current_feed;
    current_feed.settlement_price = bitusd.amount(100) / asset(100);
    publish_feed(bitusd, sam, current_feed);
@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    }
 
    // force maintenance
-   const auto& dynamic_global_props = db.get<dynamic_global_property_object>(dynamic_global_property_id_type());
+   const auto& dynamic_global_props = db.get(dynamic_global_property_id_type());
    generate_blocks(dynamic_global_props.next_maintenance_time, true);
 
    BOOST_CHECK( !(*bitusd_id(db).bitasset_data_id)(db).current_feed.settlement_price.is_null() );
@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    BOOST_CHECK_THROW( direct.get( account_id_type( 1 ) ), fc::assert_exception );
 
    account_object test_account;
-   test_account.id = account_id_type(1);
+   test_account.id = object_id_type( account_id_type(1) );
    test_account.name = "account1";
 
    my_accounts.load( fc::raw::pack( test_account ) );
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    BOOST_CHECK_EQUAL( test_account.name, direct.get( test_account.id ).name );
 
    // The following assumes that MAX_HOLE = 100
-   test_account.id = account_id_type(102);
+   test_account.id = object_id_type( account_id_type(102) );
    test_account.name = "account102";
    // highest insert was 1, direct.next is 2 => 102 is highest allowed instance
    my_accounts.load( fc::raw::pack( test_account ) );
@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
        acct.name = "account0";
    } );
 
-   test_account.id = account_id_type(50);
+   test_account.id = object_id_type( account_id_type(50) );
    test_account.name = "account50";
    my_accounts.load( fc::raw::pack( test_account ) );
 
@@ -194,7 +194,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    });
 
    // direct.next is still 103, so 204 is not allowed
-   test_account.id = account_id_type(204);
+   test_account.id = object_id_type( account_id_type(204) );
    test_account.name = "account204";
    GRAPHENE_REQUIRE_THROW( my_accounts.load( fc::raw::pack( test_account ) ), fc::assert_exception );
    // This is actually undefined behaviour. The object has been inserted into
@@ -204,7 +204,8 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    uint32_t count = 0;
    for( uint32_t i = 0; i < 250; i++ )
    {
-      const account_object* aptr = dynamic_cast< const account_object* >( my_accounts.find( account_id_type( i ) ) );
+      const account_object* aptr = dynamic_cast< const account_object* >(
+                                      my_accounts.find( object_id_type( account_id_type( i ) ) ) );
       if( aptr )
       {
          count++;
@@ -217,7 +218,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    BOOST_CHECK_EQUAL( count, my_accounts.indices().size() - 1 );
 
    GRAPHENE_REQUIRE_THROW( my_accounts.modify( direct.get( account_id_type( 1 ) ), [] ( object& acct ) {
-      acct.id = account_id_type(2);
+      acct.id = object_id_type( account_id_type(2) );
    }), fc::assert_exception );
    // This is actually undefined behaviour. The object has been modified, but
    // but the secondary has not updated its representation

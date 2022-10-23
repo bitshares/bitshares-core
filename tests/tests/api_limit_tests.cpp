@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
    create_bitasset("USD", account_id_type());
    create_account("dan");
    create_account("bob");
-   asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
+   asset_id_type bit_jmj_id = create_bitasset("JMJBIT").get_id();
    generate_block();
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_limit_orders(std::string(static_cast<object_id_type>(asset_id_type())),
@@ -176,10 +176,10 @@ BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
    graphene::app::database_api db_api( db, &( app.get_options() ));
    //account_id_type() do 3 ops
    auto nathan_private_key = generate_private_key("nathan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).get_id();
    transfer(account_id_type(), nathan_id, asset(100));
    asset_id_type bitusd_id = create_bitasset(
-         "USDBIT", nathan_id, 100, disable_force_settle).id;
+         "USDBIT", nathan_id, 100, disable_force_settle).get_id();
    generate_block();
    fc::usleep(fc::milliseconds(100));
    BOOST_CHECK( bitusd_id(db).is_market_issued() );
@@ -198,10 +198,10 @@ BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
    graphene::app::database_api db_api( db, &( app.get_options() ));
    //account_id_type() do 3 ops
    auto nathan_private_key = generate_private_key("nathan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).get_id();
    transfer(account_id_type(), nathan_id, asset(100));
    asset_id_type bitusd_id = create_bitasset(
-         "USDBIT", nathan_id, 100, disable_force_settle).id;
+         "USDBIT", nathan_id, 100, disable_force_settle).get_id();
    generate_block();
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_settle_orders(
@@ -219,12 +219,12 @@ BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
    graphene::app::database_api db_api( db, &( app.get_options() ));
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
-   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).get_id();
+   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).get_id();
    transfer(account_id_type(), nathan_id, asset(100));
    transfer(account_id_type(), dan_id, asset(100));
-   asset_id_type bitusd_id = create_user_issued_asset( "USDBIT", nathan_id(db), charge_market_fee).id;
-   asset_id_type bitdan_id = create_user_issued_asset( "DANBIT", dan_id(db), charge_market_fee).id;
+   asset_id_type bitusd_id = create_user_issued_asset( "USDBIT", nathan_id(db), charge_market_fee).get_id();
+   asset_id_type bitdan_id = create_user_issued_asset( "DANBIT", dan_id(db), charge_market_fee).get_id();
    issue_uia( nathan_id, asset(100, bitusd_id) );
    issue_uia( dan_id, asset(100, bitdan_id) );
    create_sell_order( nathan_id, asset(100, bitusd_id), asset(10000, bitdan_id) );
@@ -450,7 +450,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
       for (int i=0; i<3; i++) {
 
          std::string acct_name = "mytempacct" + std::to_string(i);
-         account_id_type account_id=create_account(acct_name).id;
+         account_id_type account_id=create_account(acct_name).get_id();
          transfer(committee_account, account_id, asset(init_balance));
          bid_collateral(account_id(db), back(db).amount(10), swan(db).amount(1));
       }
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
       //limit= api_limit
       for (int i=3; i<255; i++) {
          std::string acct_name = "mytempacct" + std::to_string(i);
-         account_id_type account_id=create_account(acct_name).id;
+         account_id_type account_id=create_account(acct_name).get_id();
          transfer(committee_account, account_id, asset(init_balance));
          bid_collateral(account_id(db), back(db).amount(10), swan(db).amount(1));
       }

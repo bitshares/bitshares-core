@@ -115,7 +115,7 @@ try {
 
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
-   auto obj = db_api.get_objects( {alice_htlc_id }).front();
+   auto obj = db_api.get_objects( { object_id_type(alice_htlc_id) }).front();
    graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
    // someone else attempts to extend it (bob says he's alice, but he's not)
@@ -304,7 +304,7 @@ try {
             asset(3 * GRAPHENE_BLOCKCHAIN_PRECISION), hash_it<fc::sha256>(pre_image), 0, 60);
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
-      htlc_id_type htlc_id = PUSH_TX(db, trx, ~0).operation_results[0].get<object_id_type>();
+      htlc_id_type htlc_id { PUSH_TX(db, trx, ~0).operation_results[0].get<object_id_type>() };
       trx.clear();
       BOOST_TEST_MESSAGE("Bob attempts to redeem, but can't because preimage size is 0 (should fail)");
       graphene::chain::htlc_redeem_operation redeem;
@@ -319,7 +319,7 @@ try {
 
    // Alice creates an asset
    BOOST_TEST_MESSAGE("Create ALICECOIN so transfer_restricted can be controlled");
-   const asset_id_type uia_id = create_user_issued_asset( "ALICECOIN", alice, transfer_restricted).id;
+   const asset_id_type uia_id = create_user_issued_asset( "ALICECOIN", alice, transfer_restricted).get_id();
    BOOST_TEST_MESSAGE("Issuing ALICECOIN to Bob");
    issue_uia(bob, asset(10000, uia_id) );
    // verify transfer restrictions are in place
@@ -462,7 +462,7 @@ try {
       sign(trx, alice_private_key);
       graphene::protocol::processed_transaction results = PUSH_TX(db, trx, ~0);
       trx.operations.clear();
-      htlc_id_type htlc_id = results.operation_results[0].get<object_id_type>();
+      htlc_id_type htlc_id { results.operation_results[0].get<object_id_type>() };
       BOOST_TEST_MESSAGE("Attempt to redeem HTLC that has no preimage, but include one anyway (should fail)");
       htlc_redeem_operation redeem;
       redeem.htlc_id = htlc_id;
@@ -489,7 +489,7 @@ try {
       sign(trx, alice_private_key);
       graphene::protocol::processed_transaction results = PUSH_TX(db, trx, ~0);
       trx.operations.clear();
-      htlc_id_type htlc_id = results.operation_results[0].get<object_id_type>();
+      htlc_id_type htlc_id { results.operation_results[0].get<object_id_type>() };
       BOOST_TEST_MESSAGE("Attempt to redeem with no preimage (should fail)");
       htlc_redeem_operation redeem;
       redeem.htlc_id = htlc_id;
@@ -962,7 +962,7 @@ try {
    upgrade_to_lifetime_member( nathan );
 
    // create a UIA
-   const asset_id_type uia_id = create_user_issued_asset( "NATHANCOIN", nathan, white_list ).id;
+   const asset_id_type uia_id = create_user_issued_asset( "NATHANCOIN", nathan, white_list ).get_id();
    // Make a whitelist authority
    {
       BOOST_TEST_MESSAGE( "Changing the whitelist authority" );

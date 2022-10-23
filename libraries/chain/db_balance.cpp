@@ -60,7 +60,7 @@ void database::adjust_balance(account_id_type account, asset delta )
    auto abo = index.get_account_balance( account, delta.asset_id );
    if( !abo )
    {
-      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
+      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
                  ("a",account(*this).name)
                  ("b",to_pretty_string(asset(0,delta.asset_id)))
                  ("r",to_pretty_string(-delta)));
@@ -207,9 +207,14 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
    if( amount == 0 )
       return;
 
-   if( acct.get_id() == GRAPHENE_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_WITNESS_ACCOUNT ||
-       acct.get_id() == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_NULL_ACCOUNT ||
-       acct.get_id() == GRAPHENE_TEMP_ACCOUNT )
+   account_id_type acct_id = acct.get_id();
+
+   // Note: missing 'PROXY_TO_SELF' here
+   bool is_reserved_account = ( acct_id == GRAPHENE_COMMITTEE_ACCOUNT || acct_id == GRAPHENE_WITNESS_ACCOUNT ||
+                                acct_id == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT );
+   is_reserved_account = ( is_reserved_account || acct_id == GRAPHENE_NULL_ACCOUNT ||
+                           acct_id == GRAPHENE_TEMP_ACCOUNT );
+   if( is_reserved_account )
    {
       // The blockchain's accounts do not get cashback; it simply goes to the reserve pool.
       modify( get_core_dynamic_data(), [amount](asset_dynamic_data_object& d) {
@@ -223,7 +228,7 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
       amount,
       get_global_properties().parameters.cashback_vesting_period_seconds,
       vesting_balance_type::cashback,
-      acct.id,
+      acct_id,
       require_vesting );
 
    if( new_vbid.valid() )

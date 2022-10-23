@@ -316,7 +316,7 @@ try {
    BOOST_CHECK_EQUAL(storage_results[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "en");
 
-   account_storage_id_type storage_id = storage_results[1].id;
+   account_storage_id_type storage_id { storage_results[1].id };
 
    storage_results = custom_operations_api.get_storage_info({}, "settings", {}, 2, storage_id);
    BOOST_REQUIRE_EQUAL(storage_results.size(), 2U );

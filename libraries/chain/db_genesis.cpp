@@ -345,7 +345,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create initial assets
    for( const genesis_state_type::initial_asset_type& asst : genesis_state.initial_assets )
    {
-      asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
+      asset_id_type new_asset_id { get_index_type<asset_index>().get_next_id() };
       total_supplies[ new_asset_id ] = 0;
 
       asset_dynamic_data_id_type dynamic_data_id;
@@ -362,7 +362,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             cop.registrar = GRAPHENE_TEMP_ACCOUNT;
             cop.owner = authority(1, collateral_rec.owner, 1);
             cop.active = cop.owner;
-            account_id_type owner_account_id = apply_operation(genesis_eval_state, cop).get<object_id_type>();
+            account_id_type owner_account_id { apply_operation(genesis_eval_state, cop).get<object_id_type>() };
 
             modify( owner_account_id(*this).statistics(*this), [&collateral_rec]( account_statistics_object& o ) {
                o.total_core_in_orders = collateral_rec.collateral;
@@ -374,7 +374,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                c.collateral = collateral_rec.collateral;
                c.debt = collateral_rec.debt;
                c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
-                                                chain::asset(c.collateral, core_asset.id),
+                                                chain::asset(c.collateral, core_asset.get_id()),
                                                 GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
             });
 
@@ -464,8 +464,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
       if( it->bitasset_data_id.valid() )
       {
-         auto supply_itr = total_supplies.find( it->id );
-         auto debt_itr = total_debts.find( it->id );
+         auto supply_itr = total_supplies.find( it->get_id() );
+         auto debt_itr = total_debts.find( it->get_id() );
          FC_ASSERT( supply_itr != total_supplies.end() );
          FC_ASSERT( debt_itr != total_debts.end() );
          if( supply_itr->second != debt_itr->second )

@@ -142,7 +142,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test) {
    try {
       graphene::app::history_api hist_api(app);
 
-      asset_id_type usd_id = create_user_issued_asset("USD").id;
+      asset_id_type usd_id = create_user_issued_asset("USD").get_id();
 
       ACTORS( (dan)(bob) );
       fund( dan, asset(100) );
@@ -251,11 +251,11 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
 
       const account_object& dan = create_account("dan"); // create op 1
 
-      create_bitasset("CNY", dan.id); // create op 2
+      create_bitasset("CNY", dan.get_id()); // create op 2
       create_bitasset("BTC", account_id_type()); // create op 3
-      create_bitasset("XMR", dan.id); // create op 4
+      create_bitasset("XMR", dan.get_id()); // create op 4
       create_bitasset("EUR", account_id_type()); // create op 5
-      create_bitasset("OIL", dan.id); // create op 6
+      create_bitasset("OIL", dan.get_id()); // create op 6
 
       generate_block();
       fc::usleep(fc::milliseconds(100));
@@ -605,11 +605,11 @@ BOOST_AUTO_TEST_CASE(get_account_history_by_time) {
 
       const account_object& dan = create_account("dan"); // create op 1
 
-      create_bitasset("CNY", dan.id); // create op 2
+      create_bitasset("CNY", dan.get_id()); // create op 2
       create_bitasset("BTC", account_id_type()); // create op 3
-      create_bitasset("XMR", dan.id); // create op 4
+      create_bitasset("XMR", dan.get_id()); // create op 4
       create_bitasset("EUR", account_id_type()); // create op 5
-      create_bitasset("OIL", dan.id); // create op 6
+      create_bitasset("OIL", dan.get_id()); // create op 6
 
       generate_block();
       fc::usleep(fc::milliseconds(100));
@@ -712,7 +712,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
 
       // account_id_type() creates dan(account tracked)
       const account_object& dan = create_account("dan");
-      auto dan_id = dan.id;
+      auto dan_id = dan.get_id();
 
       // dan makes 1 op
       create_bitasset("EUR", dan_id);
@@ -786,7 +786,7 @@ BOOST_AUTO_TEST_CASE(track_account2) {
 
       // account_id_type() creates alice(tracked account)
       const account_object& alice = create_account("alice");
-      auto alice_id = alice.id;
+      auto alice_id = alice.get_id();
 
       //account_id_type() creates some ops
       create_bitasset("CNY", account_id_type());
@@ -870,7 +870,7 @@ BOOST_AUTO_TEST_CASE(min_blocks_to_keep_test) {
       histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10,
                                                         operation_history_id_type(0));
       BOOST_REQUIRE_EQUAL(histories.size(), 3u);
-      operation_history_id_type oldest_op_hist_id = histories.back().id;
+      operation_history_id_type oldest_op_hist_id { histories.back().id };
       BOOST_CHECK( db.find(oldest_op_hist_id) );
 
       generate_block();

@@ -77,7 +77,8 @@ namespace graphene { namespace chain {
 
 void database::initialize_evaluators()
 {
-   _operation_evaluators.resize(255);
+   constexpr size_t max_num_of_evaluators = 255;
+   _operation_evaluators.resize(max_num_of_evaluators);
    register_evaluator<account_create_evaluator>();
    register_evaluator<account_update_evaluator>();
    register_evaluator<account_upgrade_evaluator>();

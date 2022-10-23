@@ -57,8 +57,8 @@ namespace graphene { namespace wallet { namespace detail {
 
       account_object from_account = get_account(from);
       account_object to_account = get_account(to);
-      account_id_type from_id = from_account.id;
-      account_id_type to_id = to_account.id;
+      account_id_type from_id = from_account.get_id();
+      account_id_type to_id = to_account.get_id();
 
       transfer_operation xfer_op;
 
@@ -83,9 +83,10 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
-   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount,
-         string asset_symbol, string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast )
+   signed_transaction wallet_api_impl::htlc_create( const string& source, const string& destination,
+         const string& amount, const string& asset_symbol, const string& hash_algorithm,
+         const string& preimage_hash, uint32_t preimage_size,
+         uint32_t claim_period_seconds, const string& memo, bool broadcast )
    {
       try
       {
@@ -122,7 +123,7 @@ namespace graphene { namespace wallet { namespace detail {
             (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_redeem( string htlc_id, string issuer,
+   signed_transaction wallet_api_impl::htlc_redeem( const htlc_id_type& htlc_id, const string& issuer,
          const std::vector<char>& preimage, bool broadcast )
    {
       try
@@ -147,8 +148,8 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add,
-         bool broadcast)
+   signed_transaction wallet_api_impl::htlc_extend( const htlc_id_type& htlc_id, const string& issuer,
+         uint32_t seconds_to_add, bool broadcast )
    {
       try
       {
@@ -172,11 +173,9 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
-   fc::optional<htlc_object> wallet_api_impl::get_htlc(string htlc_id) const
+   fc::optional<htlc_object> wallet_api_impl::get_htlc(const htlc_id_type& htlc_id) const
    {
-      htlc_id_type id;
-      fc::from_variant(htlc_id, id);
-      auto obj = _remote_db->get_objects( { id }, {}).front();
+      auto obj = _remote_db->get_objects( { object_id_type(htlc_id) }, {}).front();
       if ( !obj.is_null() )
       {
          return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
@@ -236,7 +235,7 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction(trx, broadcast);
    }
 
-   signed_transaction wallet_api_impl::cancel_order(limit_order_id_type order_id, bool broadcast )
+   signed_transaction wallet_api_impl::cancel_order(const limit_order_id_type& order_id, bool broadcast )
    { try {
          FC_ASSERT(!is_locked());
          signed_transaction trx;

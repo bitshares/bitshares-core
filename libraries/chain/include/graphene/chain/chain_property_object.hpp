@@ -30,12 +30,10 @@ namespace graphene { namespace chain {
 /**
  * Contains invariants which are set at genesis and never changed.
  */
-class chain_property_object : public abstract_object<chain_property_object>
+class chain_property_object : public abstract_object<chain_property_object,
+                                        implementation_ids, impl_chain_property_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id  = impl_chain_property_object_type;
-
       chain_id_type chain_id;
       immutable_chain_parameters immutable_parameters;
 };

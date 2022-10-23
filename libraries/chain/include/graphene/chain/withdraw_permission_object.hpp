@@ -42,12 +42,10 @@ namespace graphene { namespace chain {
    * this. Any number of withdrawals may be made so long as the total amount withdrawn per period does not exceed the
    * limit for any given period.
    */
-  class withdraw_permission_object : public graphene::db::abstract_object<withdraw_permission_object>
+  class withdraw_permission_object : public graphene::db::abstract_object<withdraw_permission_object,
+                                               protocol_ids, withdraw_permission_object_type>
   {
      public:
-        static constexpr uint8_t space_id = protocol_ids;
-        static constexpr uint8_t type_id  = withdraw_permission_object_type;
-
         /// The account authorizing @ref authorized_account to withdraw from it
         account_id_type    withdraw_from_account;
         /// The account authorized to make withdrawals from @ref withdraw_from_account

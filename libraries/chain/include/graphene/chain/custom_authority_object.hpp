@@ -36,15 +36,14 @@ namespace graphene { namespace chain {
     * @ingroup object
     *
     */
-   class custom_authority_object : public abstract_object<custom_authority_object> {
+   class custom_authority_object : public abstract_object<custom_authority_object,
+                                             protocol_ids, custom_authority_object_type>
+   {
       /// Unreflected field to store a cache of the predicate function
       /// Note that this cache can be modified when the object is const!
       mutable optional<restriction_predicate_function> predicate_cache;
 
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id = custom_authority_object_type;
-
       account_id_type account;
       bool enabled;
       time_point_sec valid_from;

@@ -382,8 +382,8 @@ namespace graphene { namespace app {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
        database_api_helper db_api_helper( _app );
-       asset_id_type a = db_api_helper.get_asset_from_string( asset_a )->id;
-       asset_id_type b = db_api_helper.get_asset_from_string( asset_b )->id;
+       asset_id_type a = db_api_helper.get_asset_from_string( asset_a )->get_id();
+       asset_id_type b = db_api_helper.get_asset_from_string( asset_b )->get_id();
        if( a > b ) std::swap(a,b);
        const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
        history_key hkey;
@@ -426,7 +426,7 @@ namespace graphene { namespace app {
        account_id_type account;
        try {
           database_api_helper db_api_helper( _app );
-          account = db_api_helper.get_account_from_string(account_id_or_name)->id;
+          account = db_api_helper.get_account_from_string(account_id_or_name)->get_id();
        } catch(...) { return result; }
 
        if(_app.is_plugin_enabled("elasticsearch")) {
@@ -479,8 +479,8 @@ namespace graphene { namespace app {
        account_id_type account;
        try {
           database_api_helper db_api_helper( _app );
-          account = db_api_helper.get_account_from_string(account_name_or_id)->id;
-       } catch(...) { return result; }
+          account = db_api_helper.get_account_from_string(account_name_or_id)->get_id();
+       } catch( const fc::exception& ) { return result; }
 
        fc::time_point_sec start = ostart.valid() ? *ostart : fc::time_point_sec::maximum();
 
@@ -490,7 +490,7 @@ namespace graphene { namespace app {
           return result;
 
        const auto& acc_hist_idx = db.get_index_type<account_history_index>().indices().get<by_op>();
-       auto itr = acc_hist_idx.lower_bound( boost::make_tuple( account, op_hist_itr->id ) );
+       auto itr = acc_hist_idx.lower_bound( boost::make_tuple( account, op_hist_itr->get_id() ) );
        auto itr_end = acc_hist_idx.upper_bound( account );
 
        while( itr != itr_end && result.size() < limit )
@@ -521,7 +521,7 @@ namespace graphene { namespace app {
        account_id_type account;
        try {
           database_api_helper db_api_helper( _app );
-          account = db_api_helper.get_account_from_string(account_id_or_name)->id;
+          account = db_api_helper.get_account_from_string(account_id_or_name)->get_id();
        } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( stats.most_recent_op == account_history_id_type() ) return result;
@@ -541,7 +541,7 @@ namespace graphene { namespace app {
           else node = &node->next(db);
        }
        if( stop.instance.value == 0 && result.size() < limit ) {
-          auto head = db.find(account_history_id_type());
+          const auto* head = db.find(account_history_id_type());
           if (head != nullptr && head->account == account && head->operation_id(db).op.which() == operation_type)
             result.push_back(head->operation_id(db));
        }
@@ -566,7 +566,7 @@ namespace graphene { namespace app {
        account_id_type account;
        try {
           database_api_helper db_api_helper( _app );
-          account = db_api_helper.get_account_from_string(account_id_or_name)->id;
+          account = db_api_helper.get_account_from_string(account_id_or_name)->get_id();
        } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( start == 0 )
@@ -674,8 +674,8 @@ namespace graphene { namespace app {
 
        const auto& db = *_app.chain_database();
        database_api_helper db_api_helper( _app );
-       asset_id_type a = db_api_helper.get_asset_from_string( asset_a )->id;
-       asset_id_type b = db_api_helper.get_asset_from_string( asset_b )->id;
+       asset_id_type a = db_api_helper.get_asset_from_string( asset_a )->get_id();
+       asset_id_type b = db_api_helper.get_asset_from_string( asset_b )->get_id();
        vector<bucket_object> result;
        const auto configured_limit = _app.get_options().api_limit_get_market_history;
        result.reserve( configured_limit );
@@ -899,7 +899,7 @@ namespace graphene { namespace app {
                   ("configured_limit", configured_limit) );
 
        database_api_helper db_api_helper( _app );
-       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->id;
+       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->get_id();
        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
@@ -933,7 +933,7 @@ namespace graphene { namespace app {
     int64_t asset_api::get_asset_holders_count( const std::string& asset_symbol_or_id ) const {
        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
        database_api_helper db_api_helper( _app );
-       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->id;
+       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->get_id();
        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
        int64_t count = boost::distance(range) - 1;
@@ -996,8 +996,8 @@ namespace graphene { namespace app {
       vector< limit_order_group > result;
 
       database_api_helper db_api_helper( _app );
-      asset_id_type base_asset_id = db_api_helper.get_asset_from_string( base_asset )->id;
-      asset_id_type quote_asset_id = db_api_helper.get_asset_from_string( quote_asset )->id;
+      asset_id_type base_asset_id = db_api_helper.get_asset_from_string( base_asset )->get_id();
+      asset_id_type quote_asset_id = db_api_helper.get_asset_from_string( quote_asset )->get_id();
 
       price max_price = price::max( base_asset_id, quote_asset_id );
       price min_price = price::min( base_asset_id, quote_asset_id );
@@ -1037,7 +1037,7 @@ namespace graphene { namespace app {
       if( o_account_name_or_id.valid() )
       {
          const string& account_name_or_id = *o_account_name_or_id;
-         const account_id_type account_id = db_api_helper.get_account_from_string(account_name_or_id)->id;
+         const account_id_type account_id = db_api_helper.get_account_from_string(account_name_or_id)->get_id();
          if( catalog.valid() )
          {
             if( key.valid() )

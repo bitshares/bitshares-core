@@ -39,12 +39,10 @@ namespace graphene { namespace chain {
  * This class is an implementation detail.
  */
 
-class special_authority_object : public graphene::db::abstract_object<special_authority_object>
+class special_authority_object : public graphene::db::abstract_object<special_authority_object,
+                                           implementation_ids, impl_special_authority_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_special_authority_object_type;
-
       account_id_type account;
 };
 

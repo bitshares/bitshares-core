@@ -230,7 +230,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       template<class ASSET>
       extended_asset_object extend_asset( ASSET&& a )const
       {
-         asset_id_type id = a.id;
+         asset_id_type id = a.get_id();
          extended_asset_object result = extended_asset_object( std::forward<ASSET>( a ) );
          if( amount_in_collateral_index )
          {
@@ -260,12 +260,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       template<class LP>
       extended_liquidity_pool_object extend_liquidity_pool( LP&& a, bool with_stats )const
       {
-         liquidity_pool_id_type id = a.id;
+         liquidity_pool_id_type id = a.get_id();
          extended_liquidity_pool_object result = extended_liquidity_pool_object( std::forward<LP>( a ) );
          if( with_stats && _app_options && _app_options->has_market_history_plugin )
          {
             liquidity_pool_ticker_id_type ticker_id( id.instance );
-            const liquidity_pool_ticker_object* ticker = _db.find<liquidity_pool_ticker_object>( ticker_id );
+            const liquidity_pool_ticker_object* ticker = _db.find( ticker_id );
             if( ticker )
                result.statistics = *ticker;
          }
@@ -291,7 +291,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          vector<extended_liquidity_pool_object> results;
 
-         liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+         liquidity_pool_id_type start_pool_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+         object_id_type start_id { start_pool_id };
 
          const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<INDEX_TAG>();
 
@@ -341,7 +342,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          if( !_subscribe_callback )
             return;
 
-         vector<char> key = get_subscription_key( item );
+         vector<char> key = get_subscription_key( object_id_type(item) );
          if( !_subscribe_filter.contains( key.data(), key.size() ) )
          {
             _subscribe_filter.insert( key.data(), key.size() );
@@ -354,7 +355,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          if( !_subscribe_callback )
             return false;
 
-         vector<char> key = get_subscription_key( item );
+         vector<char> key = get_subscription_key( object_id_type(item) );
          return _subscribe_filter.contains( key.data(), key.size() );
       }
 

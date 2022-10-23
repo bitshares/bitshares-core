@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
       // Should succeed
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       trx.operations.clear();
-      proposal_id_type prop_id = ptx.operation_results[0].get<object_id_type>();
+      proposal_id_type prop_id { ptx.operation_results[0].get<object_id_type>() };
 
       // The network fee percent is still 0
       BOOST_CHECK_EQUAL( db.get_global_properties().parameters.get_market_fee_network_percent(), 0 );
@@ -131,8 +131,8 @@ BOOST_AUTO_TEST_CASE( fee_sharing_test )
                                                              cer, 4, market_fee_percent );
    const asset_object& aliceusd  = create_user_issued_asset( "ALICEUSD",  alice_id(db), 0 );
 
-   asset_id_type alicecoin_id = alicecoin.id;
-   asset_id_type aliceusd_id = aliceusd.id;
+   asset_id_type alicecoin_id = alicecoin.get_id();
+   asset_id_type aliceusd_id = aliceusd.get_id();
 
    // prepare users' balance
    issue_uia( alice, aliceusd.amount( 20000000 ) );

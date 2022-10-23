@@ -199,15 +199,16 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
-signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast)
+signed_transaction wallet_api::htlc_create( const string& source, const string& destination,
+         const string& amount, const string& asset_symbol, const string& hash_algorithm,
+         const string& preimage_hash, uint32_t preimage_size,
+         uint32_t claim_period_seconds, const string& memo, bool broadcast ) const
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
          claim_period_seconds, memo, broadcast);
 }
 
-fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
+fc::optional<fc::variant> wallet_api::get_htlc(const htlc_id_type& htlc_id) const
 {
    fc::optional<htlc_object> optional_obj = my->get_htlc(htlc_id);
    if ( optional_obj.valid() )
@@ -263,15 +264,15 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
    return fc::optional<fc::variant>();
 }
 
-signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
-      bool broadcast)
+signed_transaction wallet_api::htlc_redeem( const htlc_id_type& htlc_id, const string& issuer,
+      const string& preimage, bool broadcast ) const
 {
 
    return my->htlc_redeem(htlc_id, issuer, std::vector<char>(preimage.begin(), preimage.end()), broadcast);
 }
 
-signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
-      bool broadcast)
+signed_transaction wallet_api::htlc_extend( const htlc_id_type& htlc_id, const string& issuer,
+      uint32_t seconds_to_add, bool broadcast ) const
 {
    return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
 }
@@ -1327,7 +1328,7 @@ signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amou
                                amount_of_collateral, extensions, broadcast);
 }
 
-signed_transaction wallet_api::cancel_order(object_id_type order_id, bool broadcast)
+signed_transaction wallet_api::cancel_order(const limit_order_id_type& order_id, bool broadcast) const
 {
    FC_ASSERT(!is_locked());
    return my->cancel_order(order_id, broadcast);

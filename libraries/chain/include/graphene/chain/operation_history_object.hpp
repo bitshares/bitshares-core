@@ -45,14 +45,12 @@ namespace graphene { namespace chain {
     *
     *  @note  this object is READ ONLY it can never be modified
     */
-   class operation_history_object : public abstract_object<operation_history_object>
+   class operation_history_object : public abstract_object<operation_history_object,
+                                              protocol_ids, operation_history_object_type>
    {
       public:
-         static constexpr uint8_t space_id = protocol_ids;
-         static constexpr uint8_t type_id  = operation_history_object_type;
-
          explicit operation_history_object( const operation& o ):op(o){}
-         operation_history_object(){}
+         operation_history_object() = default;
          operation_history_object( const operation& o, uint32_t bn, uint16_t tib, uint16_t oit, uint32_t vo, bool iv,
                                    const time_point_sec& bt )
          : op(o), block_num(bn), trx_in_block(tib), op_in_trx(oit), virtual_op(vo), is_virtual(iv), block_time(bt) {}
@@ -94,11 +92,10 @@ namespace graphene { namespace chain {
     *  linked list can be traversed with relatively effecient disk access because
     *  of the use of a memory mapped stack.
     */
-   class account_history_object :  public abstract_object<account_history_object>
+   class account_history_object :  public abstract_object<account_history_object,
+                                             implementation_ids, impl_account_history_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_account_history_object_type;
          account_id_type                      account; /// the account this operation applies to
          operation_history_id_type            operation_id;
          uint64_t                             sequence = 0; /// the operation position within the given account

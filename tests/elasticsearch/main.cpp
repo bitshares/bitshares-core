@@ -144,12 +144,12 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          asset_id_type core_id;
 
          const asset_object& usd = create_user_issued_asset( "MYUSD" );
-         asset_id_type usd_id = usd.id;
+         asset_id_type usd_id = usd.get_id();
          issue_uia( sam, usd.amount(init_amount) );
          issue_uia( ted, usd.amount(init_amount) );
 
          const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-         asset_id_type eur_id = eur.id;
+         asset_id_type eur_id = eur.get_id();
          issue_uia( sam, eur.amount(init_amount) );
          issue_uia( ted, eur.amount(init_amount) );
 
@@ -158,8 +158,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             flat_map<asset_id_type, price> collateral_map;
             collateral_map[usd_id] = price( asset(1), asset(1, usd_id) );
 
-            credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.id, 10000, 100, 3600, 0,
-                                                   false, db.head_block_time() + fc::days(1), collateral_map, {} );
+            credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.get_id(), 10000, 100, 3600,
+                                                   0, false, db.head_block_time() + fc::days(1), collateral_map, {} );
             propose( cop );
          }
 
@@ -170,7 +170,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          flat_map<asset_id_type, price> collateral_map1;
          collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
 
-         const credit_offer_object& coo1 = create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+         const credit_offer_object& coo1 = create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, collateral_map1, {} );
 
          BOOST_CHECK( coo1.owner_account == sam_id );
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
-         asset_id_type usd_id = create_bitasset("USD", account_id_type()).id;
+         asset_id_type usd_id = create_bitasset("USD", account_id_type()).get_id();
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
@@ -382,11 +382,11 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          create_bitasset("USD", account_id_type()); // create op 0
          const account_object& dan = create_account("dan"); // create op 1
-         create_bitasset("CNY", dan.id); // create op 2
+         create_bitasset("CNY", dan.get_id()); // create op 2
          create_bitasset("BTC", account_id_type()); // create op 3
-         create_bitasset("XMR", dan.id); // create op 4
+         create_bitasset("XMR", dan.get_id()); // create op 4
          create_bitasset("EUR", account_id_type()); // create op 5
-         create_bitasset("OIL", dan.id); // create op 6
+         create_bitasset("OIL", dan.get_id()); // create op 6
 
          generate_block();
 

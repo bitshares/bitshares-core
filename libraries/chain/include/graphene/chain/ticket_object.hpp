@@ -59,12 +59,9 @@ enum ticket_version
  *  @ingroup protocol
  *
  */
-class ticket_object : public abstract_object<ticket_object>
+class ticket_object : public abstract_object<ticket_object, protocol_ids, ticket_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id  = ticket_object_type;
-
       account_id_type  account;      ///< The account who owns the ticket
       ticket_type      target_type;  ///< The target type of the ticket
       asset            amount;       ///< The token type and amount in the ticket

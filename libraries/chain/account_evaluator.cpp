@@ -48,7 +48,7 @@ void verify_authority_accounts( const database& db, const authority& a )
       "Maximum authority membership exceeded" );
    for( const auto& acnt : a.account_auths )
    {
-      GRAPHENE_ASSERT( db.find_object( acnt.first ) != nullptr,
+      GRAPHENE_ASSERT( db.find( acnt.first ) != nullptr,
          internal_verify_auth_account_not_found,
          "Account ${a} specified in authority does not exist",
          ("a", acnt.first) );
@@ -69,7 +69,7 @@ void verify_account_votes( const database& db, const account_options& options )
    FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
-   FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
+   FC_ASSERT( db.find(options.voting_account), "Invalid proxy account specified." );
 
    uint32_t max_vote_id = gpo.next_available_vote_id;
    bool has_worker_votes = false;
