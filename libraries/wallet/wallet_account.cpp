@@ -346,9 +346,9 @@ namespace graphene { namespace wallet { namespace detail {
             addrs.push_back( address(pk) );
             keys[addrs.back()] = *key;
             // see chain/balance_evaluator.cpp
-            addrs.push_back( address( pts_address( pk, false, 56 ) ) );
+            addrs.push_back( address( pts_address( pk, false ) ) ); // version = 56 (default)
             keys[addrs.back()] = *key;
-            addrs.push_back( address( pts_address( pk, true, 56 ) ) );
+            addrs.push_back( address( pts_address( pk, true ) ) ); // version = 56 (default)
             keys[addrs.back()] = *key;
             addrs.push_back( address( pts_address( pk, false, 0 ) ) );
             keys[addrs.back()] = *key;

@@ -140,15 +140,15 @@ struct sign_state
             available_address_sigs = std::map<address,public_key_type>();
             provided_address_sigs = std::map<address,public_key_type>();
             for( auto& item : available_keys ) {
-             (*available_address_sigs)[ address(pts_address(item, false, 56) ) ] = item;
-             (*available_address_sigs)[ address(pts_address(item, true, 56) ) ] = item;
+             (*available_address_sigs)[ address(pts_address(item, false) ) ] = item; // verison = 56 (default)
+             (*available_address_sigs)[ address(pts_address(item, true) ) ] = item; // verison = 56 (default)
              (*available_address_sigs)[ address(pts_address(item, false, 0) ) ] = item;
              (*available_address_sigs)[ address(pts_address(item, true, 0) ) ] = item;
              (*available_address_sigs)[ address(item) ] = item;
             }
             for( auto& item : provided_signatures ) {
-             (*provided_address_sigs)[ address(pts_address(item.first, false, 56) ) ] = item.first;
-             (*provided_address_sigs)[ address(pts_address(item.first, true, 56) ) ] = item.first;
+             (*provided_address_sigs)[ address(pts_address(item.first, false) ) ] = item.first; //verison 56 (default)
+             (*provided_address_sigs)[ address(pts_address(item.first, true) ) ] = item.first; // verison 56 (default)
              (*provided_address_sigs)[ address(pts_address(item.first, false, 0) ) ] = item.first;
              (*provided_address_sigs)[ address(pts_address(item.first, true, 0) ) ] = item.first;
              (*provided_address_sigs)[ address(item.first) ] = item.first;

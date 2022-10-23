@@ -411,8 +411,8 @@ vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<
 
    for( auto& key : keys )
    {
-      address a1( pts_address(key, false, 56) );
-      address a2( pts_address(key, true, 56) );
+      address a1( pts_address(key, false) ); // version = 56 (default)
+      address a2( pts_address(key, true) ); // version = 56 (default)
       address a3( pts_address(key, false, 0)  );
       address a4( pts_address(key, true, 0)  );
       address a5( key );
