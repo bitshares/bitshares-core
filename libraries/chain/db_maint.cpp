@@ -527,8 +527,11 @@ void database::process_budget()
          - rec.from_accumulated_fees )
          - rec.from_unused_witness_budget;
 
-      modify(core, [&rec,&witness_budget,&worker_budget,&leftover_worker_funds,&dpo]
-                   ( asset_dynamic_data_object& _core )
+      modify(core, [&rec
+#ifndef NDEBUG
+                    ,&witness_budget,&worker_budget,&leftover_worker_funds,&dpo
+#endif
+                   ] ( asset_dynamic_data_object& _core )
       {
          _core.current_supply = (_core.current_supply + rec.supply_delta );
 
