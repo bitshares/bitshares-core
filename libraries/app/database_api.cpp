@@ -774,16 +774,16 @@ vector<optional<account_object>> database_api_impl::lookup_account_names(const v
    return get_accounts( account_names, false );
 }
 
-map<string,account_id_type> database_api::lookup_accounts( const string& lower_bound_name,
+map<string, account_id_type, std::less<>> database_api::lookup_accounts( const string& lower_bound_name,
                                                            uint32_t limit,
-                                                           optional<bool> subscribe )const
+                                                           const optional<bool>& subscribe )const
 {
    return my->lookup_accounts( lower_bound_name, limit, subscribe );
 }
 
-map<string,account_id_type> database_api_impl::lookup_accounts( const string& lower_bound_name,
+map<string, account_id_type, std::less<>> database_api_impl::lookup_accounts( const string& lower_bound_name,
                                                                 uint32_t limit,
-                                                                optional<bool> subscribe )const
+                                                                const optional<bool>& subscribe )const
 {
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_lookup_accounts;
@@ -792,7 +792,7 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
               ("configured_limit", configured_limit) );
 
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
-   map<string,account_id_type> result;
+   map<string, account_id_type, std::less<>> result;
 
    if( limit == 0 ) // shortcut to save a database query
       return result;

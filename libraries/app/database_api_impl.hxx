@@ -77,9 +77,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
-      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+      map<string, account_id_type, std::less<>> lookup_accounts( const string& lower_bound_name,
                                                    uint32_t limit,
-                                                   optional<bool> subscribe )const;
+                                                   const optional<bool>& subscribe )const;
       uint64_t get_account_count()const;
 
       // Balances

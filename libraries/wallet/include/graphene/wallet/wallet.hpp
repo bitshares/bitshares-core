@@ -98,7 +98,7 @@ class wallet_api
        * @param limit the maximum number of accounts to return (max: 1000)
        * @returns a list of accounts mapping account names to account ids
        */
-      map<string,account_id_type>       list_accounts(const string& lowerbound, uint32_t limit)const;
+      map<string, account_id_type, std::less<>> list_accounts(const string& lowerbound, uint32_t limit)const;
       /** List the balances of an account.
        * Each account can have multiple balances, one for each type of asset owned by that
        * account.  The returned list will only contain assets for which the account has a

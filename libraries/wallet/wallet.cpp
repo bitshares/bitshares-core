@@ -177,7 +177,7 @@ vector<account_object> wallet_api::list_my_accounts()const
    return vector<account_object>(my->_wallet.my_accounts.begin(), my->_wallet.my_accounts.end());
 }
 
-map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, uint32_t limit)const
+map<string, account_id_type, std::less<>> wallet_api::list_accounts(const string& lowerbound, uint32_t limit)const
 {
    return my->_remote_db->lookup_accounts(lowerbound, limit, {});
 }

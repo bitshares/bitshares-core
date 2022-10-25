@@ -80,7 +80,7 @@ class database_api
       /**
        * @brief Get the objects corresponding to the provided IDs
        * @param ids IDs of the objects to retrieve
-       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
@@ -277,7 +277,7 @@ class database_api
       /**
        * @brief Get a list of accounts by names or IDs
        * @param account_names_or_ids names or IDs of the accounts to retrieve
-       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried account objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The accounts corresponding to the provided names or IDs
@@ -292,7 +292,7 @@ class database_api
        * @param names_or_ids Each item must be the name or ID of an account to retrieve,
        *              the quantity should not be greater than the configured value of
        *              @a api_limit_get_full_accounts
-       * @param subscribe @a true to subscribe to the queried full account objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried full account objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return Map of string from @p names_or_ids to the corresponding account
@@ -345,7 +345,7 @@ class database_api
        * @param lower_bound_name Lower bound of the first name to return
        * @param limit Maximum number of results to return, must not exceed the configured value of
        *              @a api_limit_lookup_accounts
-       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried account objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return Map of account names to corresponding IDs
@@ -353,9 +353,9 @@ class database_api
        * @note In addition to the common auto-subscription rules,
        *       this API will subscribe to the returned account only if @p limit is 1.
        */
-      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+      map<string, account_id_type, std::less<>> lookup_accounts( const string& lower_bound_name,
                                                    uint32_t limit,
-                                                   optional<bool> subscribe = optional<bool>() )const;
+                                                   const optional<bool>& subscribe = optional<bool>() )const;
 
       //////////////
       // Balances //
@@ -414,7 +414,7 @@ class database_api
       /**
        * @brief Get a list of assets by symbol names or IDs
        * @param asset_symbols_or_ids symbol names or IDs of the assets to retrieve
-       * @param subscribe @a true to subscribe to the queried asset objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried asset objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The assets corresponding to the provided symbol names or IDs
@@ -802,7 +802,7 @@ class database_api
        * @param ids IDs of the liquidity pools,
        *              the quantity should not be greater than the configured value of
        *              @a api_limit_get_liquidity_pools
-       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @param with_statistics Whether to return statistics
@@ -821,7 +821,7 @@ class database_api
        * @param asset_symbols_or_ids symbol names or IDs of the share assets,
        *              the quantity should not be greater than the configured value of
        *              @a api_limit_get_liquidity_pools
-       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       * @param subscribe @a true to subscribe to the queried objects, @a false to not subscribe,
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @param with_statistics Whether to return statistics
@@ -1370,7 +1370,7 @@ class database_api
       /**
        *  @brief Get HTLC object
        *  @param id HTLC contract id
-       *  @param subscribe @a true to subscribe to the queried HTLC objects; @a false to not subscribe;
+       *  @param subscribe @a true to subscribe to the queried HTLC objects, @a false to not subscribe,
        *                   @a null to subscribe or not subscribe according to current auto-subscription setting
        *                   (see @ref set_auto_subscription)
        *  @return HTLC object for the id
