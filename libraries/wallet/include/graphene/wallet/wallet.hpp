@@ -826,7 +826,7 @@ class wallet_api
 
 
       /** Sign a message using an account's memo key. The signature is generated as in
-       *    https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64 .
+       *    https://github.com/xeroc/python-graphenelib/blob/d9634d74/graphenecommon/message.py#L64 .
        *
        * @param signer the name or id of signing account
        * @param message text to sign
