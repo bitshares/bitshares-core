@@ -42,10 +42,10 @@ namespace graphene { namespace wallet {
 
    class api_documentation
    {
-      typedef boost::multi_index::multi_index_container<method_description,
+      using method_description_set = boost::multi_index::multi_index_container<method_description,
          boost::multi_index::indexed_by<
             boost::multi_index::ordered_unique<
-               boost::multi_index::member<method_description, std::string, &method_description::method_name> > > > method_description_set;
+               boost::multi_index::member<method_description, std::string, &method_description::method_name> > > >;
       method_description_set method_descriptions;
    public:
       api_documentation();
