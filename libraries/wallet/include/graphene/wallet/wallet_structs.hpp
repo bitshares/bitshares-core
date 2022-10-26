@@ -228,8 +228,7 @@ struct worker_vote_delta
 
 struct signed_block_with_info : public signed_block
 {
-   signed_block_with_info( const signed_block& block );
-   signed_block_with_info( const signed_block_with_info& block ) = default;
+   explicit signed_block_with_info( const signed_block& block );
 
    block_id_type block_id;
    public_key_type signing_key;
@@ -238,8 +237,7 @@ struct signed_block_with_info : public signed_block
 
 struct vesting_balance_object_with_info : public vesting_balance_object
 {
-   vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now );
-   vesting_balance_object_with_info( const vesting_balance_object_with_info& vbo ) = default;
+   vesting_balance_object_with_info( const vesting_balance_object& vbo, const fc::time_point_sec& now );
 
    /**
     * How much is allowed to be withdrawn.
@@ -289,8 +287,8 @@ class utility {
        * @param number_of_desired_keys  Number of desired keys
        * @return A list of keys that are deterministically derived from the brainkey
        */
-      static vector<brain_key_info> derive_owner_keys_from_brain_key( string brain_key,
-                                                                      int number_of_desired_keys = 1 );
+      static vector<brain_key_info> derive_owner_keys_from_brain_key( const string& brain_key,
+                                                                      uint32_t number_of_desired_keys = 1 );
 
       /** Suggests a safe brain key to use for creating your account.
        * \c create_account_with_brain_key() requires you to specify a 'brain key',

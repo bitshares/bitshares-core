@@ -306,8 +306,9 @@ class database_api
        *       @a api_limit_get_full_accounts_lists option. Exceeded objects need to be queried with other APIs.
        *
        */
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
-                                                       optional<bool> subscribe = optional<bool>() );
+      map<string, full_account, std::less<>> get_full_accounts(
+            const vector<string>& names_or_ids,
+            const optional<bool>& subscribe = optional<bool>() );
 
       /**
        * @brief Returns vector of voting power sorted by reverse vp_active
@@ -1141,7 +1142,8 @@ class database_api
        *              @a api_limit_lookup_witness_accounts
        * @return Map of witness names to corresponding IDs
        */
-      map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
+      map<string, witness_id_type, std::less<>> lookup_witness_accounts( const string& lower_bound_name,
+                                                                         uint32_t limit )const;
 
       /**
        * @brief Get the total number of witnesses registered with the blockchain
@@ -1176,8 +1178,9 @@ class database_api
        *              @a api_limit_lookup_committee_member_accounts
        * @return Map of committee_member names to corresponding IDs
        */
-      map<string, committee_member_id_type> lookup_committee_member_accounts( const string& lower_bound_name,
-                                                                              uint32_t limit )const;
+      map<string, committee_member_id_type, std::less<>> lookup_committee_member_accounts(
+            const string& lower_bound_name,
+            uint32_t limit )const;
 
       /**
        * @brief Get the total number of committee registered with the blockchain
