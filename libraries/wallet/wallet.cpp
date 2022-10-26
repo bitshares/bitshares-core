@@ -1313,7 +1313,7 @@ signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to
                                                 string asset_symbol, string amount_of_collateral, bool broadcast)const
 {
    FC_ASSERT(!is_locked());
-   return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
+   return my->borrow_asset_ext(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, {}, broadcast);
 }
 
 signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amount_to_sell,
