@@ -1802,13 +1802,13 @@ class wallet_api
        *
        * @param account The account name or ID that we are adding additional information to.
        * @param catalog The name of the catalog the operation will insert data to.
-       * @param remove true if you want to remove stuff from a catalog.
+       * @param is_to_remove true if you want to remove stuff from a catalog.
        * @param key_values The map to be inserted/removed to/from the catalog
        * @param broadcast true if you wish to broadcast the transaction
        *
        * @return The signed transaction
        */
-      signed_transaction account_store_map( const string& account, const string& catalog, bool remove,
+      signed_transaction account_store_map( const string& account, const string& catalog, bool is_to_remove,
             const flat_map<string, optional<string>>& key_values, bool broadcast )const;
 
       /**

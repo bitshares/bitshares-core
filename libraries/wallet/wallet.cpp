@@ -1928,10 +1928,10 @@ order_book wallet_api::get_order_book( const string& base, const string& quote, 
 }
 
 // custom operations
-signed_transaction wallet_api::account_store_map( const string& account, const string& catalog, bool remove,
+signed_transaction wallet_api::account_store_map( const string& account, const string& catalog, bool is_to_remove,
       const flat_map<string, optional<string>>& key_values, bool broadcast )const
 {
-   return my->account_store_map(account, catalog, remove, key_values, broadcast);
+   return my->account_store_map(account, catalog, is_to_remove, key_values, broadcast);
 }
 
 vector<account_storage_object> wallet_api::get_account_storage( const string& account, const string& catalog )const
