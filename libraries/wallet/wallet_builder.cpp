@@ -27,9 +27,9 @@ namespace graphene { namespace wallet { namespace detail {
 
    transaction_handle_type wallet_api_impl::begin_builder_transaction()
    {
-      int trx_handle = _builder_transactions.empty()? 0
+      transaction_handle_type trx_handle = _builder_transactions.empty() ? 0
                                                     : (--_builder_transactions.end())->first + 1;
-      _builder_transactions[trx_handle];
+      _builder_transactions[trx_handle] = {}; // Reset if exists already
       return trx_handle;
    }
 

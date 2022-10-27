@@ -34,7 +34,7 @@ using std::vector;
 
 namespace graphene { namespace wallet { 
 
-using transaction_handle_type = uint16_t;
+using transaction_handle_type = uint32_t;
 
 struct plain_keys
 {
