@@ -355,9 +355,6 @@ public:
          string min_to_receive, string symbol_to_receive, uint32_t timeout_sec = 0,
          bool fill_or_kill = false, bool broadcast = false);
 
-   signed_transaction borrow_asset(string seller_name, string amount_to_borrow, string asset_symbol,
-         string amount_of_collateral, bool broadcast = false);
-
    signed_transaction borrow_asset_ext( string seller_name, string amount_to_borrow, string asset_symbol,
          string amount_of_collateral, call_order_update_operation::extensions_type extensions,
          bool broadcast = false);
@@ -370,7 +367,8 @@ public:
    signed_transaction issue_asset(string to_account, string amount, string symbol,
          string memo, bool broadcast = false);
 
-   std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const;
+   std::map< string, std::function< string( const fc::variant&, const fc::variants& ) >, std::less<> >
+         get_result_formatters() const;
 
    signed_transaction propose_parameter_change( const string& proposing_account, fc::time_point_sec expiration_time,
          const variant_object& changed_values, bool broadcast = false);

@@ -71,15 +71,15 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Accounts
       vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
                                                      optional<bool> subscribe )const;
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
-                                                       optional<bool> subscribe );
+      map<string, full_account, std::less<>> get_full_accounts( const vector<string>& names_or_ids,
+                                                                const optional<bool>& subscribe );
       vector<account_statistics_object> get_top_voters(uint32_t limit)const;
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
-      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+      map<string, account_id_type, std::less<>> lookup_accounts( const string& lower_bound_name,
                                                    uint32_t limit,
-                                                   optional<bool> subscribe )const;
+                                                   const optional<bool>& subscribe )const;
       uint64_t get_account_count()const;
 
       // Balances
@@ -160,7 +160,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
       fc::optional<witness_object> get_witness_by_account(const std::string& account_id_or_name)const;
-      map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
+      map<string, witness_id_type, std::less<>> lookup_witness_accounts(
+            const string& lower_bound_name, uint32_t limit )const;
       uint64_t get_witness_count()const;
 
       // Committee members
@@ -168,7 +169,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             const vector<committee_member_id_type>& committee_member_ids )const;
       fc::optional<committee_member_object> get_committee_member_by_account(
             const std::string& account_id_or_name )const;
-      map<string, committee_member_id_type> lookup_committee_member_accounts(
+      map<string, committee_member_id_type, std::less<>> lookup_committee_member_accounts(
             const string& lower_bound_name, uint32_t limit )const;
       uint64_t get_committee_count()const;
 

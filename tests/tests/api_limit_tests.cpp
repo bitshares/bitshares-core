@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_accounts ) {
       graphene::app::database_api db_api( db, &( app.get_options() ));
       ACTOR(bob);
       GRAPHENE_CHECK_THROW(db_api.lookup_accounts("bob",220), fc::exception);
-      map<string,account_id_type> result =db_api.lookup_accounts("bob",190);
+      auto result =db_api.lookup_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 17u);
 
    } catch (fc::exception& e) {
@@ -264,7 +264,7 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_witness_accounts ) {
       graphene::app::database_api db_api( db, &( app.get_options() ));
       ACTORS((bob)) ;
       GRAPHENE_CHECK_THROW(db_api.lookup_witness_accounts("bob",220), fc::exception);
-      map<string, witness_id_type> result =db_api.lookup_witness_accounts("bob",190);
+      auto result =db_api.lookup_witness_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 10u);
 
    } catch (fc::exception& e) {
@@ -549,7 +549,7 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_committee_member_accounts ) {
       graphene::app::database_api db_api( db, &( app.get_options() ));
       ACTORS((bob));
       GRAPHENE_CHECK_THROW(db_api.lookup_committee_member_accounts("bob",220), fc::exception);
-      std::map<std::string, committee_member_id_type>  result =db_api.lookup_committee_member_accounts("bob",190);
+      auto result =db_api.lookup_committee_member_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 10u);
 
    } catch (fc::exception& e) {

@@ -411,8 +411,8 @@ vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<
 
    for( auto& key : keys )
    {
-      address a1( pts_address(key, false, 56) );
-      address a2( pts_address(key, true, 56) );
+      address a1( pts_address(key, false) ); // version = 56 (default)
+      address a2( pts_address(key, true) ); // version = 56 (default)
       address a3( pts_address(key, false, 0)  );
       address a4( pts_address(key, true, 0)  );
       address a5( key );
@@ -513,19 +513,14 @@ vector<optional<account_object>> database_api_impl::get_accounts( const vector<s
    return result;
 }
 
-std::map<string,full_account> database_api::get_full_accounts( const vector<string>& names_or_ids,
-                                                               optional<bool> subscribe )
+std::map<string, full_account, std::less<>> database_api::get_full_accounts( const vector<string>& names_or_ids,
+                                                                             const optional<bool>& subscribe )
 {
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
-vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
-{
-   return my->get_top_voters( limit );
-}
-
-std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
-                                                                          optional<bool> subscribe )
+std::map<std::string, full_account, std::less<>> database_api_impl::get_full_accounts(
+      const vector<std::string>& names_or_ids, const optional<bool>& subscribe )
 {
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_get_full_accounts;
@@ -535,7 +530,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
    bool to_subscribe = get_whether_to_subscribe( subscribe );
 
-   std::map<std::string, full_account> results;
+   std::map<std::string, full_account, std::less<>> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
    {
@@ -703,6 +698,11 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
    return results;
 }
 
+vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
+{
+   return my->get_top_voters( limit );
+}
+
 vector<account_statistics_object> database_api_impl::get_top_voters(uint32_t limit)const
 {
    FC_ASSERT( _app_options, "Internal error" );
@@ -774,16 +774,16 @@ vector<optional<account_object>> database_api_impl::lookup_account_names(const v
    return get_accounts( account_names, false );
 }
 
-map<string,account_id_type> database_api::lookup_accounts( const string& lower_bound_name,
+map<string, account_id_type, std::less<>> database_api::lookup_accounts( const string& lower_bound_name,
                                                            uint32_t limit,
-                                                           optional<bool> subscribe )const
+                                                           const optional<bool>& subscribe )const
 {
    return my->lookup_accounts( lower_bound_name, limit, subscribe );
 }
 
-map<string,account_id_type> database_api_impl::lookup_accounts( const string& lower_bound_name,
+map<string, account_id_type, std::less<>> database_api_impl::lookup_accounts( const string& lower_bound_name,
                                                                 uint32_t limit,
-                                                                optional<bool> subscribe )const
+                                                                const optional<bool>& subscribe )const
 {
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_lookup_accounts;
@@ -792,7 +792,7 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
               ("configured_limit", configured_limit) );
 
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
-   map<string,account_id_type> result;
+   map<string, account_id_type, std::less<>> result;
 
    if( limit == 0 ) // shortcut to save a database query
       return result;
@@ -2203,14 +2203,14 @@ fc::optional<witness_object> database_api_impl::get_witness_by_account(const std
    return {};
 }
 
-map<string, witness_id_type> database_api::lookup_witness_accounts( const string& lower_bound_name,
-                                                                    uint32_t limit )const
+map<string, witness_id_type, std::less<>> database_api::lookup_witness_accounts( const string& lower_bound_name,
+                                                                                 uint32_t limit )const
 {
    return my->lookup_witness_accounts( lower_bound_name, limit );
 }
 
-map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const string& lower_bound_name,
-                                                                         uint32_t limit )const
+map<string, witness_id_type, std::less<>> database_api_impl::lookup_witness_accounts( const string& lower_bound_name,
+                                                                                      uint32_t limit )const
 {
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_lookup_witness_accounts;
@@ -2226,7 +2226,7 @@ map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const s
    // records to return.  This could be optimized, but we expect the
    // number of witnesses to be few and the frequency of calls to be rare
    // TODO optimize
-   std::map<std::string, witness_id_type> witnesses_by_account_name;
+   std::map<std::string, witness_id_type, std::less<>> witnesses_by_account_name;
    for (const witness_object& witness : witnesses_by_id)
        if (auto account_iter = _db.find(witness.witness_account))
            if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name
@@ -2294,13 +2294,13 @@ fc::optional<committee_member_object> database_api_impl::get_committee_member_by
    return {};
 }
 
-map<string, committee_member_id_type> database_api::lookup_committee_member_accounts(
+map<string, committee_member_id_type, std::less<>> database_api::lookup_committee_member_accounts(
                                          const string& lower_bound_name, uint32_t limit )const
 {
    return my->lookup_committee_member_accounts( lower_bound_name, limit );
 }
 
-map<string, committee_member_id_type> database_api_impl::lookup_committee_member_accounts(
+map<string, committee_member_id_type, std::less<>> database_api_impl::lookup_committee_member_accounts(
                                          const string& lower_bound_name, uint32_t limit )const
 {
    FC_ASSERT( _app_options, "Internal error" );
@@ -2317,7 +2317,7 @@ map<string, committee_member_id_type> database_api_impl::lookup_committee_member
    // records to return.  This could be optimized, but we expect the
    // number of committee_members to be few and the frequency of calls to be rare
    // TODO optimize
-   std::map<std::string, committee_member_id_type> committee_members_by_account_name;
+   std::map<std::string, committee_member_id_type, std::less<>> committee_members_by_account_name;
    for (const committee_member_object& committee_member : committee_members_by_id)
       if (auto account_iter = _db.find(committee_member.committee_member_account))
          if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name

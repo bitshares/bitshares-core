@@ -205,13 +205,6 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction wallet_api_impl::borrow_asset(string seller_name, string amount_to_borrow, 
-         string asset_symbol, string amount_of_collateral, bool broadcast )
-   {
-      return borrow_asset_ext( seller_name, amount_to_borrow, asset_symbol, amount_of_collateral,
-                              {}, broadcast );
-   }
-
    signed_transaction wallet_api_impl::borrow_asset_ext( string seller_name, string amount_to_borrow, 
          string asset_symbol, string amount_of_collateral,
          call_order_update_operation::extensions_type extensions, bool broadcast )

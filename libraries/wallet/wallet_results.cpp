@@ -27,21 +27,22 @@
 
 namespace graphene { namespace wallet { namespace detail {
 
-std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_api_impl::get_result_formatters() const
+   std::map< string, std::function< string( const fc::variant&, const fc::variants& ) >, std::less<> >
+         wallet_api_impl::get_result_formatters() const
    {
-      std::map<string,std::function<string(fc::variant,const fc::variants&)> > m;
+      std::map< string, std::function< string( const fc::variant&, const fc::variants& ) >, std::less<> > m;
 
-      m["help"] = [](variant result, const fc::variants&)
+      m["help"] = [](const variant& result, const fc::variants&)
       {
          return result.get_string();
       };
 
-      m["gethelp"] = [](variant result, const fc::variants&)
+      m["gethelp"] = [](const variant& result, const fc::variants&)
       {
          return result.get_string();
       };
 
-      auto format_account_history = [this](variant result, const fc::variants&)
+      auto format_account_history = [this](const variant& result, const fc::variants&)
       {
          auto r = result.as<vector<operation_detail>>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
@@ -64,7 +65,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
       m["get_account_history"] = format_account_history;
       m["get_relative_account_history"] = format_account_history;
 
-      m["get_account_history_by_operations"] = [this](variant result, const fc::variants&) {
+      m["get_account_history_by_operations"] = [this](const variant& result, const fc::variants&) {
           auto r = result.as<account_history_operation_detail>( GRAPHENE_MAX_NESTED_OBJECTS );
           std::stringstream ss;
           ss << "total_count : " << r.total_count << " \n";
@@ -85,7 +86,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
           return ss.str();
       };
 
-      auto format_balances = [this](variant result, const fc::variants&)
+      auto format_balances = [this](const variant& result, const fc::variants&)
       {
          auto r = result.as<vector<asset>>( GRAPHENE_MAX_NESTED_OBJECTS );
          vector<asset_object> asset_recs;
@@ -103,7 +104,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
       m["list_account_balances"] = format_balances;
       m["get_blind_balances"] = format_balances;
 
-      auto format_blind_transfers  = [this](variant result, const fc::variants&)
+      auto format_blind_transfers  = [this](const variant& result, const fc::variants&)
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
@@ -121,7 +122,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
       m["transfer_to_blind"] = format_blind_transfers;
       m["blind_transfer"] = format_blind_transfers;
 
-      m["receive_blind_transfer"] = [this](variant result, const fc::variants&)
+      m["receive_blind_transfer"] = [this](const variant& result, const fc::variants&)
       {
          auto r = result.as<blind_receipt>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
@@ -131,7 +132,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          return ss.str();
       };
 
-      m["blind_history"] = [this](variant result, const fc::variants&)
+      m["blind_history"] = [this](const variant& result, const fc::variants&)
       {
          auto records = result.as<vector<blind_receipt>>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
@@ -148,7 +149,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          return ss.str();
       };
 
-      m["get_order_book"] = [](variant result, const fc::variants&)
+      m["get_order_book"] = [](const variant& result, const fc::variants&)
       {
          auto orders = result.as<order_book>( GRAPHENE_MAX_NESTED_OBJECTS );
          auto bids = orders.bids;
@@ -236,7 +237,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          return ss.str();
       };
 
-      m["sign_message"] = [](variant result, const fc::variants&)
+      m["sign_message"] = [](const variant& result, const fc::variants&)
       {
          auto r = result.as<signed_message>( GRAPHENE_MAX_NESTED_OBJECTS );
 

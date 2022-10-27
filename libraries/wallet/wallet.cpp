@@ -90,20 +90,22 @@ namespace graphene { namespace wallet {
       fc::stringstream to_sign;
       to_sign << message << '\n';
       to_sign << "account=" << meta.account << '\n';
-      to_sign << "memokey=" << std::string( meta.memo_key ) << '\n';
+      to_sign << "memokey=" << string( meta.memo_key ) << '\n';
       to_sign << "block=" << meta.block << '\n';
       to_sign << "timestamp=" << meta.time;
 
       return fc::sha256::hash( to_sign.str() );
    }
-   vector<brain_key_info> utility::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys)
+   vector<brain_key_info> utility::derive_owner_keys_from_brain_key( const string& brain_key,
+                                                                     uint32_t number_of_desired_keys )
    {
       // Safety-check
-      FC_ASSERT( number_of_desired_keys >= 1 );
+      FC_ASSERT( number_of_desired_keys >= 1, "number_of_desired_keys should be at least 1" );
 
       // Create as many derived owner keys as requested
       vector<brain_key_info> results;
-      for (int i = 0; i < number_of_desired_keys; ++i) {
+      for( uint32_t i = 0; i < number_of_desired_keys; ++i )
+      {
         fc::ecc::private_key priv_key = graphene::wallet::detail::derive_private_key( brain_key, i );
 
         brain_key_info result;
@@ -130,7 +132,7 @@ namespace graphene { namespace wallet {
       entropy += entropy2;
       string brain_key = "";
 
-      for (int i = 0; i < BRAIN_KEY_WORD_COUNT; i++)
+      for( uint32_t i = 0; i < BRAIN_KEY_WORD_COUNT; ++i )
       {
          fc::bigint choice = entropy % graphene::words::word_list_size;
          entropy /= graphene::words::word_list_size;
@@ -150,21 +152,19 @@ namespace graphene { namespace wallet {
 
 namespace graphene { namespace wallet {
 
-wallet_api::wallet_api(const wallet_data& initial_data, fc::api<login_api> rapi)
+wallet_api::wallet_api( const wallet_data& initial_data, const fc::api<login_api>& rapi )
    : my( std::make_unique<detail::wallet_api_impl>(*this, initial_data, rapi) )
 {
 }
 
-wallet_api::~wallet_api()
-{
-}
+wallet_api::~wallet_api() = default;
 
-bool wallet_api::copy_wallet_file(string destination_filename)
+bool wallet_api::copy_wallet_file( const string& destination_filename )const
 {
    return my->copy_wallet_file(destination_filename);
 }
 
-optional<signed_block_with_info> wallet_api::get_block(uint32_t num)
+optional<signed_block_with_info> wallet_api::get_block(uint32_t num)const
 {
    return my->_remote_db->get_block(num);
 }
@@ -174,22 +174,22 @@ uint64_t wallet_api::get_account_count() const
    return my->_remote_db->get_account_count();
 }
 
-vector<account_object> wallet_api::list_my_accounts()
+vector<account_object> wallet_api::list_my_accounts()const
 {
    return vector<account_object>(my->_wallet.my_accounts.begin(), my->_wallet.my_accounts.end());
 }
 
-map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, uint32_t limit)
+map<string, account_id_type, std::less<>> wallet_api::list_accounts( const string& lowerbound, uint32_t limit )const
 {
    return my->_remote_db->lookup_accounts(lowerbound, limit, {});
 }
 
-vector<asset> wallet_api::list_account_balances(const string& id)
+vector<asset> wallet_api::list_account_balances( const string& id )const
 {
    return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
 }
 
-vector<extended_asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
+vector<extended_asset_object> wallet_api::list_assets( const string& lowerbound, uint32_t limit )const
 {
    return my->_remote_db->list_assets( lowerbound, limit );
 }
@@ -239,7 +239,7 @@ fc::optional<fc::variant> wallet_api::get_htlc(const htlc_id_type& htlc_id) cons
          result_type operator()(const fc::hash160& obj)const
          { return convert("HASH160", obj.str()); }
          private:
-         result_type convert(const std::string& type, const std::string& hash)const
+         result_type convert(const string& type, const string& hash)const
          {
             fc::mutable_variant_object ret_val;
             ret_val["hash_algo"] = type;
@@ -277,7 +277,7 @@ signed_transaction wallet_api::htlc_extend( const htlc_id_type& htlc_id, const s
    return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
 }
 
-vector<operation_detail> wallet_api::get_account_history(const string& name, uint32_t limit)const
+vector<operation_detail> wallet_api::get_account_history( const string& name, uint32_t limit )const
 {
    vector<operation_detail> result;
 
@@ -339,7 +339,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(
       const string& name,
       uint32_t stop,
       uint32_t limit,
-      uint32_t start)const
+      uint32_t start )const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
@@ -379,7 +379,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
       const string& name,
       const flat_set<uint16_t>& operation_types,
       uint32_t start,
-      uint32_t limit)
+      uint32_t limit )const
 {
     account_history_operation_detail result;
 
@@ -422,50 +422,50 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
     return result;
 }
 
-full_account wallet_api::get_full_account( const string& name_or_id)
+full_account wallet_api::get_full_account( const string& name_or_id )const
 {
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
 vector<bucket_object> wallet_api::get_market_history(
-      string symbol1,
-      string symbol2,
+      const string& symbol1,
+      const string& symbol2,
       uint32_t bucket,
-      fc::time_point_sec start,
-      fc::time_point_sec end )const
+      const fc::time_point_sec& start,
+      const fc::time_point_sec& end )const
 {
    return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
 vector<limit_order_object> wallet_api::get_account_limit_orders(
       const string& name_or_id,
-      const string &base,
-      const string &quote,
+      const string& base,
+      const string& quote,
       uint32_t limit,
-      optional<limit_order_id_type> ostart_id,
-      optional<price> ostart_price)
+      const optional<limit_order_id_type>& ostart_id,
+      const optional<price>& ostart_price )const
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
 
-vector<limit_order_object> wallet_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
+vector<limit_order_object> wallet_api::get_limit_orders( const string& a, const string& b, uint32_t limit )const
 {
    return my->_remote_db->get_limit_orders(a, b, limit);
 }
 
-vector<call_order_object> wallet_api::get_call_orders(std::string a, uint32_t limit)const
+vector<call_order_object> wallet_api::get_call_orders( const string& a, uint32_t limit )const
 {
    return my->_remote_db->get_call_orders(a, limit);
 }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
+vector<force_settlement_object> wallet_api::get_settle_orders( const string& a, uint32_t limit )const
 {
    return my->_remote_db->get_settle_orders(a, limit);
 }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
+vector<collateral_bid_object> wallet_api::get_collateral_bids( const string& a, uint32_t limit, uint32_t start )const
 {
-   return my->_remote_db->get_collateral_bids(asset, limit, start);
+   return my->_remote_db->get_collateral_bids(a, limit, start);
 }
 
 brain_key_info wallet_api::suggest_brain_key()const
@@ -474,25 +474,25 @@ brain_key_info wallet_api::suggest_brain_key()const
 }
 
 vector<brain_key_info> wallet_api::derive_owner_keys_from_brain_key(
-      string brain_key,
-      int number_of_desired_keys) const
+      const string& brain_key,
+      uint32_t number_of_desired_keys ) const
 {
    return graphene::wallet::utility::derive_owner_keys_from_brain_key(brain_key, number_of_desired_keys);
 }
 
-bool wallet_api::is_public_key_registered(string public_key) const
+bool wallet_api::is_public_key_registered( const string& public_key ) const
 {
    bool is_known = my->_remote_db->is_public_key_registered(public_key);
    return is_known;
 }
 
 
-string wallet_api::serialize_transaction( signed_transaction tx )const
+string wallet_api::serialize_transaction( const signed_transaction& tx )const
 {
    return fc::to_hex(fc::raw::pack(tx));
 }
 
-variant wallet_api::get_object( object_id_type id ) const
+variant wallet_api::get_object( const object_id_type& id ) const
 {
    return my->_remote_db->get_objects({id}, {});
 }
@@ -502,107 +502,108 @@ string wallet_api::get_wallet_filename() const
    return my->get_wallet_filename();
 }
 
-transaction_handle_type wallet_api::begin_builder_transaction()
+transaction_handle_type wallet_api::begin_builder_transaction()const
 {
    return my->begin_builder_transaction();
 }
 
 void wallet_api::add_operation_to_builder_transaction(
       transaction_handle_type transaction_handle,
-      const operation& op)
+      const operation& op )const
 {
    my->add_operation_to_builder_transaction(transaction_handle, op);
 }
 
 void wallet_api::replace_operation_in_builder_transaction(
       transaction_handle_type handle,
-      unsigned operation_index,
-      const operation& new_op)
+      uint32_t operation_index,
+      const operation& new_op )const
 {
    my->replace_operation_in_builder_transaction(handle, operation_index, new_op);
 }
 
-asset wallet_api::set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset)
+asset wallet_api::set_fees_on_builder_transaction( transaction_handle_type handle, const string& fee_asset )const
 {
    return my->set_fees_on_builder_transaction(handle, fee_asset);
 }
 
-transaction wallet_api::preview_builder_transaction(transaction_handle_type handle)
+transaction wallet_api::preview_builder_transaction(transaction_handle_type handle)const
 {
    return my->preview_builder_transaction(handle);
 }
 
-signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast)
+signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type transaction_handle,
+                                                        bool broadcast)const
 {
    return my->sign_builder_transaction(transaction_handle, broadcast);
 }
 
 signed_transaction wallet_api::sign_builder_transaction2(transaction_handle_type transaction_handle,
                                                         const vector<public_key_type>& explicit_keys,
-                                                        bool broadcast)
+                                                        bool broadcast)const
 {
    return my->sign_builder_transaction2(transaction_handle, explicit_keys, broadcast);
 }
 
-pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
+pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction( const signed_transaction& tx )const
 {
     return my->broadcast_transaction(tx);
 }
 
 signed_transaction wallet_api::propose_builder_transaction(
       transaction_handle_type handle,
-      time_point_sec expiration,
+      const time_point_sec& expiration,
       uint32_t review_period_seconds,
-      bool broadcast)
+      bool broadcast )const
 {
    return my->propose_builder_transaction(handle, expiration, review_period_seconds, broadcast);
 }
 
 signed_transaction wallet_api::propose_builder_transaction2(
       transaction_handle_type handle,
-      string account_name_or_id,
-      time_point_sec expiration,
+      const string& account_name_or_id,
+      const time_point_sec& expiration,
       uint32_t review_period_seconds,
-      bool broadcast)
+      bool broadcast )const
 {
    return my->propose_builder_transaction2(handle, account_name_or_id, expiration, review_period_seconds, broadcast);
 }
 
-void wallet_api::remove_builder_transaction(transaction_handle_type handle)
+void wallet_api::remove_builder_transaction(transaction_handle_type handle)const
 {
    return my->remove_builder_transaction(handle);
 }
 
-account_object wallet_api::get_account(string account_name_or_id) const
+account_object wallet_api::get_account( const string& account_name_or_id ) const
 {
    return my->get_account(account_name_or_id);
 }
 
-extended_asset_object wallet_api::get_asset(string asset_name_or_id) const
+extended_asset_object wallet_api::get_asset( const string& asset_name_or_id ) const
 {
    auto found_asset = my->find_asset(asset_name_or_id);
    FC_ASSERT( found_asset, "Unable to find asset '${a}'", ("a",asset_name_or_id) );
    return *found_asset;
 }
 
-asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id) const
+asset_bitasset_data_object wallet_api::get_bitasset_data( const string& asset_name_or_id ) const
 {
    auto asset = get_asset(asset_name_or_id);
    FC_ASSERT(asset.is_market_issued() && asset.bitasset_data_id);
    return my->get_object(*asset.bitasset_data_id);
 }
 
-account_id_type wallet_api::get_account_id(string account_name_or_id) const
+account_id_type wallet_api::get_account_id( const string& account_name_or_id ) const
 {
    return my->get_account_id(account_name_or_id);
 }
 
-asset_id_type wallet_api::get_asset_id(const string& asset_symbol_or_id) const
+asset_id_type wallet_api::get_asset_id( const string& asset_symbol_or_id ) const
 {
    return my->get_asset_id(asset_symbol_or_id);
 }
 
-bool wallet_api::import_key(string account_name_or_id, string wif_key)
+bool wallet_api::import_key( const string& account_name_or_id, const string& wif_key )const
 {
    FC_ASSERT(!is_locked());
    // backup wallet
@@ -621,7 +622,7 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
    return false;
 }
 
-map<string, bool> wallet_api::import_accounts( string filename, string password )
+map<string, bool, std::less<>> wallet_api::import_accounts( const string& filename, const string& password )const
 {
    FC_ASSERT( !is_locked() );
    FC_ASSERT( fc::exists( filename ) );
@@ -631,7 +632,7 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
    const auto password_hash = fc::sha512::hash( password );
    FC_ASSERT( fc::sha512::hash( password_hash ) == imported_keys.password_checksum );
 
-   map<string, bool> result;
+   map<string, bool, std::less<>> result;
    for( const auto& item : imported_keys.account_keys )
    {
        const auto import_this_account = [ & ]() -> bool
@@ -694,10 +695,10 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
 }
 
 bool wallet_api::import_account_keys(
-      string filename,
-      string password,
-      string src_account_name,
-      string dest_account_name )
+      const string& filename,
+      const string& password,
+      const string& src_account_name,
+      const string& dest_account_name )const
 {
    FC_ASSERT( !is_locked() );
    FC_ASSERT( fc::exists( filename ) );
@@ -744,12 +745,12 @@ bool wallet_api::import_account_keys(
    return false;
 }
 
-string wallet_api::normalize_brain_key(string s) const
+string wallet_api::normalize_brain_key( const string& s ) const
 {
    return detail::normalize_brain_key( s );
 }
 
-variant wallet_api::info()
+variant wallet_api::info()const
 {
    return my->info();
 }
@@ -759,328 +760,330 @@ variant_object wallet_api::about() const
     return my->about();
 }
 
-fc::ecc::private_key wallet_api::derive_private_key(const std::string& prefix_string, int sequence_number) const
+fc::ecc::private_key wallet_api::derive_private_key( const string& prefix_string, uint32_t sequence_number ) const
 {
    return detail::derive_private_key( prefix_string, sequence_number );
 }
 
-signed_transaction wallet_api::register_account(string name,
-                                                public_key_type owner_pubkey,
-                                                public_key_type active_pubkey,
-                                                string  registrar_account,
-                                                string  referrer_account,
-                                                uint32_t referrer_percent,
-                                                bool broadcast)
+signed_transaction wallet_api::register_account( const string& name,
+                                                 const public_key_type& owner_pubkey,
+                                                 const public_key_type& active_pubkey,
+                                                 const string&  registrar_account,
+                                                 const string&  referrer_account,
+                                                 uint32_t referrer_percent,
+                                                 bool broadcast )const
 {
    return my->register_account( name, owner_pubkey, active_pubkey,
                                 registrar_account, referrer_account, referrer_percent, broadcast );
 }
-signed_transaction wallet_api::create_account_with_brain_key(string brain_key, string account_name,
-                                                             string registrar_account, string referrer_account,
-                                                             bool broadcast /* = false */)
+signed_transaction wallet_api::create_account_with_brain_key( const string& brain_key, const string& account_name,
+      const string& registrar_account, const string& referrer_account,
+      bool broadcast /* = false */ )const
 {
    return my->create_account_with_brain_key(
             brain_key, account_name, registrar_account,
             referrer_account, broadcast
             );
 }
-signed_transaction wallet_api::issue_asset(string to_account, string amount, string symbol,
-                                           string memo, bool broadcast)
+signed_transaction wallet_api::issue_asset( const string& to_account, const string& amount, const string& symbol,
+                                            const string& memo, bool broadcast )const
 {
    return my->issue_asset(to_account, amount, symbol, memo, broadcast);
 }
 
-signed_transaction wallet_api::transfer(string from, string to, string amount,
-                                        string asset_symbol, string memo, bool broadcast /* = false */)
+signed_transaction wallet_api::transfer( const string& from, const string& to, const string& amount,
+                                         const string& asset_symbol, const string& memo,
+                                         bool broadcast /* = false */ )const
 {
    return my->transfer(from, to, amount, asset_symbol, memo, broadcast);
 }
-signed_transaction wallet_api::create_asset(string issuer,
-                                            string symbol,
-                                            uint8_t precision,
-                                            asset_options common,
-                                            fc::optional<bitasset_options> bitasset_opts,
-                                            bool broadcast)
-
+signed_transaction wallet_api::create_asset( const string& issuer,
+                                             const string& symbol,
+                                             uint8_t precision,
+                                             const asset_options& common,
+                                             const optional<bitasset_options>& bitasset_opts,
+                                             bool broadcast )const
 {
    return my->create_asset(issuer, symbol, precision, common, bitasset_opts, broadcast);
 }
 
-signed_transaction wallet_api::update_asset(string symbol,
-                                            optional<string> new_issuer,
-                                            asset_options new_options,
-                                            bool broadcast /* = false */)
+signed_transaction wallet_api::update_asset( const string& symbol,
+                                             const optional<string>& new_issuer,
+                                             const asset_options& new_options,
+                                             bool broadcast /* = false */ )const
 {
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
 }
 
-signed_transaction wallet_api::update_asset_issuer(string symbol,
-                                            string new_issuer,
-                                            bool broadcast /* = false */)
+signed_transaction wallet_api::update_asset_issuer( const string& symbol,
+                                                    const string& new_issuer,
+                                                    bool broadcast /* = false */ )const
 {
    return my->update_asset_issuer(symbol, new_issuer, broadcast);
 }
 
-signed_transaction wallet_api::update_bitasset(string symbol,
-                                               bitasset_options new_options,
-                                               bool broadcast /* = false */)
+signed_transaction wallet_api::update_bitasset( const string& symbol,
+                                                const bitasset_options& new_options,
+                                                bool broadcast /* = false */ )const
 {
    return my->update_bitasset(symbol, new_options, broadcast);
 }
 
-signed_transaction wallet_api::update_asset_feed_producers(string symbol,
-                                                           flat_set<string> new_feed_producers,
-                                                           bool broadcast /* = false */)
+signed_transaction wallet_api::update_asset_feed_producers( const string& symbol,
+                                                            const flat_set<string>& new_feed_producers,
+                                                            bool broadcast /* = false */ )const
 {
    return my->update_asset_feed_producers(symbol, new_feed_producers, broadcast);
 }
 
-signed_transaction wallet_api::publish_asset_feed(string publishing_account,
-                                                  string symbol,
-                                                  price_feed feed,
-                                                  bool broadcast /* = false */)
+signed_transaction wallet_api::publish_asset_feed( const string& publishing_account,
+                                                   const string& symbol,
+                                                   const price_feed& feed,
+                                                   bool broadcast /* = false */ )const
 {
    return my->publish_asset_feed(publishing_account, symbol, feed, broadcast);
 }
 
-signed_transaction wallet_api::fund_asset_fee_pool(string from,
-                                                   string symbol,
-                                                   string amount,
-                                                   bool broadcast /* = false */)
+signed_transaction wallet_api::fund_asset_fee_pool( const string& from,
+                                                    const string& symbol,
+                                                    const string& amount,
+                                                    bool broadcast /* = false */ )const
 {
    return my->fund_asset_fee_pool(from, symbol, amount, broadcast);
 }
 
-signed_transaction wallet_api::claim_asset_fee_pool(string symbol,
-                                                    string amount,
-                                                    bool broadcast /* = false */)
+signed_transaction wallet_api::claim_asset_fee_pool( const string& symbol,
+                                                     const string& amount,
+                                                     bool broadcast /* = false */ )const
 {
    return my->claim_asset_fee_pool(symbol, amount, broadcast);
 }
 
-signed_transaction wallet_api::reserve_asset(string from,
-                                          string amount,
-                                          string symbol,
-                                          bool broadcast /* = false */)
+signed_transaction wallet_api::reserve_asset( const string& from,
+                                              const string& amount,
+                                              const string& symbol,
+                                              bool broadcast /* = false */ )const
 {
    return my->reserve_asset(from, amount, symbol, broadcast);
 }
 
-signed_transaction wallet_api::global_settle_asset(string symbol,
-                                                   price settle_price,
-                                                   bool broadcast /* = false */)
+signed_transaction wallet_api::global_settle_asset( const string& symbol,
+                                                    const price& settle_price,
+                                                    bool broadcast /* = false */ )const
 {
    return my->global_settle_asset(symbol, settle_price, broadcast);
 }
 
-signed_transaction wallet_api::settle_asset(string account_to_settle,
-                                            string amount_to_settle,
-                                            string symbol,
-                                            bool broadcast /* = false */)
+signed_transaction wallet_api::settle_asset( const string& account_to_settle,
+                                             const string& amount_to_settle,
+                                             const string& symbol,
+                                             bool broadcast /* = false */ )const
 {
    return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
 }
 
-signed_transaction wallet_api::bid_collateral(string bidder_name,
-                                              string debt_amount, string debt_symbol,
-                                              string additional_collateral,
-                                              bool broadcast )
+signed_transaction wallet_api::bid_collateral( const string& bidder_name,
+                                               const string& debt_amount, const string& debt_symbol,
+                                               const string& additional_collateral,
+                                               bool broadcast )const
 {
    return my->bid_collateral(bidder_name, debt_amount, debt_symbol, additional_collateral, broadcast);
 }
 
-signed_transaction wallet_api::whitelist_account(string authorizing_account,
-                                                 string account_to_list,
-                                                 account_whitelist_operation::account_listing new_listing_status,
-                                                 bool broadcast /* = false */)
+signed_transaction wallet_api::whitelist_account( const string& authorizing_account,
+                                                  const string& account_to_list,
+                                                  account_whitelist_operation::account_listing new_listing_status,
+                                                  bool broadcast /* = false */ )const
 {
    return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
 
-signed_transaction wallet_api::create_committee_member(string owner_account, string url,
-                                               bool broadcast /* = false */)
+signed_transaction wallet_api::create_committee_member( const string& owner_account, const string& url,
+                                                        bool broadcast /* = false */ )const
 {
    return my->create_committee_member(owner_account, url, broadcast);
 }
 
-map<string,witness_id_type> wallet_api::list_witnesses(const string& lowerbound, uint32_t limit)
+map<string, witness_id_type, std::less<>> wallet_api::list_witnesses( const string& lowerbound, uint32_t limit )const
 {
    return my->_remote_db->lookup_witness_accounts(lowerbound, limit);
 }
 
-map<string,committee_member_id_type> wallet_api::list_committee_members(const string& lowerbound, uint32_t limit)
+map<string,committee_member_id_type, std::less<>> wallet_api::list_committee_members(
+      const string& lowerbound, uint32_t limit )const
 {
    return my->_remote_db->lookup_committee_member_accounts(lowerbound, limit);
 }
 
-witness_object wallet_api::get_witness(string owner_account)
+witness_object wallet_api::get_witness( const string& owner_account )const
 {
    return my->get_witness(owner_account);
 }
 
-committee_member_object wallet_api::get_committee_member(string owner_account)
+committee_member_object wallet_api::get_committee_member( const string& owner_account )const
 {
    return my->get_committee_member(owner_account);
 }
 
-signed_transaction wallet_api::create_witness(string owner_account,
-                                              string url,
-                                              bool broadcast /* = false */)
+signed_transaction wallet_api::create_witness( const string& owner_account,
+                                               const string& url,
+                                               bool broadcast /* = false */ )const
 {
    return my->create_witness(owner_account, url, broadcast);
 }
 
 signed_transaction wallet_api::create_worker(
-   string owner_account,
-   time_point_sec work_begin_date,
-   time_point_sec work_end_date,
-   share_type daily_pay,
-   string name,
-   string url,
-   variant worker_settings,
-   bool broadcast /* = false */)
+   const string& owner_account,
+   const time_point_sec& work_begin_date,
+   const time_point_sec& work_end_date,
+   const share_type& daily_pay,
+   const string& name,
+   const string& url,
+   const variant& worker_settings,
+   bool broadcast /* = false */ )const
 {
    return my->create_worker( owner_account, work_begin_date, work_end_date,
       daily_pay, name, url, worker_settings, broadcast );
 }
 
 signed_transaction wallet_api::update_worker_votes(
-   string owner_account,
-   worker_vote_delta delta,
-   bool broadcast /* = false */)
+   const string& owner_account,
+   const worker_vote_delta& delta,
+   bool broadcast /* = false */ )const
 {
    return my->update_worker_votes( owner_account, delta, broadcast );
 }
 
 signed_transaction wallet_api::update_witness(
-   string witness_name,
-   string url,
-   string block_signing_key,
-   bool broadcast /* = false */)
+   const string& witness_name,
+   const string& url,
+   const string& block_signing_key,
+   bool broadcast /* = false */ )const
 {
    return my->update_witness(witness_name, url, block_signing_key, broadcast);
 }
 
-vector< vesting_balance_object_with_info > wallet_api::get_vesting_balances( string account_name )
+vector< vesting_balance_object_with_info > wallet_api::get_vesting_balances( const string& account_name )const
 {
    return my->get_vesting_balances( account_name );
 }
 
 signed_transaction wallet_api::withdraw_vesting(
-   string witness_name,
-   string amount,
-   string asset_symbol,
-   bool broadcast /* = false */)
+   const string& witness_name,
+   const string& amount,
+   const string& asset_symbol,
+   bool broadcast /* = false */ )const
 {
    return my->withdraw_vesting( witness_name, amount, asset_symbol, broadcast );
 }
 
-signed_transaction wallet_api::vote_for_committee_member(string voting_account,
-                                                 string witness,
-                                                 bool approve,
-                                                 bool broadcast /* = false */)
+signed_transaction wallet_api::vote_for_committee_member( const string& voting_account,
+                                                          const string& witness,
+                                                          bool approve,
+                                                          bool broadcast /* = false */ )const
 {
    return my->vote_for_committee_member(voting_account, witness, approve, broadcast);
 }
 
-signed_transaction wallet_api::vote_for_witness(string voting_account,
-                                                string witness,
-                                                bool approve,
-                                                bool broadcast /* = false */)
+signed_transaction wallet_api::vote_for_witness( const string& voting_account,
+                                                 const string& witness,
+                                                 bool approve,
+                                                 bool broadcast /* = false */ )const
 {
    return my->vote_for_witness(voting_account, witness, approve, broadcast);
 }
 
-signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
-                                                optional<string> voting_account,
-                                                bool broadcast /* = false */)
+signed_transaction wallet_api::set_voting_proxy( const string& account_to_modify,
+                                                 const optional<string>& voting_account,
+                                                 bool broadcast /* = false */ )const
 {
    return my->set_voting_proxy(account_to_modify, voting_account, broadcast);
 }
 
-signed_transaction wallet_api::set_desired_witness_and_committee_member_count(string account_to_modify,
+signed_transaction wallet_api::set_desired_witness_and_committee_member_count( const string& account_to_modify,
                                                                       uint16_t desired_number_of_witnesses,
                                                                       uint16_t desired_number_of_committee_members,
-                                                                      bool broadcast /* = false */)
+                                                                      bool broadcast /* = false */ )const
 {
    return my->set_desired_witness_and_committee_member_count(account_to_modify, desired_number_of_witnesses,
                                                      desired_number_of_committee_members, broadcast);
 }
 
-void wallet_api::set_wallet_filename(string wallet_filename)
+void wallet_api::set_wallet_filename( const string& wallet_filename )const
 {
    my->_wallet_filename = wallet_filename;
 }
 
-signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broadcast /* = false */)
+signed_transaction wallet_api::sign_transaction( const signed_transaction& tx, bool broadcast /* = false */ )const
 { try {
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
-signed_transaction wallet_api::sign_transaction2(signed_transaction tx, const vector<public_key_type>& signing_keys,
-                                                 bool broadcast /* = false */)
+signed_transaction wallet_api::sign_transaction2( const signed_transaction& tx,
+                                                  const vector<public_key_type>& signing_keys,
+                                                  bool broadcast /* = false */ )const
 { try {
    return my->sign_transaction2( tx, signing_keys, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
-flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
+flat_set<public_key_type> wallet_api::get_transaction_signers( const signed_transaction& tx ) const
 { try {
    return my->get_transaction_signers(tx);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
-vector<flat_set<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
+vector<flat_set<account_id_type>> wallet_api::get_key_references( const vector<public_key_type>& keys ) const
 { try {
    return my->get_key_references(keys);
 } FC_CAPTURE_AND_RETHROW( (keys) ) }
 
-operation wallet_api::get_prototype_operation(string operation_name)
+operation wallet_api::get_prototype_operation( const string& operation_name )const
 {
    return my->get_prototype_operation( operation_name );
 }
 
-void wallet_api::dbg_make_uia(string creator, string symbol)
+void wallet_api::dbg_make_uia( const string& creator, const string& symbol )const
 {
    FC_ASSERT(!is_locked());
    my->dbg_make_uia(creator, symbol);
 }
 
-void wallet_api::dbg_make_mia(string creator, string symbol)
+void wallet_api::dbg_make_mia( const string& creator, const string& symbol )const
 {
    FC_ASSERT(!is_locked());
    my->dbg_make_mia(creator, symbol);
 }
 
-void wallet_api::dbg_push_blocks( std::string src_filename, uint32_t count )
+void wallet_api::dbg_push_blocks( const string& src_filename, uint32_t count )const
 {
    my->dbg_push_blocks( src_filename, count );
 }
 
-void wallet_api::dbg_generate_blocks( std::string debug_wif_key, uint32_t count )
+void wallet_api::dbg_generate_blocks( const string& debug_wif_key, uint32_t count )const
 {
    my->dbg_generate_blocks( debug_wif_key, count );
 }
 
-void wallet_api::dbg_stream_json_objects( const std::string& filename )
+void wallet_api::dbg_stream_json_objects( const string& filename )const
 {
    my->dbg_stream_json_objects( filename );
 }
 
-void wallet_api::dbg_update_object( fc::variant_object update )
+void wallet_api::dbg_update_object( const fc::variant_object& update )const
 {
    my->dbg_update_object( update );
 }
 
-void wallet_api::network_add_nodes( const vector<string>& nodes )
+void wallet_api::network_add_nodes( const vector<string>& nodes )const
 {
    my->network_add_nodes( nodes );
 }
 
-vector< variant > wallet_api::network_get_connected_peers()
+vector< variant > wallet_api::network_get_connected_peers()const
 {
    return my->network_get_connected_peers();
 }
 
-void wallet_api::flood_network(string prefix, uint32_t number_of_transactions)
+void wallet_api::flood_network( const string& prefix, uint32_t number_of_transactions )const
 {
    FC_ASSERT(!is_locked());
    my->flood_network(prefix, number_of_transactions);
@@ -1088,20 +1091,20 @@ void wallet_api::flood_network(string prefix, uint32_t number_of_transactions)
 
 signed_transaction wallet_api::propose_parameter_change(
    const string& proposing_account,
-   fc::time_point_sec expiration_time,
+   const fc::time_point_sec& expiration_time,
    const variant_object& changed_values,
    bool broadcast /* = false */
-   )
+   )const
 {
    return my->propose_parameter_change( proposing_account, expiration_time, changed_values, broadcast );
 }
 
 signed_transaction wallet_api::propose_fee_change(
    const string& proposing_account,
-   fc::time_point_sec expiration_time,
+   const fc::time_point_sec& expiration_time,
    const variant_object& changed_fees,
    bool broadcast /* = false */
-   )
+   )const
 {
    return my->propose_fee_change( proposing_account, expiration_time, changed_fees, broadcast );
 }
@@ -1111,7 +1114,7 @@ signed_transaction wallet_api::approve_proposal(
    const string& proposal_id,
    const approval_delta& delta,
    bool broadcast /* = false */
-   )
+   )const
 {
    return my->approve_proposal( fee_paying_account, proposal_id, delta, broadcast );
 }
@@ -1126,17 +1129,17 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
    return my->get_dynamic_global_properties();
 }
 
-signed_transaction wallet_api::add_transaction_signature( signed_transaction tx,
-                                                          bool broadcast )
+signed_transaction wallet_api::add_transaction_signature( const signed_transaction& tx,
+                                                          bool broadcast )const
 {
    return my->add_transaction_signature( tx, broadcast );
 }
 
 string wallet_api::help()const
 {
-   std::vector<std::string> method_names = my->method_documentation.get_method_names();
+   std::vector<string> method_names = my->method_documentation.get_method_names();
    std::stringstream ss;
-   for (const std::string& method_name : method_names)
+   for (const string& method_name : method_names)
    {
       try
       {
@@ -1150,13 +1153,13 @@ string wallet_api::help()const
    return ss.str();
 }
 
-string wallet_api::gethelp(const string& method)const
+string wallet_api::gethelp( const string& method )const
 {
    fc::api<wallet_api> tmp;
    std::stringstream ss;
    ss << "\n";
 
-   std::string doxygenHelpString = my->method_documentation.get_detailed_description(method);
+   string doxygenHelpString = my->method_documentation.get_detailed_description(method);
    if (!doxygenHelpString.empty())
       ss << doxygenHelpString << "\n";
 
@@ -1213,23 +1216,23 @@ string wallet_api::gethelp(const string& method)const
    return ss.str();
 }
 
-bool wallet_api::load_wallet_file( string wallet_filename )
+bool wallet_api::load_wallet_file( const string& wallet_filename )const
 {
    return my->load_wallet_file( wallet_filename );
 }
 
-void wallet_api::quit()
+void wallet_api::quit()const
 {
    my->quit();
 }
 
-void wallet_api::save_wallet_file( string wallet_filename )
+void wallet_api::save_wallet_file( const string& wallet_filename )const
 {
    my->save_wallet_file( wallet_filename );
 }
 
-std::map<string,std::function<string(fc::variant,const fc::variants&)> >
-wallet_api::get_result_formatters() const
+std::map< string, std::function< string( const fc::variant&, const fc::variants& ) >, std::less<> >
+      wallet_api::get_result_formatters() const
 {
    return my->get_result_formatters();
 }
@@ -1243,12 +1246,12 @@ bool wallet_api::is_new()const
    return my->_wallet.cipher_keys.size() == 0;
 }
 
-void wallet_api::encrypt_keys()
+void wallet_api::encrypt_keys()const
 {
    my->encrypt_keys();
 }
 
-void wallet_api::lock()
+void wallet_api::lock()const
 { try {
    FC_ASSERT( !is_locked() );
    encrypt_keys();
@@ -1259,7 +1262,7 @@ void wallet_api::lock()
    my->self.lock_changed(true);
 } FC_CAPTURE_AND_RETHROW() }
 
-void wallet_api::unlock(string password)
+void wallet_api::unlock( const string& password )const
 { try {
    FC_ASSERT(password.size() > 0);
    auto pw = fc::sha512::hash(password.c_str(), password.size());
@@ -1271,7 +1274,7 @@ void wallet_api::unlock(string password)
    my->self.lock_changed(false);
 } FC_CAPTURE_AND_RETHROW() }
 
-void wallet_api::set_password( string password )
+void wallet_api::set_password( const string& password )const
 {
    if( !is_new() )
       FC_ASSERT( !is_locked(), "The wallet must be unlocked before the password can be set" );
@@ -1280,80 +1283,81 @@ void wallet_api::set_password( string password )
 }
 
 vector< signed_transaction > wallet_api::import_balance(
-      string name_or_id,
+      const string& name_or_id,
       const vector<string>& wif_keys,
-      bool broadcast )
+      bool broadcast )const
 {
    return my->import_balance( name_or_id, wif_keys, broadcast );
 }
 
-map<public_key_type, string> wallet_api::dump_private_keys()
+map<public_key_type, string> wallet_api::dump_private_keys()const
 {
    FC_ASSERT(!is_locked());
    return my->_keys;
 }
 
-signed_transaction wallet_api::upgrade_account( string name, bool broadcast )
+signed_transaction wallet_api::upgrade_account( const string& name, bool broadcast )const
 {
    return my->upgrade_account(name,broadcast);
 }
 
-signed_transaction wallet_api::sell_asset(string seller_account,
-                                          string amount_to_sell,
-                                          string symbol_to_sell,
-                                          string min_to_receive,
-                                          string symbol_to_receive,
-                                          uint32_t expiration,
-                                          bool   fill_or_kill,
-                                          bool   broadcast)
+signed_transaction wallet_api::sell_asset( const string& seller_account,
+                                           const string& amount_to_sell,
+                                           const string& symbol_to_sell,
+                                           const string& min_to_receive,
+                                           const string& symbol_to_receive,
+                                           uint32_t expiration,
+                                           bool   fill_or_kill,
+                                           bool   broadcast )const
 {
    return my->sell_asset(seller_account, amount_to_sell, symbol_to_sell, min_to_receive,
                          symbol_to_receive, expiration, fill_or_kill, broadcast);
 }
 
-signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to_sell,
-                                                string asset_symbol, string amount_of_collateral, bool broadcast)
+signed_transaction wallet_api::borrow_asset( const string& seller_name, const string& amount_to_sell,
+                                             const string& asset_symbol, const string& amount_of_collateral,
+                                             bool broadcast )const
 {
    FC_ASSERT(!is_locked());
-   return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
+   return my->borrow_asset_ext( seller_name, amount_to_sell, asset_symbol, amount_of_collateral, {}, broadcast );
 }
 
-signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amount_to_sell,
-                                                 string asset_symbol, string amount_of_collateral,
-                                                 call_order_update_operation::extensions_type extensions,
-                                                 bool broadcast)
+signed_transaction wallet_api::borrow_asset_ext( const string& seller_name, const string& amount_to_sell,
+                                                 const string& asset_symbol, const string& amount_of_collateral,
+                                                 const call_order_update_operation::extensions_type& extensions,
+                                                 bool broadcast )const
 {
    FC_ASSERT(!is_locked());
    return my->borrow_asset_ext(seller_name, amount_to_sell, asset_symbol,
                                amount_of_collateral, extensions, broadcast);
 }
 
-signed_transaction wallet_api::cancel_order(const limit_order_id_type& order_id, bool broadcast) const
+signed_transaction wallet_api::cancel_order( const limit_order_id_type& order_id, bool broadcast ) const
 {
    FC_ASSERT(!is_locked());
    return my->cancel_order(order_id, broadcast);
 }
 
-memo_data wallet_api::sign_memo(string from, string to, string memo)
+memo_data wallet_api::sign_memo( const string& from, const string& to, const string& memo )const
 {
    FC_ASSERT(!is_locked());
    return my->sign_memo(from, to, memo);
 }
 
-string wallet_api::read_memo(const memo_data& memo)
+string wallet_api::read_memo( const memo_data& memo )const
 {
    FC_ASSERT(!is_locked());
    return my->read_memo(memo);
 }
 
-signed_message wallet_api::sign_message(string signer, string message)
+signed_message wallet_api::sign_message( const string& signer, const string& message )const
 {
    FC_ASSERT(!is_locked());
    return my->sign_message(signer, message);
 }
 
 bool wallet_api::verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
-                                 const fc::ecc::compact_signature& sig )
+                                 const fc::ecc::compact_signature& sig )const
 {
    return my->verify_message( message, account, block, msg_time, sig );
 }
@@ -1363,7 +1367,7 @@ bool wallet_api::verify_message( const string& message, const string& account, i
  * @param message the signed_message structure containing message, meta data and signature
  * @return true if signature matches
  */
-bool wallet_api::verify_signed_message( signed_message message )
+bool wallet_api::verify_signed_message( const signed_message& message )const
 {
    return my->verify_signed_message( message );
 }
@@ -1373,13 +1377,13 @@ bool wallet_api::verify_signed_message( signed_message message )
  * @param message the complete encapsulated message string including separators and line feeds
  * @return true if signature matches
  */
-bool wallet_api::verify_encapsulated_message( string message )
+bool wallet_api::verify_encapsulated_message( const string& message )const
 {
    return my->verify_encapsulated_message( message );
 }
 
 
-string wallet_api::get_key_label( public_key_type key )const
+string wallet_api::get_key_label( const public_key_type& key )const
 {
    auto key_itr   = my->_wallet.labeled_keys.get<by_key>().find(key);
    if( key_itr != my->_wallet.labeled_keys.get<by_key>().end() )
@@ -1387,12 +1391,12 @@ string wallet_api::get_key_label( public_key_type key )const
    return string();
 }
 
-string wallet_api::get_private_key( public_key_type pubkey )const
+string wallet_api::get_private_key( const public_key_type& pubkey )const
 {
    return key_to_wif( my->get_private_key( pubkey ) );
 }
 
-public_key_type  wallet_api::get_public_key( string label )const
+public_key_type  wallet_api::get_public_key( const string& label )const
 {
    try { return fc::variant(label, 1).as<public_key_type>( 1 ); } catch ( ... ){}
 
@@ -1402,7 +1406,7 @@ public_key_type  wallet_api::get_public_key( string label )const
    return public_key_type();
 }
 
-bool               wallet_api::set_key_label( public_key_type key, string label )
+bool               wallet_api::set_key_label( const public_key_type& key, const string& label )const
 {
    auto result = my->_wallet.labeled_keys.insert( key_label{label,key} );
    if( result.second  ) return true;
@@ -1416,17 +1420,17 @@ bool               wallet_api::set_key_label( public_key_type key, string label 
    }
    return false;
 }
-map<string,public_key_type> wallet_api::get_blind_accounts()const
+map<string, public_key_type, std::less<>> wallet_api::get_blind_accounts()const
 {
-   map<string,public_key_type> result;
+   map<string, public_key_type, std::less<>> result;
    for( const auto& item : my->_wallet.labeled_keys )
       result[item.label] = item.key;
    return result;
 }
-map<string,public_key_type> wallet_api::get_my_blind_accounts()const
+map<string, public_key_type, std::less<>> wallet_api::get_my_blind_accounts()const
 {
    FC_ASSERT( !is_locked() );
-   map<string,public_key_type> result;
+   map<string, public_key_type, std::less<>> result;
    for( const auto& item : my->_wallet.labeled_keys )
    {
       if( my->_keys.find(item.key) != my->_keys.end() )
@@ -1435,14 +1439,14 @@ map<string,public_key_type> wallet_api::get_my_blind_accounts()const
    return result;
 }
 
-public_key_type    wallet_api::create_blind_account( string label, string brain_key  )
+public_key_type    wallet_api::create_blind_account( const string& label, const string& p_brain_key  )const
 {
    FC_ASSERT( !is_locked() );
 
    auto label_itr = my->_wallet.labeled_keys.get<by_label>().find(label);
    if( label_itr !=  my->_wallet.labeled_keys.get<by_label>().end() )
       FC_ASSERT( !"Key with label already exists" );
-   brain_key = fc::trim_and_normalize_spaces( brain_key );
+   auto brain_key = fc::trim_and_normalize_spaces( p_brain_key );
    auto secret = fc::sha256::hash( brain_key.c_str(), brain_key.size() );
    auto priv_key = fc::ecc::private_key::regenerate( secret );
    public_key_type pub_key  = priv_key.get_public_key();
@@ -1455,7 +1459,7 @@ public_key_type    wallet_api::create_blind_account( string label, string brain_
    return pub_key;
 }
 
-vector<asset>   wallet_api::get_blind_balances( string key_or_label )
+vector<asset>   wallet_api::get_blind_balances( const string& key_or_label )const
 {
    vector<asset> result;
    map<asset_id_type, share_type> balances;
@@ -1488,11 +1492,11 @@ vector<asset>   wallet_api::get_blind_balances( string key_or_label )
    return result;
 }
 
-blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_key_or_label,
-                                                    string to_account_id_or_name,
-                                                    string amount_in,
-                                                    string symbol,
-                                                    bool broadcast )
+blind_confirmation wallet_api::transfer_from_blind( const string& from_blind_account_key_or_label,
+                                                    const string& to_account_id_or_name,
+                                                    const string& amount_in,
+                                                    const string& symbol,
+                                                    bool broadcast )const
 { try {
    transfer_from_blind_operation from_blind;
 
@@ -1549,20 +1553,20 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    return conf;
 } FC_CAPTURE_AND_RETHROW( (from_blind_account_key_or_label)(to_account_id_or_name)(amount_in)(symbol) ) }
 
-blind_confirmation wallet_api::blind_transfer( string from_key_or_label,
-                                               string to_key_or_label,
-                                               string amount_in,
-                                               string symbol,
-                                               bool broadcast )
+blind_confirmation wallet_api::blind_transfer( const string& from_key_or_label,
+                                               const string& to_key_or_label,
+                                               const string& amount_in,
+                                               const string& symbol,
+                                               bool broadcast )const
 {
    return blind_transfer_help( from_key_or_label, to_key_or_label, amount_in, symbol, broadcast, false );
 }
-blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
-                                               string to_key_or_label,
-                                               string amount_in,
-                                               string symbol,
-                                               bool broadcast,
-                                               bool to_temp )
+blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_label,
+                                                    const string& to_key_or_label,
+                                                    const string& amount_in,
+                                                    const string& symbol,
+                                                    bool broadcast,
+                                                    bool to_temp )const
 {
    blind_confirmation confirm;
    try {
@@ -1735,11 +1739,11 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
  *  Transfers a public balance from @from to one or more blinded balances using a
  *  stealth transfer.
  */
-blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name,
-                                                  string asset_symbol,
+blind_confirmation wallet_api::transfer_to_blind( const string& from_account_id_or_name,
+                                                  const string& asset_symbol,
                                                   /* map from key or label to amount */
-                                                  vector<pair<string, string>> to_amounts,
-                                                  bool broadcast )
+                                                  const vector<pair<string, string>>& to_amounts,
+                                                  bool broadcast )const
 { try {
    FC_ASSERT( !is_locked() );
    idump((to_amounts));
@@ -1822,7 +1826,8 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
    return confirm;
 } FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
 
-blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo )
+blind_receipt wallet_api::receive_blind_transfer( const string& confirmation_receipt,
+                                                  const string& opt_from, const string& opt_memo )const
 {
    FC_ASSERT( !is_locked() );
    stealth_confirmation conf(confirmation_receipt);
@@ -1899,7 +1904,7 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    return result;
 }
 
-vector<blind_receipt> wallet_api::blind_history( string key_or_account )
+vector<blind_receipt> wallet_api::blind_history( const string& key_or_account )const
 {
    vector<blind_receipt> result;
    auto pub_key = get_public_key( key_or_account );
@@ -1917,28 +1922,28 @@ vector<blind_receipt> wallet_api::blind_history( string key_or_account )
    return result;
 }
 
-order_book wallet_api::get_order_book( const string& base, const string& quote, unsigned limit )
+order_book wallet_api::get_order_book( const string& base, const string& quote, uint32_t limit )const
 {
    return( my->_remote_db->get_order_book( base, quote, limit ) );
 }
 
 // custom operations
-signed_transaction wallet_api::account_store_map(string account, string catalog, bool remove,
-      flat_map<string, optional<string>> key_values, bool broadcast)
+signed_transaction wallet_api::account_store_map( const string& account, const string& catalog, bool is_to_remove,
+      const flat_map<string, optional<string>>& key_values, bool broadcast )const
 {
-   return my->account_store_map(account, catalog, remove, key_values, broadcast);
+   return my->account_store_map(account, catalog, is_to_remove, key_values, broadcast);
 }
 
-vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
+vector<account_storage_object> wallet_api::get_account_storage( const string& account, const string& catalog )const
 { try {
    return my->_custom_operations->get_storage_info(account, catalog);
 } FC_CAPTURE_AND_RETHROW( (account)(catalog) ) }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
-   : signed_block( block )
+   : signed_block( block ),
+     block_id { id() },
+     signing_key { signee() }
 {
-   block_id = id();
-   signing_key = signee();
    transaction_ids.reserve( transactions.size() );
    for( const processed_transaction& tx : transactions )
       transaction_ids.push_back( tx.id() );
@@ -1946,11 +1951,11 @@ signed_block_with_info::signed_block_with_info( const signed_block& block )
 
 vesting_balance_object_with_info::vesting_balance_object_with_info(
       const vesting_balance_object& vbo,
-      fc::time_point_sec now )
-   : vesting_balance_object( vbo )
+      const fc::time_point_sec& now )
+   : vesting_balance_object( vbo ),
+     allowed_withdraw { get_allowed_withdraw( now ) },
+     allowed_withdraw_time { now }
 {
-   allowed_withdraw = get_allowed_withdraw( now );
-   allowed_withdraw_time = now;
 }
 
 } } // graphene::wallet
