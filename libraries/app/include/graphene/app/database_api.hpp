@@ -308,7 +308,7 @@ class database_api
        */
       map<string, full_account, std::less<>> get_full_accounts(
             const vector<string>& names_or_ids,
-            const optional<bool>& subscribe = optional<bool>() );
+            const optional<bool>& subscribe = optional<bool>() )const;
 
       /**
        * @brief Returns vector of voting power sorted by reverse vp_active
