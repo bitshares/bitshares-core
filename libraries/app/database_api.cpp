@@ -514,7 +514,7 @@ vector<optional<account_object>> database_api_impl::get_accounts( const vector<s
 }
 
 std::map<string, full_account, std::less<>> database_api::get_full_accounts( const vector<string>& names_or_ids,
-                                                                             const optional<bool>& subscribe )
+                                                                             const optional<bool>& subscribe )const
 {
    return my->get_full_accounts( names_or_ids, subscribe );
 }
