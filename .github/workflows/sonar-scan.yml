@@ -8,11 +8,11 @@ jobs:
     name: Scan with SonarScanner
     strategy:
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.17.5
+        image: docker://elasticsearch:7.17.7
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Download and install latest SonarScanner CLI tool
@@ -61,7 +61,7 @@ jobs:
         df -h
         sudo du -hs /mnt/*
         sudo ls -alr /mnt/
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
         submodules: recursive
@@ -103,7 +103,7 @@ jobs:
     - run: |
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ccache

@@ -1,9 +1,11 @@
-FROM phusion/baseimage:focal-1.0.0
+FROM phusion/baseimage:focal-1.2.0
 MAINTAINER The bitshares decentralized organisation
 
 ENV LANG=en_US.UTF-8
 RUN \
-    apt-get update -y && \
+    apt-get update && \
+    apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
+    apt-get update && \
     apt-get install -y \
       g++ \
       autoconf \
@@ -53,7 +55,7 @@ RUN \
     install -s programs/witness_node/witness_node programs/genesis_util/get_dev_key programs/cli_wallet/cli_wallet /usr/local/bin && \
     #
     # Obtain version
-    mkdir /etc/bitshares && \
+    mkdir -p /etc/bitshares && \
     git rev-parse --short HEAD > /etc/bitshares/version && \
     cd / && \
     rm -rf /bitshares-core

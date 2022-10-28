@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.17.5
+        image: docker://elasticsearch:7.17.7
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: recursive
     - name: Configure
@@ -57,7 +57,7 @@ jobs:
               ..
         popd
     - name: Load Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ccache
         key: ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
