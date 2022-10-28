@@ -4,15 +4,13 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-    - name: Inject slug/short environment variables
-      uses: rlespinasse/github-slug-action@v3.x
     - name: Decide whether to push to DockerHub, and set tag
       if: |
         github.event_name == 'push' &&
         ( startsWith( github.ref, 'refs/tags/' ) ||
-          contains( fromJSON('["master","develop","testnet","hardfork"]'), env.GITHUB_REF_NAME ) )
+          contains( fromJSON('["master","develop","testnet","hardfork"]'), github.ref_name ) )
       run: |
-        if [[ "${GITHUB_REF_NAME}" == "master" ]] ; then
+        if [ "${GITHUB_REF_NAME}" == "master" ] ; then
           DOCKER_PUSH_TAG=latest
         else
           DOCKER_PUSH_TAG=${GITHUB_REF_NAME}
