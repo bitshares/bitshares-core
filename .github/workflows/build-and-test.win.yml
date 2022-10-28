@@ -6,8 +6,8 @@ env:
   # The following are for windows cross-build only:
   BOOST_VERSION: 1_69_0
   BOOST_DOTTED_VERSION: 1.69.0
-  CURL_VERSION: 7.67.0
-  OPENSSL_VERSION: 1.1.1d
+  CURL_VERSION: 7.86.0
+  OPENSSL_VERSION: 1.1.1q
   ZLIB_VERSION: 1.2.13
 jobs:
   prepare-mingw64-libs:
@@ -19,7 +19,7 @@ jobs:
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
       id: cache-libs
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: libs
         key: mingw64-libs-${{ env.OS_VERSION }}-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
@@ -113,13 +113,13 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: recursive
     - run: |
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load external libraries
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: libs
         key: mingw64-libs-${{ env.OS_VERSION }}-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
@@ -143,7 +143,7 @@ jobs:
               -D GRAPHENE_DISABLE_UNITY_BUILD=ON \
               ..
     - name: Load Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ccache
         key: ccache-mingw64-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
