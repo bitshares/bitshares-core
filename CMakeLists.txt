@@ -59,6 +59,13 @@ macro(FIND_CURL)
       find_package(CURL REQUIRED)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
 
+   if( APPLE AND NOT "${CURL_VERSION_STRING}" VERSION_LESS "7.77.0" )
+      list( APPEND CURL_LIBRARIES "-framework CoreFoundation" )
+      list( APPEND CURL_LIBRARIES "-framework SystemConfiguration" )
+   endif()
+
+   message(STATUS "CURL libraries: ${CURL_LIBRARIES}")
+
    if( WIN32 )
      if ( MSVC )
        list( APPEND CURL_LIBRARIES Wldap32 )
@@ -261,7 +268,7 @@ else( WIN32 ) # Apple AND Linux
 
     if( APPLE )
         # Apple Specific Options Here
-        message( STATUS "Configuring BitShares on OS X" )
+        message( STATUS "Configuring BitShares on macOS" )
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall -fvisibility-inlines-hidden -fvisibility=hidden" )
     else( APPLE )
         if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD" )
