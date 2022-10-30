@@ -41,4 +41,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: bitshares/bitshares-core:${{ env.DOCKER_PUSH_TAG }}
+        tags: ${{ secrets.DOCKERHUB_REPO_PATH }}:${{ env.DOCKER_PUSH_TAG }}
