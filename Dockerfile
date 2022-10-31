@@ -52,7 +52,10 @@ RUN \
 	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
     make witness_node cli_wallet get_dev_key && \
-    install -s programs/witness_node/witness_node programs/genesis_util/get_dev_key programs/cli_wallet/cli_wallet /usr/local/bin && \
+    install -s programs/witness_node/witness_node \
+               programs/genesis_util/get_dev_key \
+               programs/cli_wallet/cli_wallet \
+            /usr/local/bin && \
     #
     # Obtain version
     mkdir -p /etc/bitshares && \
@@ -62,7 +65,8 @@ RUN \
 
 # Home directory $HOME
 WORKDIR /
-RUN useradd -s /bin/bash -m -d /var/lib/bitshares bitshares
+RUN groupadd -g 10001 bitshares
+RUN useradd -u 10000 -g bitshares -s /bin/bash -m -d /var/lib/bitshares --no-log-init bitshares
 ENV HOME /var/lib/bitshares
 RUN chown bitshares:bitshares -R /var/lib/bitshares
 
@@ -82,6 +86,8 @@ RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 
 # Make Docker send SIGINT instead of SIGTERM to the daemon
 STOPSIGNAL SIGINT
+
+USER bitshares:bitshares
 
 # default execute entry
 CMD ["/usr/local/bin/bitsharesentry.sh"]
