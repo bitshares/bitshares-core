@@ -17,6 +17,15 @@ jobs:
         fi
         echo "DOCKER_PUSH_TAG=${DOCKER_PUSH_TAG}"
         echo "DOCKER_PUSH_TAG=${DOCKER_PUSH_TAG}" >> $GITHUB_ENV
+        VERSION_MAJOR=`echo "${DOCKER_PUSH_TAG}" | cut -f1 -d'.'`
+        if [ "${VERSION_MAJOR}" != "${DOCKER_PUSH_TAG}" ]; then
+          VERSION_MINOR=`echo "${DOCKER_PUSH_TAG}" | cut -f2 -d'.'`
+          DOCKER_PUSH_TAG_SHORT=${VERSION_MAJOR}.${VERSION_MINOR}
+          if [ "${DOCKER_PUSH_TAG_SHORT}" != "${DOCKER_PUSH_TAG}" ]; then
+            echo "DOCKER_PUSH_TAG_SHORT=${DOCKER_PUSH_TAG_SHORT}"
+            echo "DOCKER_PUSH_TAG_SHORT=${DOCKER_PUSH_TAG_SHORT}" >> $GITHUB_ENV
+          fi
+        fi
     - name: Test tag
       if: env.DOCKER_PUSH_TAG != ''
       run: echo "${DOCKER_PUSH_TAG}"
@@ -35,10 +44,19 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Push to DockerHub
-      if: env.DOCKER_PUSH_TAG != ''
+    - name: Push to DockerHub (for branches)
+      if: env.DOCKER_PUSH_TAG != '' && env.DOCKER_PUSH_TAG_SHORT == ''
       uses: docker/build-push-action@v3
       with:
         context: .
         push: true
         tags: ${{ secrets.DOCKERHUB_REPO_PATH }}:${{ env.DOCKER_PUSH_TAG }}
+    - name: Push to DockerHub (for tags)
+      if: env.DOCKER_PUSH_TAG != '' && env.DOCKER_PUSH_TAG_SHORT != ''
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_REPO_PATH }}:${{ env.DOCKER_PUSH_TAG }}
+          ${{ secrets.DOCKERHUB_REPO_PATH }}:${{ env.DOCKER_PUSH_TAG_SHORT }}
