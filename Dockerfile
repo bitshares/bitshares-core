@@ -87,7 +87,7 @@ RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 # Make Docker send SIGINT instead of SIGTERM to the daemon
 STOPSIGNAL SIGINT
 
-USER bitshares:bitshares
+#USER bitshares:bitshares
 
 # default execute entry
 CMD ["/usr/local/bin/bitsharesentry.sh"]
