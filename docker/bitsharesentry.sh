@@ -86,6 +86,9 @@ ln -f -s /etc/bitshares/logging.ini /var/lib/bitshares
 
 chown -R bitshares:bitshares /var/lib/bitshares
 
+# Get the latest security updates
+apt-get update && apt-get upgrade -y -o Dpkg::Options::="--force-confold"
+
 # Plugins need to be provided in a space-separated list, which
 # makes it necessary to write it like this
 if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
