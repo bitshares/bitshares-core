@@ -1,7 +1,8 @@
-FROM phusion/baseimage:focal-1.2.0
-MAINTAINER The bitshares decentralized organisation
-
+# The image for building
+FROM phusion/baseimage:focal-1.2.0 as build
 ENV LANG=en_US.UTF-8
+
+# Install dependencies
 RUN \
     apt-get update && \
     apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
@@ -63,12 +64,38 @@ RUN \
     cd / && \
     rm -rf /bitshares-core
 
-# Home directory $HOME
+# The final image
+FROM phusion/baseimage:focal-1.2.0
+LABEL maintainer="The bitshares decentralized organisation"
+ENV LANG=en_US.UTF-8
+
+# Install required libraries
+RUN \
+    apt-get update && \
+    apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
+    apt-get update && \
+    apt-get install --no-install-recommends -y \
+      libcurl4 \
+      ca-certificates \
+    && \
+    mkdir -p /etc/bitshares && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --from=build /usr/local/bin/* /usr/local/bin/
+COPY --from=build /etc/bitshares/version /etc/bitshares/
+
 WORKDIR /
 RUN groupadd -g 10001 bitshares
 RUN useradd -u 10000 -g bitshares -s /bin/bash -m -d /var/lib/bitshares --no-log-init bitshares
 ENV HOME /var/lib/bitshares
 RUN chown bitshares:bitshares -R /var/lib/bitshares
+
+# default exec/config files
+ADD docker/default_config.ini /etc/bitshares/config.ini
+ADD docker/default_logging.ini /etc/bitshares/logging.ini
+ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
+RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 
 # Volume
 VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
@@ -78,16 +105,11 @@ EXPOSE 8090
 # p2p service:
 EXPOSE 1776
 
-# default exec/config files
-ADD docker/default_config.ini /etc/bitshares/config.ini
-ADD docker/default_logging.ini /etc/bitshares/logging.ini
-ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
-RUN chmod a+x /usr/local/bin/bitsharesentry.sh
-
 # Make Docker send SIGINT instead of SIGTERM to the daemon
 STOPSIGNAL SIGINT
 
+# Temporarily commented out due to permission issues cuased by older versions, to be restored in a future version
 #USER bitshares:bitshares
 
 # default execute entry
-CMD ["/usr/local/bin/bitsharesentry.sh"]
+ENTRYPOINT ["/usr/local/bin/bitsharesentry.sh"]
