@@ -106,8 +106,8 @@ The blockchain data will be stored under the directory `witness_node_data_dir`.
 
 **Stop Node Software:**
 
-For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
-It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to inisiate the node run so you can go back to the node run screen to stop it.
+For stopping the node run cleanly, you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
+It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to initiate the node run so you can go back to the node run screen to stop it.
 
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
