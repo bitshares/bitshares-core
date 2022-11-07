@@ -256,12 +256,12 @@ The `cli_wallet` program can also be configured to serve **all of its commands**
 
 Start `cli_wallet` with RPC connection enabled:
 
-    $ ./programs/cli_wallet/cli_wallet --rpc-endpoint=127.0.0.1:8091
+    $ ./programs/cli_wallet/cli_wallet --rpc-http-endpoint=127.0.0.1:8093
 
 Access the wallet API using an HTTP client:
 
-    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8091/
-    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8091/
+    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8093/
+    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8093/
 
 Note: The syntax to access wallet API is a bit different than accessing node API.
 
@@ -343,8 +343,8 @@ FAQ
 - Is there a way to allow external program to drive `cli_wallet` via websocket, JSONRPC, or HTTP?
 
     Yes. External programs may connect to the command-line wallet and make its calls over a websockets API. To do this, run the wallet in
-    server mode, i.e. `cli_wallet -s "127.0.0.1:9999"` and then have the external program connect to it over the specified port
-    (in this example, port 9999). Please check the ["Using the API"](#using-the-api) section for more info.
+    server mode, i.e. `cli_wallet -H "127.0.0.1:9999"` and then have the external program connect to it over the specified port
+    (in this example, port 9999). Please check the ["Using Built-In APIs"](#using-built-in-apis) section for more info.
 
 - Is there a way to access methods which require login over HTTP?
 
@@ -370,7 +370,7 @@ FAQ
 - The answer to the previous question was really confusing.  Can you make it clearer?
 
     All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
-    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account,"
+    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account",
     which is controlled by the committee members and has a few abilities and restrictions other accounts
     do not).
 
