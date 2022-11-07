@@ -107,7 +107,7 @@ EXPOSE 1776
 # Make Docker send SIGINT instead of SIGTERM to the daemon
 STOPSIGNAL SIGINT
 
-# Temporarily commented out due to permission issues cuased by older versions, to be restored in a future version
+# Temporarily commented out due to permission issues caused by older versions, to be restored in a future version
 #USER bitshares:bitshares
 
 # default execute entry
