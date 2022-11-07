@@ -48,7 +48,7 @@ void verify_authority_accounts( const database& db, const authority& a )
       "Maximum authority membership exceeded" );
    for( const auto& acnt : a.account_auths )
    {
-      GRAPHENE_ASSERT( db.find_object( acnt.first ) != nullptr,
+      GRAPHENE_ASSERT( db.find( acnt.first ) != nullptr,
          internal_verify_auth_account_not_found,
          "Account ${a} specified in authority does not exist",
          ("a", acnt.first) );
@@ -69,7 +69,7 @@ void verify_account_votes( const database& db, const account_options& options )
    FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
-   FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
+   FC_ASSERT( db.find(options.voting_account), "Invalid proxy account specified." );
 
    uint32_t max_vote_id = gpo.next_available_vote_id;
    bool has_worker_votes = false;
@@ -177,7 +177,8 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 
    const auto& global_properties = d.get_global_properties();
 
-   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]( account_object& obj )
+   const auto& new_acnt_object = d.create<account_object>( [&o,&d,&global_properties,referrer_percent]
+                                                           ( account_object& obj )
    {
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
@@ -208,6 +209,9 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
             obj.allowed_assets = o.extensions.value.buyback_options->markets;
             obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
          }
+
+         obj.creation_block_num = d._current_block_num;
+         obj.creation_time      = d._current_block_time;
    });
 
    const auto& dynamic_properties = d.get_dynamic_global_properties();

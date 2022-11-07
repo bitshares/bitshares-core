@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_with_callback_test ) {
       };
 
       fc::ecc::private_key cid_key = fc::ecc::private_key::regenerate( fc::digest("key") );
-      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).id;
+      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).get_id();
       fund( cid_id(db) );
 
       auto nb_api = std::make_shared< graphene::app::network_broadcast_api >( app );
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_disabled_p2p_test ) {
       };
 
       fc::ecc::private_key cid_key = fc::ecc::private_key::regenerate( fc::digest("key") );
-      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).id;
+      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).get_id();
       fund( cid_id(db) );
 
       auto nb_api = std::make_shared< graphene::app::network_broadcast_api >( app );
@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_too_large ) {
    try {
 
       fc::ecc::private_key cid_key = fc::ecc::private_key::regenerate( fc::digest("key") );
-      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).id;
+      const account_id_type cid_id = create_account( "cid", cid_key.get_public_key() ).get_id();
       fund( cid_id(db) );
 
       auto nb_api = std::make_shared< graphene::app::network_broadcast_api >( app );

@@ -47,7 +47,7 @@ bool _is_authorized_asset(
 
    if( acct.allowed_assets.valid() )
    {
-      if( acct.allowed_assets->find( asset_obj.id ) == acct.allowed_assets->end() )
+      if( acct.allowed_assets->find( asset_obj.get_id() ) == acct.allowed_assets->end() )
          return false;
       // must still pass other checks even if it is in allowed_assets
    }

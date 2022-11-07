@@ -34,7 +34,6 @@
 
 namespace graphene { namespace db {
    class object_database;
-   using fc::path;
 
    /**
     * @class index_observer
@@ -43,7 +42,7 @@ namespace graphene { namespace db {
    class index_observer
    {
       public:
-         virtual ~index_observer(){}
+         virtual ~index_observer() = default;
          /** called just after the object is added */
          virtual void on_add( const object& obj ){}
          /** called just before obj is removed */
@@ -71,7 +70,7 @@ namespace graphene { namespace db {
    class index
    {
       public:
-         virtual ~index(){}
+         virtual ~index() = default;
 
          virtual uint8_t object_space_id()const = 0;
          virtual uint8_t object_type_id()const = 0;
@@ -126,20 +125,21 @@ namespace graphene { namespace db {
           */
          template<typename Object, typename Lambda>
          void modify( const Object& obj, const Lambda& l ) {
-            modify( static_cast<const object&>(obj), std::function<void(object&)>( [&]( object& o ){ l( static_cast<Object&>(o) ); } ) );
+            modify( static_cast<const object&>(obj),
+                    std::function<void(object&)>( [&l]( object& o ){ l( static_cast<Object&>(o) ); } ) );
          }
 
-         virtual void               inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
-         virtual void               add_observer( const shared_ptr<index_observer>& ) = 0;
+         virtual void inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
+         virtual void add_observer( const std::shared_ptr<index_observer>& ) = 0;
 
-         virtual void               object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
-         virtual void               object_default( object& obj )const = 0;
+         virtual void object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
+         virtual void object_default( object& obj )const = 0;
    };
 
    class secondary_index
    {
       public:
-         virtual ~secondary_index(){};
+         virtual ~secondary_index() = default;
          virtual void object_inserted( const object& obj ){};
          virtual void object_removed( const object& obj ){};
          virtual void about_to_modify( const object& before ){};
@@ -152,7 +152,9 @@ namespace graphene { namespace db {
    class base_primary_index
    {
       public:
-         base_primary_index( object_database& db ):_db(db){}
+         explicit base_primary_index( object_database& db ):_db(db){}
+
+         virtual ~base_primary_index() = default;
 
          /** called just before obj is modified */
          void save_undo( const object& obj );
@@ -185,8 +187,8 @@ namespace graphene { namespace db {
          }
 
       protected:
-         vector< shared_ptr<index_observer> >   _observers;
-         vector< unique_ptr<secondary_index> >  _sindex;
+         std::vector< std::shared_ptr<index_observer> >   _observers;
+         std::vector< std::unique_ptr<secondary_index> >  _sindex;
 
       private:
          object_database& _db;
@@ -210,7 +212,7 @@ namespace graphene { namespace db {
          static const size_t MAX_HOLE = 100;
          static const size_t _mask = ((1ULL << chunkbits) - 1);
          uint64_t next = 0;
-         vector< vector< const Object* > > content;
+         std::vector< std::vector< const Object* > > content;
          std::stack< object_id_type > ids_being_modified;
 
       public:
@@ -218,9 +220,7 @@ namespace graphene { namespace db {
             FC_ASSERT( (1ULL << chunkbits) > MAX_HOLE, "Small chunkbits is inefficient." );
          }
 
-         virtual ~direct_index(){}
-
-         virtual void object_inserted( const object& obj )
+         void object_inserted( const object& obj ) override
          {
             uint64_t instance = obj.id.instance();
             if( instance == next )
@@ -233,10 +233,12 @@ namespace graphene { namespace db {
                next++;
             }
             else if( instance < next )
-               FC_ASSERT( !content[instance >> chunkbits][instance & _mask], "Overwriting insert at {id}!", ("id",obj.id) );
+               FC_ASSERT( !content[instance >> chunkbits][instance & _mask],
+                          "Overwriting insert at {id}!", ("id",obj.id) );
             else // instance > next, allow small "holes"
             {
-               FC_ASSERT( instance <= next + MAX_HOLE, "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
+               FC_ASSERT( instance <= next + MAX_HOLE,
+                          "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
                if( 0 == (next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
                {
                   content.resize((instance >> chunkbits) + 1);
@@ -252,21 +254,22 @@ namespace graphene { namespace db {
             content[instance >> chunkbits][instance & _mask] = static_cast<const Object*>( &obj );
          }
 
-         virtual void object_removed( const object& obj )
+         void object_removed( const object& obj ) override
          {
             FC_ASSERT( nullptr != dynamic_cast<const Object*>(&obj), "Wrong object type!" );
             uint64_t instance = obj.id.instance();
             FC_ASSERT( instance < next, "Removing out-of-range object: {id} > {next}!", ("id",obj.id)("next",next) );
-            FC_ASSERT( content[instance >> chunkbits][instance & _mask], "Removing non-existent object {id}!", ("id",obj.id) );
+            FC_ASSERT( content[instance >> chunkbits][instance & _mask],
+                       "Removing non-existent object {id}!", ("id",obj.id) );
             content[instance >> chunkbits][instance & _mask] = nullptr;
          }
 
-         virtual void about_to_modify( const object& before )
+         void about_to_modify( const object& before ) override
          {
             ids_being_modified.emplace( before.id );
          }
 
-         virtual void object_modified( const object& after  )
+         void object_modified( const object& after  ) override
          {
             FC_ASSERT( ids_being_modified.top() == after.id, "Modification of ID is not supported!");
             ids_being_modified.pop();
@@ -309,27 +312,27 @@ namespace graphene { namespace db {
    class primary_index  : public DerivedIndex, public base_primary_index
    {
       public:
-         typedef typename DerivedIndex::object_type object_type;
+         using object_type = typename DerivedIndex::object_type;
 
-         primary_index( object_database& db )
+         explicit primary_index( object_database& db )
          :base_primary_index(db),_next_id(object_type::space_id,object_type::type_id,0)
          {
             if( DirectBits > 0 )
                _direct_by_id = add_secondary_index< direct_index< object_type, DirectBits > >();
          }
 
-         virtual uint8_t object_space_id()const override
+         uint8_t object_space_id()const override
          { return object_type::space_id; }
 
-         virtual uint8_t object_type_id()const override
+         uint8_t object_type_id()const override
          { return object_type::type_id; }
 
-         virtual object_id_type get_next_id()const override              { return _next_id;    }
-         virtual void           use_next_id()override                    { ++_next_id.number;  }
-         virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
+         object_id_type get_next_id()const override              { return _next_id;    }
+         void           use_next_id()override                    { ++_next_id.number;  }
+         void           set_next_id( object_id_type id )override { _next_id = id;      }
 
          /** @return the object with id or nullptr if not found */
-         virtual const object*  find( object_id_type id )const override
+         const object*  find( object_id_type id )const override
          {
             if( DirectBits > 0 )
                return _direct_by_id->find( id );
@@ -338,12 +341,12 @@ namespace graphene { namespace db {
 
          fc::sha256 get_object_version()const
          {
-            std::string desc = "1.0";//get_type_description<object_type>();
+            std::string desc = "1.0";
             return fc::sha256::hash(desc);
          }
 
-         virtual void open( const path& db )override
-         { 
+         void open( const fc::path& db )override
+         {
             if( !fc::exists( db ) ) return;
             fc::file_mapping fm( db.generic_string().c_str(), fc::read_only );
             fc::mapped_region mr( fm, fc::read_only, 0, fc::file_size(db) );
@@ -352,8 +355,9 @@ namespace graphene { namespace db {
 
             fc::raw::unpack(ds, _next_id);
             fc::raw::unpack(ds, open_ver);
-            FC_ASSERT( open_ver == get_object_version(), "Incompatible Version, the serialization of objects in this index has changed" );
-            vector<char> tmp;
+            FC_ASSERT( open_ver == get_object_version(),
+                       "Incompatible Version, the serialization of objects in this index has changed" );
+            std::vector<char> tmp;
             while( ds.remaining() > 0 )
             {
                fc::raw::unpack( ds, tmp );
@@ -361,22 +365,22 @@ namespace graphene { namespace db {
             }
          }
 
-         virtual void save( const path& db ) override 
+         void save( const fc::path& db ) override
          {
-            std::ofstream out( db.generic_string(), 
+            std::ofstream out( db.generic_string(),
                                std::ofstream::binary | std::ofstream::out | std::ofstream::trunc );
             FC_ASSERT( out );
             auto ver  = get_object_version();
             fc::raw::pack( out, _next_id );
             fc::raw::pack( out, ver );
-            this->inspect_all_objects( [&]( const object& o ) {
+            this->inspect_all_objects( [&out]( const object& o ) {
                 auto vec = fc::raw::pack( static_cast<const object_type&>(o) );
                 auto packed_vec = fc::raw::pack( vec );
                 out.write( packed_vec.data(), packed_vec.size() );
             });
          }
 
-         virtual const object&  load( const std::vector<char>& data )override
+         const object&  load( const std::vector<char>& data )override
          {
             const auto& result = DerivedIndex::insert( fc::raw::unpack<object_type>( data ) );
             for( const auto& item : _sindex )
@@ -385,7 +389,7 @@ namespace graphene { namespace db {
          }
 
 
-         virtual const object&  create(const std::function<void(object&)>& constructor )override
+         const object&  create(const std::function<void(object&)>& constructor )override
          {
             const auto& result = DerivedIndex::create( constructor );
             for( const auto& item : _sindex )
@@ -394,7 +398,7 @@ namespace graphene { namespace db {
             return result;
          }
 
-         virtual const object& insert( object&& obj ) override
+         const object& insert( object&& obj ) override
          {
             const auto& result = DerivedIndex::insert( std::move( obj ) );
             for( const auto& item : _sindex )
@@ -403,7 +407,7 @@ namespace graphene { namespace db {
             return result;
          }
 
-         virtual void  remove( const object& obj ) override
+         void  remove( const object& obj ) override
          {
             for( const auto& item : _sindex )
                item->object_removed( obj );
@@ -411,7 +415,7 @@ namespace graphene { namespace db {
             DerivedIndex::remove(obj);
          }
 
-         virtual void modify( const object& obj, const std::function<void(object&)>& m )override
+         void modify( const object& obj, const std::function<void(object&)>& m )override
          {
             save_undo( obj );
             for( const auto& item : _sindex )
@@ -422,12 +426,12 @@ namespace graphene { namespace db {
             on_modify( obj );
          }
 
-         virtual void add_observer( const shared_ptr<index_observer>& o ) override
+         void add_observer( const std::shared_ptr<index_observer>& o ) override
          {
             _observers.emplace_back( o );
          }
 
-         virtual void object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const override
+         void object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const override
          {
             object_id_type id = obj.id;
             object_type* result = dynamic_cast<object_type*>( &obj );
@@ -436,7 +440,7 @@ namespace graphene { namespace db {
             obj.id = id;
          }
 
-         virtual void object_default( object& obj )const override
+         void object_default( object& obj )const override
          {
             object_id_type id = obj.id;
             object_type* result = dynamic_cast<object_type*>( &obj );

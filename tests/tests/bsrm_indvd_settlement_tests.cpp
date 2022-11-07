@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       if( 0 == i )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
@@ -128,31 +128,31 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // 100000 / 2100 = 47.619047619
       // undercollateralization price = 100000:2100 * 1250:1000 = 100000:1680
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // 100000 / 2200 = 45.454545455
       // undercollateralization price = 100000:2200 * 1250:1000 = 100000:1760
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(2200) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // 100000 / 2500 = 40
       // undercollateralization price = 100000:2500 * 1250:1000 = 100000:2000
       const call_order_object* call4_ptr = borrow( borrower4, asset(100000, mpa_id), asset(2500) );
       BOOST_REQUIRE( call4_ptr );
-      call_order_id_type call4_id = call4_ptr->id;
+      call_order_id_type call4_id = call4_ptr->get_id();
 
       // 100000 / 2240 = 44.642857143
       // undercollateralization price = 100000:2240 * 1250:1000 = 100000:1792
       const call_order_object* call5_ptr = borrow( borrower5, asset(1000000, mpa_id), asset(22400) );
       BOOST_REQUIRE( call5_ptr );
-      call_order_id_type call5_id = call5_ptr->id;
+      call_order_id_type call5_id = call5_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -191,36 +191,36 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       // seller sells some
       const limit_order_object* sell_low = create_sell_order( seller, asset(10000,mpa_id), asset(190) );
       BOOST_REQUIRE( sell_low );
-      limit_order_id_type sell_low_id = sell_low->id;
+      limit_order_id_type sell_low_id = sell_low->get_id();
       BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 10000 );
 
       // seller sells some
       const limit_order_object* sell_mid = create_sell_order( seller, asset(100000,mpa_id), asset(2000) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100000 );
 
       // seller4 sells some
       const limit_order_object* sell_mid2 = create_sell_order( seller4, asset(20000,mpa_id), asset(439) );
       BOOST_REQUIRE( sell_mid2 );
-      limit_order_id_type sell_mid2_id = sell_mid2->id;
+      limit_order_id_type sell_mid2_id = sell_mid2->get_id();
       BOOST_CHECK_EQUAL( sell_mid2_id(db).for_sale.value, 20000 );
 
       // seller sells some
       const limit_order_object* sell_high = create_sell_order( seller, asset(100000,mpa_id), asset(2400) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100000 );
 
       // seller2 settles
       auto result = force_settle( seller2, asset(50000,mpa_id) );
-      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
       BOOST_REQUIRE( db.find( settle_id ) );
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 50000 );
 
       // seller3 settles
       result = force_settle( seller3, asset(10000,mpa_id) );
-      force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle2_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
       BOOST_REQUIRE( db.find( settle2_id ) );
       BOOST_CHECK_EQUAL( settle2_id(db).balance.amount.value, 10000 );
 
@@ -529,7 +529,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
          BOOST_TEST_MESSAGE( "Seller4 sells some" );
          const limit_order_object* sell_mid3 = create_sell_order( seller4, asset(20000,mpa_id), asset(439) );
          BOOST_REQUIRE( sell_mid3 );
-         limit_order_id_type sell_mid3_id = sell_mid3->id;
+         limit_order_id_type sell_mid3_id = sell_mid3->get_id();
 
          auto check_result_2 = [&]
          {
@@ -589,7 +589,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       // Create asset
       asset_id_type samcoin_id = create_user_issued_asset( "SAMCOIN", sam_id(db), charge_market_fee,
                                                            price(asset(1, asset_id_type(1)), asset(1)),
-                                                           2, 100 ).id; // fee 1%
+                                                           2, 100 ).get_id(); // fee 1%
       issue_uia( borrower, asset(init_amount, samcoin_id) );
       issue_uia( borrower2, asset(init_amount, samcoin_id) );
 
@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_fund );
@@ -643,12 +643,12 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000, samcoin_id) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // undercollateralization price = 100000:2500 * 1250:1000 = 100000:2000
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2500, samcoin_id) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -875,7 +875,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_fund );
@@ -904,22 +904,22 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // undercollateralization price = 100000:2100 * 1250:1000 = 100000:1680
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // undercollateralization price = 100000:2200 * 1250:1000 = 100000:1760
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(2200) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // undercollateralization price = 100000:2500 * 1250:1000 = 100000:2000
       const call_order_object* call4_ptr = borrow( borrower4, asset(100000, mpa_id), asset(2500) );
       BOOST_REQUIRE( call4_ptr );
-      call_order_id_type call4_id = call4_ptr->id;
+      call_order_id_type call4_id = call4_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -978,7 +978,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       BOOST_CHECK_THROW( borrow( borrower5, asset(100000, mpa_id), asset(3135) ), fc::exception );
       const call_order_object* call5_ptr = borrow( borrower5, asset(100000, mpa_id), asset(3136) );
       BOOST_REQUIRE( call5_ptr );
-      call_order_id_type call5_id = call5_ptr->id;
+      call_order_id_type call5_id = call5_ptr->get_id();
 
       BOOST_CHECK_EQUAL( call5_id(db).debt.value, 100000 );
       BOOST_CHECK_EQUAL( call5_id(db).collateral.value, 3136 );
@@ -1012,7 +1012,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       limit_ptr = create_sell_order( seller, asset(100000,mpa_id), asset(2000) );
       // the limit order is not filled
       BOOST_REQUIRE( limit_ptr );
-      limit_order_id_type limit_id = limit_ptr->id;
+      limit_order_id_type limit_id = limit_ptr->get_id();
 
       BOOST_CHECK_EQUAL( limit_ptr->for_sale.value, 100000 );
 
@@ -1177,7 +1177,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_order );
@@ -1205,22 +1205,22 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // undercollateralization price = 100000:2100 * 1250:1000 = 100000:1680
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // undercollateralization price = 100000:2200 * 1250:1000 = 100000:1760
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(2200) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // undercollateralization price = 100000:2500 * 1250:1000 = 100000:2000
       const call_order_object* call4_ptr = borrow( borrower4, asset(100000, mpa_id), asset(2500) );
       BOOST_REQUIRE( call4_ptr );
-      call_order_id_type call4_id = call4_ptr->id;
+      call_order_id_type call4_id = call4_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -1320,7 +1320,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       // borrower buys at higher price
       const limit_order_object* buy_high = create_sell_order( borrower, asset(10), asset(100,mpa_id) );
       BOOST_CHECK( buy_high );
-      limit_order_id_type buy_high_id = buy_high->id;
+      limit_order_id_type buy_high_id = buy_high->get_id();
 
       // seller sells some, this will match buy_high,
       // and when it matches call4, it will be cancelled since it is too small
@@ -1348,7 +1348,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       // borrower buys at higher price
       buy_high = create_sell_order( borrower, asset(10), asset(100,mpa_id) );
       BOOST_CHECK( buy_high );
-      buy_high_id = buy_high->id;
+      buy_high_id = buy_high->get_id();
 
       // seller sells some, this will match buy_high,
       // and when it matches the settled debt, it will be cancelled since it is too small
@@ -1473,7 +1473,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_order );
@@ -1484,7 +1484,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       trx.operations.push_back( acop );
       ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa2 = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa2_id = mpa2.id;
+      asset_id_type mpa2_id = mpa2.get_id();
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -1518,12 +1518,12 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // undercollateralization price = 100000:2100 * 1250:1000 = 100000:1680
       const call_order_object* call2_ptr = borrow( borrower, asset(100000, mpa2_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -1564,13 +1564,13 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
 
       // seller settles some
       auto result = force_settle( seller, asset(11100,mpa_id) );
-      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
       BOOST_REQUIRE( db.find(settle_id) );
 
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
 
       result = force_settle( seller, asset(11100,mpa2_id) );
-      force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle2_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
       BOOST_REQUIRE( db.find(settle2_id) );
 
       BOOST_CHECK_EQUAL( settle2_id(db).balance.amount.value, 11100 );

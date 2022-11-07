@@ -214,8 +214,8 @@ namespace graphene { namespace wallet { namespace detail {
       return msg;
    }
 
-   bool wallet_api_impl::verify_message( const string& message, const string& account, int block, const string& time,
-                        const compact_signature& sig )
+   bool wallet_api_impl::verify_message( const string& message, const string& account, int32_t block,
+                                         const string& msg_time, const fc::ecc::compact_signature& sig )
    {
       const account_object from_account = get_account( account );
 
@@ -224,7 +224,7 @@ namespace graphene { namespace wallet { namespace detail {
       msg.meta.account = from_account.name;
       msg.meta.memo_key = from_account.options.memo_key;
       msg.meta.block = block;
-      msg.meta.time = time;
+      msg.meta.time = msg_time;
       msg.signature = sig;
 
       return verify_signed_message( msg );
@@ -236,7 +236,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       const account_object from_account = get_account( message.meta.account );
 
-      const public_key signer( *message.signature, message.digest() );
+      const fc::ecc::public_key signer( *message.signature, message.digest() );
       if( !( message.meta.memo_key == signer ) ) return false;
       FC_ASSERT( from_account.options.memo_key == signer,
                  "Message was signed by contained key, but it doesn't belong to the contained account!" );
@@ -442,7 +442,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       _wallet.update_account(account);
 
-      _wallet.extra_keys[account.id].insert(wif_pub_key);
+      _wallet.extra_keys[account.get_id()].insert(wif_pub_key);
 
       return all_keys_for_account.find(wif_pub_key) != all_keys_for_account.end();
    }
@@ -496,13 +496,13 @@ namespace graphene { namespace wallet { namespace detail {
       get_object( update_op.proposal );
 
       for( const std::string& name : delta.active_approvals_to_add )
-         update_op.active_approvals_to_add.insert( get_account( name ).id );
+         update_op.active_approvals_to_add.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.active_approvals_to_remove )
-         update_op.active_approvals_to_remove.insert( get_account( name ).id );
+         update_op.active_approvals_to_remove.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.owner_approvals_to_add )
-         update_op.owner_approvals_to_add.insert( get_account( name ).id );
+         update_op.owner_approvals_to_add.insert( get_account( name ).get_id() );
       for( const std::string& name : delta.owner_approvals_to_remove )
-         update_op.owner_approvals_to_remove.insert( get_account( name ).id );
+         update_op.owner_approvals_to_remove.insert( get_account( name ).get_id() );
       for( const std::string& k : delta.key_approvals_to_add )
          update_op.key_approvals_to_add.insert( public_key_type( k ) );
       for( const std::string& k : delta.key_approvals_to_remove )

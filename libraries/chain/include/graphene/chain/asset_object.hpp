@@ -53,12 +53,10 @@ namespace graphene { namespace chain {
     *  This object exists as an implementation detail and its ID should never be referenced by
     *  a blockchain operation.
     */
-   class asset_dynamic_data_object : public abstract_object<asset_dynamic_data_object>
+   class asset_dynamic_data_object : public abstract_object<asset_dynamic_data_object,
+                                               implementation_ids, impl_asset_dynamic_data_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_asset_dynamic_data_object_type;
-
          /// The number of shares currently in existence
          share_type current_supply;
          share_type confidential_supply; ///< total asset held in confidential balances
@@ -74,12 +72,9 @@ namespace graphene { namespace chain {
     *  All assets have a globally unique symbol name that controls how they are traded and an issuer who
     *  has authority over the parameters of the asset.
     */
-   class asset_object : public graphene::db::abstract_object<asset_object>
+   class asset_object : public graphene::db::abstract_object<asset_object, protocol_ids, asset_object_type>
    {
       public:
-         static constexpr uint8_t space_id = protocol_ids;
-         static constexpr uint8_t type_id  = asset_object_type;
-
          /// This function does not check if any registered asset has this symbol or not; it simply checks whether the
          /// symbol would be valid.
          /// @return true if symbol is a valid ticker symbol; false otherwise.
@@ -116,7 +111,7 @@ namespace graphene { namespace chain {
          bool can_bid_collateral()const { return (0 == (options.flags & disable_collateral_bidding)); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
-         asset amount(share_type a)const { return asset(a, id); }
+         asset amount(share_type a)const { return asset(a, asset_id_type(id)); }
          /// Convert a string amount (i.e. "123.45") to an asset object with this asset's type
          /// The string may have a decimal and/or a negative sign.
          asset amount_from_string(string amount_string)const;
@@ -141,7 +136,6 @@ namespace graphene { namespace chain {
 
          asset_options options;
 
-
          /// Current supply, fee pool, and collected fees are stored in a separate object as they change frequently.
          asset_dynamic_data_id_type  dynamic_asset_data_id;
          /// Extra data associated with BitAssets. This field is non-null if and only if is_market_issued() returns true
@@ -152,7 +146,10 @@ namespace graphene { namespace chain {
          /// The ID of the liquidity pool if the asset is the share asset of a liquidity pool
          optional<liquidity_pool_id_type> for_liquidity_pool;
 
-         asset_id_type get_id()const { return id; }
+         /// The block number when the asset object was created
+         uint32_t       creation_block_num = 0;
+         /// The time when the asset object was created
+         time_point_sec creation_time;
 
          void validate()const
          {
@@ -255,12 +252,10 @@ namespace graphene { namespace chain {
     *  @ingroup object
     *  @ingroup implementation
     */
-   class asset_bitasset_data_object : public abstract_object<asset_bitasset_data_object>
+   class asset_bitasset_data_object : public abstract_object<asset_bitasset_data_object,
+                                                implementation_ids, impl_asset_bitasset_data_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_asset_bitasset_data_object_type;
-
          /// The asset this object belong to
          asset_id_type asset_id;
 
@@ -486,6 +481,8 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (bitasset_data_id)
                     (buyback_account)
                     (for_liquidity_pool)
+                    (creation_block_num)
+                    (creation_time)
                   )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )

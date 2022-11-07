@@ -54,14 +54,14 @@ BOOST_AUTO_TEST_CASE( credit_offer_hardfork_time_test )
       const asset_object& core = asset_id_type()(db);
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( sam, usd.amount(init_amount) );
 
       // Before the hard fork, unable to create a credit offer or transact against a credit offer or a credit deal,
       // or do any of them with proposals
       flat_map<asset_id_type, price> collateral_map;
       collateral_map[usd_id] = price( asset(1), asset(1, usd_id) );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               db.head_block_time() + fc::days(1), collateral_map, {} ),
                          fc::exception );
 
@@ -75,8 +75,8 @@ BOOST_AUTO_TEST_CASE( credit_offer_hardfork_time_test )
       BOOST_CHECK_THROW( repay_credit_deal( sam_id, tmp_cd_id, core.amount(100), core.amount(100) ),
                          fc::exception );
 
-      credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.id, 10000, 100, 3600, 0, false,
-                                              db.head_block_time() + fc::days(1), collateral_map, {} );
+      credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.get_id(), 10000, 100, 3600, 0,
+                                              false, db.head_block_time() + fc::days(1), collateral_map, {} );
       BOOST_CHECK_THROW( propose( cop ), fc::exception );
 
       credit_offer_delete_operation dop = make_credit_offer_delete_op( sam_id, tmp_co_id );
@@ -130,12 +130,12 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
       // Make a whitelist
@@ -177,8 +177,8 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
          flat_map<asset_id_type, price> collateral_map;
          collateral_map[usd_id] = price( asset(1), asset(1, usd_id) );
 
-         credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.id, 10000, 100, 3600, 0, false,
-                                              db.head_block_time() + fc::days(1), collateral_map, {} );
+         credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.get_id(), 10000, 100, 3600, 0,
+                                              false, db.head_block_time() + fc::days(1), collateral_map, {} );
          propose( cop );
 
          credit_offer_delete_operation dop = make_credit_offer_delete_op( sam_id, tmp_co_id );
@@ -241,9 +241,9 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
       flat_map<asset_id_type, price> collateral_map1;
       collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
 
-      const credit_offer_object& coo1 = create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      const credit_offer_object& coo1 = create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, collateral_map1, {} );
-      credit_offer_id_type co1_id = coo1.id;
+      credit_offer_id_type co1_id = coo1.get_id();
       BOOST_CHECK( coo1.owner_account == sam_id );
       BOOST_CHECK( coo1.asset_type == core.id );
       BOOST_CHECK( coo1.total_balance == 10000 );
@@ -274,7 +274,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
 
       const credit_offer_object& coo2 = create_credit_offer( ted_id, usd_id, 1, 10000000u, duration2, 10000, true,
                                               disable_time2, collateral_map2, borrower_map2 );
-      credit_offer_id_type co2_id = coo2.id;
+      credit_offer_id_type co2_id = coo2.get_id();
       BOOST_CHECK( coo2.owner_account == ted_id );
       BOOST_CHECK( coo2.asset_type == usd_id );
       BOOST_CHECK( coo2.total_balance == 1 );
@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
 
       const credit_offer_object& coo3 = create_credit_offer( sam_id, eur_id, 10, 1, 30, 1, false,
                                               disable_time3, collateral_map3, {} ); // Account is whitelisted
-      credit_offer_id_type co3_id = coo3.id;
+      credit_offer_id_type co3_id = coo3.get_id();
       BOOST_CHECK( coo3.owner_account == sam_id );
       BOOST_CHECK( coo3.asset_type == eur_id );
       BOOST_CHECK( coo3.total_balance == 10 );
@@ -354,7 +354,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
       invalid_borrower_map2_3[no_account_id] = 1; // account does not exist
 
       // Non-positive balance
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 0, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 0, 100, 3600, 0, false,
                                               disable_time1, collateral_map1, {} ),
                          fc::exception );
       BOOST_CHECK_THROW( create_credit_offer( ted_id, usd_id, -1, 10000000u, duration2, 10000, true,
@@ -373,15 +373,15 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
                                               disable_time2, collateral_map2, borrower_map2 ),
                          fc::exception );
       // Negative minimum deal amount
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, -1, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, -1, false,
                                               disable_time1, collateral_map1, {} ),
                          fc::exception );
       // Too big minimum deal amount
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, GRAPHENE_MAX_SHARE_SUPPLY + 1, false,
-                                              disable_time1, collateral_map1, {} ),
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, GRAPHENE_MAX_SHARE_SUPPLY + 1,
+                                              false, disable_time1, collateral_map1, {} ),
                          fc::exception );
       // Auto-disable time in the past and the offer is enabled
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, true,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, true,
                                               disable_time1, collateral_map1, {} ),
                          fc::exception );
       // Auto-disable time too late
@@ -389,29 +389,29 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
                                               too_late_disable_time, collateral_map2, borrower_map2 ),
                          fc::exception );
       // Empty allowed collateral map
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, empty_collateral_map, {} ),
                          fc::exception );
       // Invalid allowed collateral map
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_1, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_2, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_3, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_4, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_5, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_6, {} ),
                          fc::exception );
-      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+      BOOST_CHECK_THROW( create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, invalid_collateral_map1_7, {} ),
                          fc::exception );
       // Invalid acceptable borrowers map
@@ -693,19 +693,19 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD", ted, white_list );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( ray, usd.amount(init_amount) );
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( ray, eur.amount(init_amount) );
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
 
       const asset_object& cny = create_user_issued_asset( "MYCNY" );
-      asset_id_type cny_id = cny.id;
+      asset_id_type cny_id = cny.get_id();
       issue_uia( ray, cny.amount(init_amount) );
       issue_uia( sam, cny.amount(init_amount) );
       issue_uia( ted, cny.amount(init_amount) );
@@ -813,9 +813,9 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
       collateral_map1[eur_id] = price( asset(1), asset(1, eur_id) );
 
-      const credit_offer_object& coo1 = create_credit_offer( sam_id, core.id, 10000, 30000, 3600, 0, false,
+      const credit_offer_object& coo1 = create_credit_offer( sam_id, core.get_id(), 10000, 30000, 3600, 0, false,
                                               disable_time1, collateral_map1, {} );
-      credit_offer_id_type co1_id = coo1.id;
+      credit_offer_id_type co1_id = coo1.get_id();
       BOOST_CHECK( co1_id(db).owner_account == sam_id );
       BOOST_CHECK( co1_id(db).asset_type == core.id );
       BOOST_CHECK( co1_id(db).total_balance == 10000 );
@@ -842,7 +842,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       // Now able to borrow
       BOOST_TEST_MESSAGE( "Ray borrows" );
       const credit_deal_object& cdo11 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id) );
-      credit_deal_id_type cd11_id = cdo11.id;
+      credit_deal_id_type cd11_id = cdo11.get_id();
       time_point_sec expected_repay_time11 = db.head_block_time() + fc::seconds(3600); // 60 minutes after init
 
       BOOST_CHECK( cd11_id(db).borrower == ray_id );
@@ -916,7 +916,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       BOOST_TEST_MESSAGE( "Ray borrows more" );
       const credit_deal_object& cdo12 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id),
                                                                   ok_fee_rate, ok_duration );
-      credit_deal_id_type cd12_id = cdo12.id;
+      credit_deal_id_type cd12_id = cdo12.get_id();
       time_point_sec expected_repay_time12 = db.head_block_time() + fc::seconds(3600);  // 60 minutes after init
 
       BOOST_CHECK( cd12_id(db).borrower == ray_id );
@@ -943,7 +943,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       // Able to borrow the same amount with more collateral
       BOOST_TEST_MESSAGE( "Ray borrows even more" );
       const credit_deal_object& cdo13 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(499, usd_id) );
-      credit_deal_id_type cd13_id = cdo13.id;
+      credit_deal_id_type cd13_id = cdo13.get_id();
       time_point_sec expected_repay_time13 = db.head_block_time() + fc::seconds(3600); // 65 minutes after init
 
       BOOST_CHECK( cd13_id(db).borrower == ray_id );
@@ -998,7 +998,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ted is now able to borrow with CNY
       const credit_deal_object& cdo14 = borrow_from_credit_offer( ted_id, co1_id, asset(200), asset(200, cny_id) );
-      credit_deal_id_type cd14_id = cdo14.id;
+      credit_deal_id_type cd14_id = cdo14.get_id();
       time_point_sec expected_repay_time14 = db.head_block_time() + fc::seconds(600); // 15 minutes after init
 
       BOOST_CHECK( cd14_id(db).borrower == ted_id );
@@ -1027,7 +1027,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ted is able to borrow less with CNY
       const credit_deal_object& cdo15 = borrow_from_credit_offer( ted_id, co1_id, asset(50), asset(100, cny_id) );
-      credit_deal_id_type cd15_id = cdo15.id;
+      credit_deal_id_type cd15_id = cdo15.get_id();
       time_point_sec expected_repay_time15 = db.head_block_time() + fc::seconds(600); // 15 minutes after init
 
       BOOST_CHECK( cd15_id(db).borrower == ted_id );
@@ -1076,7 +1076,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Now Ted is able to borrow 40 CORE with EUR
       const credit_deal_object& cdo16 = borrow_from_credit_offer( ted_id, co1_id, asset(40), asset(499, eur_id) );
-      credit_deal_id_type cd16_id = cdo16.id;
+      credit_deal_id_type cd16_id = cdo16.get_id();
       time_point_sec expected_repay_time16 = db.head_block_time() + fc::seconds(600); // 18 minutes after init
 
       BOOST_CHECK( cd16_id(db).borrower == ted_id );
@@ -1135,7 +1135,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_REQUIRE( result.updated_objects.valid() );
       BOOST_CHECK( result.updated_objects->size() == 2 );
-      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id(db).id, cd13_id(db).id }) );
 
       BOOST_CHECK( !result.removed_objects.valid() );
 
@@ -1162,7 +1162,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ted is able to borrow 2 CORE with EUR
       const credit_deal_object& cdo17 = borrow_from_credit_offer( ted_id, co1_id, asset(2), asset(49, eur_id) );
-      credit_deal_id_type cd17_id = cdo17.id;
+      credit_deal_id_type cd17_id = cdo17.get_id();
       time_point_sec expected_repay_time17 = db.head_block_time() + fc::seconds(600); // 22 minutes after init
 
       BOOST_CHECK( cd17_id(db).borrower == ted_id );
@@ -1192,7 +1192,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_REQUIRE( result.updated_objects.valid() );
       BOOST_CHECK( result.updated_objects->size() == 2 );
-      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id(db).id, cd13_id(db).id }) );
 
       BOOST_CHECK( !result.removed_objects.valid() );
 
@@ -1269,7 +1269,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       collateral_map2[eur_id] = price( asset(10, usd_id), asset(10, eur_id) );
       const credit_offer_object& coo2 = create_credit_offer( sam_id, usd_id, 10000, 70000, 1800, 0, true,
                                               disable_time2, collateral_map2, {} );
-      credit_offer_id_type co2_id = coo2.id;
+      credit_offer_id_type co2_id = coo2.get_id();
       BOOST_CHECK( co2_id(db).owner_account == sam_id );
       BOOST_CHECK( co2_id(db).asset_type == usd_id );
       BOOST_CHECK( co2_id(db).total_balance == 10000 );
@@ -1287,7 +1287,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ray borrows from the new credit offer
       const auto& cdo21 = borrow_from_credit_offer( ray_id, co2_id, asset(1000, usd_id), asset(1200, cny_id) );
-      credit_deal_id_type cd21_id = cdo21.id;
+      credit_deal_id_type cd21_id = cdo21.get_id();
       time_point_sec expected_repay_time21 = db.head_block_time() + fc::seconds(1800); // 42 minutes after init
 
       BOOST_CHECK( cd21_id(db).borrower == ray_id );
@@ -1317,7 +1317,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_REQUIRE( result.updated_objects.valid() );
       BOOST_CHECK( result.updated_objects->size() == 2 );
-      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id, cd21_id }) );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id(db).id, cd21_id(db).id }) );
 
       BOOST_CHECK( !result.removed_objects.valid() );
 
@@ -1371,7 +1371,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_REQUIRE( result.updated_objects.valid() );
       BOOST_CHECK( result.updated_objects->size() == 2 );
-      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id(db).id, cd13_id(db).id }) );
 
       BOOST_CHECK( !result.removed_objects.valid() );
 
@@ -1428,7 +1428,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ted borrows from the new credit offer
       const auto& cdo22 = borrow_from_credit_offer( ted_id, co2_id, asset(1000, usd_id), asset(1100, eur_id) );
-      credit_deal_id_type cd22_id = cdo22.id;
+      credit_deal_id_type cd22_id = cdo22.get_id();
       time_point_sec expected_repay_time22 = db.head_block_time() + fc::seconds(1800); // 43 minutes after init
 
       BOOST_CHECK( cd22_id(db).borrower == ted_id );
@@ -1458,7 +1458,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_REQUIRE( result.updated_objects.valid() );
       BOOST_CHECK( result.updated_objects->size() == 2 );
-      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id, cd22_id }) );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id(db).id, cd22_id(db).id }) );
 
       BOOST_CHECK( !result.removed_objects.valid() );
 
@@ -1572,7 +1572,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       // Ted borrows more
       const credit_deal_object& cdo18 = borrow_from_credit_offer( ted_id, co1_id, asset(10), asset(30, eur_id) );
-      credit_deal_id_type cd18_id = cdo18.id;
+      credit_deal_id_type cd18_id = cdo18.get_id();
       time_point_sec expected_repay_time18 = db.head_block_time() + fc::seconds(600); // 28 minutes after init
 
       BOOST_CHECK( cd18_id(db).borrower == ted_id );
@@ -1790,14 +1790,14 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( bob, usd.amount(init_amount) );
       issue_uia( ray, usd.amount(init_amount) );
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( bob, eur.amount(init_amount) );
       issue_uia( ray, eur.amount(init_amount) );
       issue_uia( sam, eur.amount(init_amount) );
@@ -1816,27 +1816,27 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
 
       const credit_offer_object& coo1 = create_credit_offer( sam_id, core_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_core, {} );
-      credit_offer_id_type co1_id = coo1.id;
+      credit_offer_id_type co1_id = coo1.get_id();
 
       const credit_offer_object& coo2 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_usd, {} );
-      credit_offer_id_type co2_id = coo2.id;
+      credit_offer_id_type co2_id = coo2.get_id();
 
       const credit_offer_object& coo3 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_eur, {} );
-      credit_offer_id_type co3_id = coo3.id;
+      credit_offer_id_type co3_id = coo3.get_id();
 
       const credit_offer_object& coo4 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_eur, {} );
-      credit_offer_id_type co4_id = coo4.id;
+      credit_offer_id_type co4_id = coo4.get_id();
 
       const credit_offer_object& coo5 = create_credit_offer( sam_id, usd_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_usd, {} );
-      credit_offer_id_type co5_id = coo5.id;
+      credit_offer_id_type co5_id = coo5.get_id();
 
       const credit_offer_object& coo6 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, true,
                                               db.head_block_time() + fc::days(1), collateral_map_usd, {} );
-      credit_offer_id_type co6_id = coo6.id;
+      credit_offer_id_type co6_id = coo6.get_id();
 
       generate_block();
 
@@ -1927,29 +1927,29 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       // Create credit deals
       // Offer owner : sam
       const credit_deal_object& cdo11 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id) );
-      credit_deal_id_type cd11_id = cdo11.id;
+      credit_deal_id_type cd11_id = cdo11.get_id();
 
       // Offer owner : sam
       const credit_deal_object& cdo12 = borrow_from_credit_offer( ray_id, co1_id, asset(150), asset(400, eur_id) );
-      credit_deal_id_type cd12_id = cdo12.id;
+      credit_deal_id_type cd12_id = cdo12.get_id();
 
       // Offer owner : sam
       const credit_deal_object& cdo13 = borrow_from_credit_offer( bob_id, co1_id, asset(200), asset(600, eur_id) );
-      credit_deal_id_type cd13_id = cdo13.id;
+      credit_deal_id_type cd13_id = cdo13.get_id();
 
       // Offer owner : ted
       const credit_deal_object& cdo21 = borrow_from_credit_offer( bob_id, co2_id, asset(500, usd_id),
                                                                   asset(500, eur_id) );
-      credit_deal_id_type cd21_id = cdo21.id;
+      credit_deal_id_type cd21_id = cdo21.get_id();
 
       // Offer owner : sam
       const credit_deal_object& cdo31 = borrow_from_credit_offer( bob_id, co3_id, asset(500, eur_id), asset(5000) );
-      credit_deal_id_type cd31_id = cdo31.id;
+      credit_deal_id_type cd31_id = cdo31.get_id();
 
       // Offer owner : sam
       const credit_deal_object& cdo51 = borrow_from_credit_offer( ray_id, co5_id, asset(400, usd_id),
                                                                   asset(800, eur_id) );
-      credit_deal_id_type cd51_id = cdo51.id;
+      credit_deal_id_type cd51_id = cdo51.get_id();
 
       generate_block();
 

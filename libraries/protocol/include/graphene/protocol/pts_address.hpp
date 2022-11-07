@@ -40,14 +40,19 @@ namespace graphene { namespace protocol {
     */
    struct pts_address
    {
+       static constexpr uint8_t default_version = 56;
+
        pts_address(); ///< constructs empty / null address
-       pts_address( const std::string& base58str );   ///< converts to binary, validates checksum
-       pts_address( const fc::ecc::public_key& pub, bool compressed = true, uint8_t version=56 ); ///< converts to binary
+       explicit pts_address( const std::string& base58str );   ///< converts to binary, validates checksum
+       /// Constructs from a public key
+       explicit pts_address( const fc::ecc::public_key& pub,
+                             bool compressed = true,
+                             uint8_t version = default_version );
 
        uint8_t version()const { return addr.at(0); }
        bool is_valid()const;
 
-       operator std::string()const; ///< converts to base58 + checksum
+       explicit operator std::string()const; ///< converts to base58 + checksum
 
        std::array<char,25> addr{}; ///< binary representation of address, 0-initialized
    };

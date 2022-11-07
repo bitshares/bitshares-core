@@ -320,7 +320,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -333,7 +333,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -371,7 +371,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //    Bob retains the asset in his own balances, or transfers it, or sells it is not critical
          //    because his debt position is what will be tracked.
          //////
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
@@ -441,7 +441,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Margin call should exchange all of the available debt (X) for X*(MSSR-MCFR)/settlement_price
          // The match price should be the settlement_price/(MSSR-MCFR) = settlement_price/(MSSR-MCFR)
@@ -589,7 +589,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -602,7 +602,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -650,7 +650,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //    Bob retains the asset in his own balances, or transfers it, or sells it is not critical
          //    because his debt position is what will be tracked.
          //////
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
@@ -697,7 +697,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //    **Bob's margin call SHOULD NOT be affected.**
          //////
          // Charlie obtains his SMARTBIT by borrowing it from the blockchain
-         call_order_id_type charlie_call_id = (*borrow(charlie, charlie_initial_smart, charlie_initial_core)).id;
+         call_order_id_type charlie_call_id = (*borrow(charlie, charlie_initial_smart, charlie_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(charlie, smartbit), 200 * SMARTBIT_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
          const price charlie_initial_cr = charlie_call_id(db).collateralization(); // Units of collateral / debt
@@ -743,7 +743,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset charlie_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, charlie_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type charlie_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type charlie_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check Charlies's limit order is still open
          BOOST_CHECK(db.find(charlie_order_id));
@@ -792,7 +792,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Margin call should exchange all of the available debt (X) for X*(MSSR-MCFR)/settlement_price
          // Payment to limit order = X*(MSSR-MCFR)/settlement_price
@@ -920,7 +920,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -933,7 +933,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -972,7 +972,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //    because his debt position is what will be tracked.
          //////
          const uint16_t tcr = 2200; // Bob's target collateral ratio (TCR) 220% expressed in terms of GRAPHENE_COLLATERAL_RATIO_DENOM
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
@@ -1044,7 +1044,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // The match price **as maker** should be the settlement_price/(MSSR-MCFR) = settlement_price/(MSSR-MCFR)
          const uint16_t ratio_numerator = current_feed.maximum_short_squeeze_ratio - smartbit_margin_call_fee_ratio;
@@ -1267,7 +1267,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -1280,7 +1280,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -1340,7 +1340,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // 3. (Order 1: Limit order) Alice places a **"large"** limit order to sell SMARTBIT.
          //////
          // Alice borrows SMARTBIT
-         call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).id;
+         call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).get_id();
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 500 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(alice_id, core_id), 0 * CORE_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
@@ -1363,7 +1363,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Alice should have no balance
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 0 * SMARTBIT_UNIT);
@@ -1377,7 +1377,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //////
          const asset bob_initial_debt_smart = bob_initial_smart;
          const asset bob_initial_debt_collateral = bob_initial_core;
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_debt_smart, bob_initial_debt_collateral)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_debt_smart, bob_initial_debt_collateral)).get_id();
 
          // Bobs's balances should reflect that CORE was used to create SMARTBIT
          BOOST_CHECK_EQUAL(get_balance(bob_id, smartbit_id), 200 * SMARTBIT_UNIT);
@@ -1565,7 +1565,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -1578,7 +1578,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -1664,7 +1664,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Alice should have no balance
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 0 * SMARTBIT_UNIT);
@@ -1677,7 +1677,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //    because his debt position is what will be tracked.
          //////
          const uint16_t tcr = 2200; // Bob's target collateral ratio (TCR) 220% expressed in terms of GRAPHENE_COLLATERAL_RATIO_DENOM
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
@@ -1934,7 +1934,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Initialize tokens
          // CORE asset exists by default
          const asset_object &core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
          const int64_t CORE_UNIT = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
 
          // Create the SMARTBIT asset
@@ -1948,7 +1948,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object smartbit = get_asset("SMARTBIT");
-         const asset_id_type smartbit_id = smartbit.id;
+         const asset_id_type smartbit_id = smartbit.get_id();
          update_feed_producers(smartbit, {feedproducer_id});
 
          // Initialize token balance of actors
@@ -2037,7 +2037,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // 3. (Order 1: Limit order) Alice places a **"large"** limit order to sell SMARTBIT.
          //////
          // Alice borrows SMARTBIT
-         call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).id;
+         call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).get_id();
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 500 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(alice_id, core_id), 0 * CORE_UNIT);
          BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
@@ -2065,7 +2065,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Alice should have no balance
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 0 * SMARTBIT_UNIT);
@@ -2080,7 +2080,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //////
          const asset bob_initial_debt_smart = bob_initial_smart;
          const asset bob_initial_debt_collateral = bob_initial_core;
-         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_debt_smart, bob_initial_debt_collateral)).id;
+         call_order_id_type bob_call_id = (*borrow(bob, bob_initial_debt_smart, bob_initial_debt_collateral)).get_id();
 
          // Bobs's balances should reflect that CORE was used to create SMARTBIT
          BOOST_CHECK_EQUAL(get_balance(bob_id, smartbit_id), 200 * SMARTBIT_UNIT);
@@ -2313,7 +2313,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
 
          // CORE asset exists by default
          asset_object core = asset_id_type()(db);
-         const asset_id_type core_id = core.id;
+         const asset_id_type core_id = core.get_id();
 
          // Fund actors
          uint64_t initial_balance_core = 10000000;
@@ -2493,7 +2493,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
 
 
             // Approve the proposal
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = assetowner_id;
@@ -2563,7 +2563,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
 
 
             // Approve the proposal
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = assetowner_id;
@@ -2635,7 +2635,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
 
 
             // Approve the proposal
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = assetowner_id;

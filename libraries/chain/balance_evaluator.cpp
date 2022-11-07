@@ -31,12 +31,15 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
    database& d = db();
    balance = &op.balance_to_claim(d);
 
-   GRAPHENE_ASSERT(
+   bool is_balance_owner = (
              op.balance_owner_key == balance->owner ||
-             pts_address(op.balance_owner_key, false, 56) == balance->owner ||
-             pts_address(op.balance_owner_key, true, 56) == balance->owner ||
+             pts_address(op.balance_owner_key, false) == balance->owner || // version = 56 (default)
+             pts_address(op.balance_owner_key, true) == balance->owner ); // version = 56 (default)
+   is_balance_owner = (
+             is_balance_owner ||
              pts_address(op.balance_owner_key, false, 0) == balance->owner ||
-             pts_address(op.balance_owner_key, true, 0) == balance->owner,
+             pts_address(op.balance_owner_key, true, 0) == balance->owner );
+   GRAPHENE_ASSERT( is_balance_owner,
              balance_claim_owner_mismatch,
              "Balance owner key was specified as '${op}' but balance's actual owner is '${bal}'",
              ("op", op.balance_owner_key)

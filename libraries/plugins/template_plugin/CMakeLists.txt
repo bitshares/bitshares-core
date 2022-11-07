@@ -4,7 +4,7 @@ add_library( graphene_template_plugin
         template_plugin.cpp
            )
 
-target_link_libraries( graphene_template_plugin graphene_chain graphene_app )
+target_link_libraries( graphene_template_plugin graphene_app graphene_chain )
 target_include_directories( graphene_template_plugin
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

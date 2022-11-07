@@ -592,7 +592,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
 
          signed_transaction trx;
          set_expiration( db, trx );
-         account_id_type nathan_id = account_idx.get_next_id();
+         account_id_type nathan_id { account_idx.get_next_id() };
          account_create_operation cop;
          cop.registrar = GRAPHENE_TEMP_ACCOUNT;
          cop.name = "nathan";
@@ -646,7 +646,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       signed_transaction trx;
       set_expiration( db1, trx );
-      account_id_type nathan_id = account_idx.get_next_id();
+      account_id_type nathan_id { account_idx.get_next_id() };
       account_create_operation cop;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.name = "nathan";
@@ -707,7 +707,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 
       signed_transaction trx;
       set_expiration( db1, trx );
-      account_id_type nathan_id = account_idx.get_next_id();
+      account_id_type nathan_id { account_idx.get_next_id() };
       account_create_operation cop;
       cop.name = "nathan";
       cop.owner = authority(1, init_account_pub_key, 1);
@@ -760,7 +760,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.set_expiration( db1.head_block_time() ); //db1.get_slot_time(1) );
       trx.set_reference_block( db1.head_block_id() );
 
-      account_id_type nathan_id = account_idx.get_next_id();
+      account_id_type nathan_id { account_idx.get_next_id() };
       account_create_operation cop;
       cop.registrar = init1.id;
       cop.name = "nathan";
@@ -1526,7 +1526,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       account_object sam_account_object = create_account( "sam", sam_key );
 
       // upgrade sam to LTM
-      upgrade_to_lifetime_member(sam_account_object.id);
+      upgrade_to_lifetime_member(sam_account_object.get_id());
 
       //Get a sane head block time
       generate_block( skip_flags );
@@ -1632,9 +1632,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                   database::skip_transaction_dupe_check |
                   database::skip_transaction_signatures
                );
-               account_id_type alice_account_id =
+               account_id_type alice_account_id {
                   ptx_create.operation_results[0]
-                  .get< object_id_type >();
+                  .get< object_id_type >() };
 
                generate_block( skip_flags );
                for( const vector< int >& key_sched_after : possible_key_sched )

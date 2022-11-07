@@ -72,7 +72,7 @@ namespace graphene { namespace chain {
          //////////////////// db_management.cpp ////////////////////
       public:
          database();
-         virtual ~database();
+         ~database() override;
 
          enum validation_steps
          {
@@ -234,8 +234,12 @@ namespace graphene { namespace chain {
          template<typename EvaluatorType>
          void register_evaluator()
          {
-            _operation_evaluators[operation::tag<typename EvaluatorType::operation_type>::value]
-                  = std::make_unique<op_evaluator_impl<EvaluatorType>>();
+            const auto op_type = operation::tag<typename EvaluatorType::operation_type>::value;
+            FC_ASSERT( op_type >= 0, "Negative operation type" );
+            FC_ASSERT( op_type < _operation_evaluators.size(),
+                       "The operation type (${a}) must be smaller than the size of _operation_evaluators (${b})",
+                       ("a", op_type)("b", _operation_evaluators.size()) );
+            _operation_evaluators[op_type] = std::make_unique<op_evaluator_impl<EvaluatorType>>();
          }
          ///@}
 
@@ -392,17 +396,8 @@ namespace graphene { namespace chain {
                                  bool mute_exceptions = false,
                                  bool skip_matching_settle_orders = false );
 
-         /**
-          * Matches the two orders, the first parameter is taker, the second is maker.
-          *
-          * @return a bit field indicating which orders were filled (and thus removed)
-          *
-          * 0 - no orders were matched
-          * 1 - only taker was filled
-          * 2 - only maker was filled
-          * 3 - both were filled
-          */
-         ///@{
+         // Note: Ideally this should be private.
+         //       Now it is public because we use it in a non-member function in db_market.cpp .
          enum class match_result_type
          {
             none_filled = 0,
@@ -412,6 +407,12 @@ namespace graphene { namespace chain {
          };
 
       private:
+         /**
+          * Matches the two orders, the first parameter is taker, the second is maker.
+          *
+          * @return which orders were filled (and thus removed)
+          */
+         ///@{
          match_result_type match( const limit_order_object& taker, const limit_order_object& maker,
                                   const price& trade_price );
          match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
@@ -585,10 +586,12 @@ namespace graphene { namespace chain {
           *  as any implied/virtual operations that resulted, such as filling an order.  The
           *  applied operations is cleared after applying each block and calling the block
           *  observers which may want to index these operations.
+          *  @param op The operation to push
+          *  @param is_virtual Whether the operation is a virtual operation
           *
           *  @return the op_id which can be used to set the result after it has finished being applied.
           */
-         uint32_t  push_applied_operation( const operation& op );
+         uint32_t  push_applied_operation( const operation& op, bool is_virtual = true );
          void      set_applied_operation_result( uint32_t op_id, const operation_result& r );
          const vector<optional< operation_history_object > >& get_applied_operations()const;
 
@@ -681,7 +684,8 @@ namespace graphene { namespace chain {
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
-         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op,
+                                                bool is_virtual = true );
 
       private:
          void                  _apply_block( const signed_block& next_block );
@@ -768,7 +772,10 @@ namespace graphene { namespace chain {
           */
          vector<optional<operation_history_object> >  _applied_ops;
 
+      public:
+         fc::time_point_sec                _current_block_time;
          uint32_t                          _current_block_num    = 0;
+      private:
          uint16_t                          _current_trx_in_block = 0;
          uint16_t                          _current_op_in_trx    = 0;
          uint32_t                          _current_virtual_op   = 0;

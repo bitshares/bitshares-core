@@ -43,12 +43,10 @@ namespace graphene { namespace chain {
     * separating the account data that changes frequently from the account data that is mostly static, which will
     * minimize the amount of data that must be backed up as part of the undo history everytime a transfer is made.
     */
-   class account_statistics_object : public graphene::db::abstract_object<account_statistics_object>
+   class account_statistics_object : public graphene::db::abstract_object<account_statistics_object,
+                                               implementation_ids, impl_account_statistics_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_account_statistics_object_type;
-
          account_id_type  owner;
 
          string           name; ///< redundantly store account name here for better maintenance performance
@@ -56,7 +54,7 @@ namespace graphene { namespace chain {
          /**
           * Keep the most recent operation as a root pointer to a linked list of the transaction history.
           */
-         account_transaction_history_id_type most_recent_op;
+         account_history_id_type most_recent_op;
          /** Total operations related to this account. */
          uint64_t                            total_ops = 0;
          /** Total operations related to this account that has been removed from the database. */
@@ -155,12 +153,10 @@ namespace graphene { namespace chain {
     * This object is indexed on owner and asset_type so that black swan
     * events in asset_type can be processed quickly.
     */
-   class account_balance_object : public abstract_object<account_balance_object>
+   class account_balance_object : public abstract_object<account_balance_object,
+                                            implementation_ids, impl_account_balance_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_account_balance_object_type;
-
          account_id_type   owner;
          asset_id_type     asset_type;
          share_type        balance;
@@ -179,12 +175,9 @@ namespace graphene { namespace chain {
     * Accounts are the primary unit of authority on the graphene system. Users must have an account in order to use
     * assets, trade in the markets, vote for committee_members, etc.
     */
-   class account_object : public graphene::db::abstract_object<account_object>
+   class account_object : public graphene::db::abstract_object<account_object, protocol_ids, account_object_type>
    {
       public:
-         static constexpr uint8_t space_id = protocol_ids;
-         static constexpr uint8_t type_id  = account_object_type;
-
          /**
           * The time at which this account's membership expires.
           * If set to any time in the past, the account is a basic account.
@@ -287,6 +280,11 @@ namespace graphene { namespace chain {
           */
          optional< flat_set<asset_id_type> > allowed_assets;
 
+         /// The block number when the account was created
+         uint32_t       creation_block_num = 0;
+         /// The time when the account was created
+         time_point_sec creation_time;
+
          bool has_special_authority()const
          {
             return (!owner_special_authority.is_type< no_special_authority >())
@@ -321,8 +319,6 @@ namespace graphene { namespace chain {
          {
             return !is_basic_account(now);
          }
-
-         account_id_type get_id()const { return id; }
    };
 
    /**

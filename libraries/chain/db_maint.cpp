@@ -301,7 +301,7 @@ void database::update_active_witnesses()
       std::transform(wits.begin(), wits.end(),
                      std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
                      [](const witness_object& w) {
-         return w.id;
+         return w.get_id();
       });
    });
 
@@ -410,7 +410,7 @@ void database::update_active_committee_members()
       gp.active_committee_members.clear();
       std::transform(committee_members.begin(), committee_members.end(),
                      std::inserter(gp.active_committee_members, gp.active_committee_members.begin()),
-                     [](const committee_member_object& d) { return d.id; });
+                     [](const committee_member_object& d) { return d.get_id(); });
    });
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -527,8 +527,11 @@ void database::process_budget()
          - rec.from_accumulated_fees )
          - rec.from_unused_witness_budget;
 
-      modify(core, [&rec,&witness_budget,&worker_budget,&leftover_worker_funds,&dpo]
-                   ( asset_dynamic_data_object& _core )
+      modify(core, [&rec
+#ifndef NDEBUG
+                    ,&witness_budget,&worker_budget,&leftover_worker_funds,&dpo
+#endif
+                   ] ( asset_dynamic_data_object& _core )
       {
          _core.current_supply = (_core.current_supply + rec.supply_delta );
 
@@ -734,7 +737,7 @@ void create_buyback_orders( database& db )
          continue;
       }
 
-      for( const auto& entry : bal_idx.get_account_balances( buyback_account.id ) )
+      for( const auto& entry : bal_idx.get_account_balances( buyback_account.get_id() ) )
       {
          const auto* it = entry.second;
          asset_id_type asset_to_sell = it->asset_type;
@@ -759,11 +762,11 @@ void create_buyback_orders( database& db )
             create_vop.fee = asset( 0, asset_id_type() );
             create_vop.seller = buyback_account.id;
             create_vop.amount_to_sell = asset( amount_to_sell, asset_to_sell );
-            create_vop.min_to_receive = asset( 1, asset_to_buy.id );
+            create_vop.min_to_receive = asset( 1, asset_to_buy.get_id() );
             create_vop.expiration = time_point_sec::maximum();
             create_vop.fill_or_kill = false;
 
-            limit_order_id_type order_id = db.apply_operation( buyback_context, create_vop ).get< object_id_type >();
+            limit_order_id_type order_id{ db.apply_operation( buyback_context, create_vop ).get< object_id_type >() };
 
             if( db.find( order_id ) != nullptr )
             {
