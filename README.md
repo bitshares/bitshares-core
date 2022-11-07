@@ -106,8 +106,8 @@ The blockchain data will be stored under the directory `witness_node_data_dir`.
 
 **Stop Node Software:**
 
-For stopping the node run cleanly; you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
-It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to inisiate the node run so you can go back to the node run screen to stop it.
+For stopping the node run cleanly, you will need to access the node run terminal then press on `Ctrl+C` then wait for the run to stop, please note that it may take usually few minutes to exit the run.
+It's recommended to use linux command [screen](https://help.ubuntu.com/community/Screen) to initiate the node run so you can go back to the node run screen to stop it.
 
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
@@ -138,7 +138,7 @@ Stay on `bitshares-core/build` directory before you run the below `cli_wallet` c
 
     ./programs/cli_wallet/cli_wallet
 
-**IMPORTANT:** The cli_wallet or API interfaces to the witness node wouldn't be fully functional unless the witness node is fully synchronized with the blockchain. The cli_wallet command `info` will show result `head_block_age` which will tell you how far you are from the live current block of the blockchain.
+**IMPORTANT:** The `cli_wallet` or API interfaces to the node wouldn't be fully functional unless the node is fully synchronized with the blockchain. The `cli_wallet` command `info` will show result `head_block_age` which will tell you how far you are from the live current block of the blockchain.
 
 To check your current block:
 
@@ -256,12 +256,12 @@ The `cli_wallet` program can also be configured to serve **all of its commands**
 
 Start `cli_wallet` with RPC connection enabled:
 
-    $ ./programs/cli_wallet/cli_wallet --rpc-endpoint=127.0.0.1:8091
+    $ ./programs/cli_wallet/cli_wallet --rpc-http-endpoint=127.0.0.1:8093
 
 Access the wallet API using an HTTP client:
 
-    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8091/
-    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8091/
+    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8093/
+    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8093/
 
 Note: The syntax to access wallet API is a bit different than accessing node API.
 
@@ -274,7 +274,7 @@ Accessing restrictable node API sets
 ------------------------------------
 
 You can restrict node API sets to particular users by specifying an `api-access` file in `config.ini`
-or by using the `--api-access /full/path/to/api-access.json` command line option on node startup. Here is an example `api-access` file which allows
+or by using the `--api-access /full/path/to/api-access.json` command-line option on node startup. Here is an example `api-access` file which allows
 user `bytemaster` with password `supersecret` to access four different API sets, while allowing any other user to access the three public API sets
 necessary to use the node:
 
@@ -343,8 +343,8 @@ FAQ
 - Is there a way to allow external program to drive `cli_wallet` via websocket, JSONRPC, or HTTP?
 
     Yes. External programs may connect to the command-line wallet and make its calls over a websockets API. To do this, run the wallet in
-    server mode, i.e. `cli_wallet -s "127.0.0.1:9999"` and then have the external program connect to it over the specified port
-    (in this example, port 9999). Please check the ["Using the API"](#using-the-api) section for more info.
+    server mode, i.e. `cli_wallet -H "127.0.0.1:9999"` and then have the external program connect to it over the specified port
+    (in this example, port 9999). Please check the ["Using Built-In APIs"](#using-built-in-apis) section for more info.
 
 - Is there a way to access methods which require login over HTTP?
 
@@ -354,13 +354,13 @@ FAQ
 
 - What is the meaning of `a.b.c` numbers?
 
-    The first number specifies the *space*.  Space 1 is for protocol objects, 2 is for implementation objects.
+    The first number specifies the *space*.  Space `1` is for protocol objects, `2` is for implementation objects.
     Protocol space objects can appear on the wire, for example in the binary form of transactions.
     Implementation space objects cannot appear on the wire and solely exist for implementation
     purposes, such as optimization or internal bookkeeping.
 
     The second number specifies the *type*.  The type of the object determines what fields it has.  For a
-    complete list of type ID's, see `GRAPHENE_DEFINE_IDS(protocol, protocol_ids ...)` in
+    complete list of type IDs, see `GRAPHENE_DEFINE_IDS(protocol, protocol_ids ...)` in
     [protocol/types.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/protocol/include/graphene/protocol/types.hpp)
     and `GRAPHENE_DEFINE_IDS(chain, implementation_ids ...)` in [chain/types.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/chain/include/graphene/chain/types.hpp).
 
@@ -369,12 +369,12 @@ FAQ
 
 - The answer to the previous question was really confusing.  Can you make it clearer?
 
-    All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
-    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account,"
+    All account IDs are of the form `1.2.x`.  If you were the 9735th account to be registered,
+    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account",
     which is controlled by the committee members and has a few abilities and restrictions other accounts
     do not).
 
-    All asset ID's are of the form `1.3.x`.  If you were the 29th asset to be registered,
+    All asset IDs are of the form `1.3.x`.  If you were the 29th asset to be registered,
     your asset's ID will be `1.3.29`.  Asset `0` is special (it's BTS, which is considered the "core asset").
 
     The first and second number together identify the kind of thing you're talking about (`1.2` for accounts,
