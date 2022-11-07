@@ -138,7 +138,7 @@ Stay on `bitshares-core/build` directory before you run the below `cli_wallet` c
 
     ./programs/cli_wallet/cli_wallet
 
-**IMPORTANT:** The cli_wallet or API interfaces to the witness node wouldn't be fully functional unless the witness node is fully synchronized with the blockchain. The cli_wallet command `info` will show result `head_block_age` which will tell you how far you are from the live current block of the blockchain.
+**IMPORTANT:** The `cli_wallet` or API interfaces to the node wouldn't be fully functional unless the node is fully synchronized with the blockchain. The `cli_wallet` command `info` will show result `head_block_age` which will tell you how far you are from the live current block of the blockchain.
 
 To check your current block:
 
@@ -274,7 +274,7 @@ Accessing restrictable node API sets
 ------------------------------------
 
 You can restrict node API sets to particular users by specifying an `api-access` file in `config.ini`
-or by using the `--api-access /full/path/to/api-access.json` command line option on node startup. Here is an example `api-access` file which allows
+or by using the `--api-access /full/path/to/api-access.json` command-line option on node startup. Here is an example `api-access` file which allows
 user `bytemaster` with password `supersecret` to access four different API sets, while allowing any other user to access the three public API sets
 necessary to use the node:
 
@@ -354,13 +354,13 @@ FAQ
 
 - What is the meaning of `a.b.c` numbers?
 
-    The first number specifies the *space*.  Space 1 is for protocol objects, 2 is for implementation objects.
+    The first number specifies the *space*.  Space `1` is for protocol objects, `2` is for implementation objects.
     Protocol space objects can appear on the wire, for example in the binary form of transactions.
     Implementation space objects cannot appear on the wire and solely exist for implementation
     purposes, such as optimization or internal bookkeeping.
 
     The second number specifies the *type*.  The type of the object determines what fields it has.  For a
-    complete list of type ID's, see `GRAPHENE_DEFINE_IDS(protocol, protocol_ids ...)` in
+    complete list of type IDs, see `GRAPHENE_DEFINE_IDS(protocol, protocol_ids ...)` in
     [protocol/types.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/protocol/include/graphene/protocol/types.hpp)
     and `GRAPHENE_DEFINE_IDS(chain, implementation_ids ...)` in [chain/types.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/chain/include/graphene/chain/types.hpp).
 
@@ -369,12 +369,12 @@ FAQ
 
 - The answer to the previous question was really confusing.  Can you make it clearer?
 
-    All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
+    All account IDs are of the form `1.2.x`.  If you were the 9735th account to be registered,
     your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account",
     which is controlled by the committee members and has a few abilities and restrictions other accounts
     do not).
 
-    All asset ID's are of the form `1.3.x`.  If you were the 29th asset to be registered,
+    All asset IDs are of the form `1.3.x`.  If you were the 29th asset to be registered,
     your asset's ID will be `1.3.29`.  Asset `0` is special (it's BTS, which is considered the "core asset").
 
     The first and second number together identify the kind of thing you're talking about (`1.2` for accounts,
