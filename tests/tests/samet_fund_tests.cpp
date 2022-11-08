@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_hardfork_time_test )
 
       // Before the hard fork, unable to create a samet fund or transact against a samet fund,
       // or do any of them with proposals
-      BOOST_CHECK_THROW( create_samet_fund( sam_id, core.id, 10000, 100 ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( sam_id, core.get_id(), 10000, 100 ), fc::exception );
 
       samet_fund_id_type tmp_sf_id;
       BOOST_CHECK_THROW( delete_samet_fund( sam_id, tmp_sf_id ), fc::exception );
@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_hardfork_time_test )
       BOOST_CHECK_THROW( repay_to_samet_fund( sam_id, tmp_sf_id, core.amount(100), core.amount(100) ),
                          fc::exception );
 
-      samet_fund_create_operation cop = make_samet_fund_create_op( sam_id, core.id, 10000, 100 );
+      samet_fund_create_operation cop = make_samet_fund_create_op( sam_id, core.get_id(), 10000, 100 );
       BOOST_CHECK_THROW( propose( cop ), fc::exception );
 
       samet_fund_delete_operation dop = make_samet_fund_delete_op( sam_id, tmp_sf_id );
@@ -103,12 +103,12 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
       // Make a whitelist
@@ -142,7 +142,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
 
       // Able to propose
       {
-         samet_fund_create_operation cop = make_samet_fund_create_op( sam_id, core.id, 10000, 100 );
+         samet_fund_create_operation cop = make_samet_fund_create_op( sam_id, core.get_id(), 10000, 100 );
          propose( cop );
 
          samet_fund_id_type tmp_sf_id;
@@ -180,8 +180,8 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       check_balances();
 
       // Able to create samet funds with valid data
-      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core.id, 10000, 100u );
-      samet_fund_id_type sf1_id = sfo1.id;
+      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core.get_id(), 10000, 100u );
+      samet_fund_id_type sf1_id = sfo1.get_id();
       BOOST_CHECK( sfo1.owner_account == sam_id );
       BOOST_CHECK( sfo1.asset_type == core.id );
       BOOST_CHECK( sfo1.balance == 10000 );
@@ -191,8 +191,8 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       expected_balance_sam_core -= 10000;
       check_balances();
 
-      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd.id, 1, 10000000u );
-      samet_fund_id_type sf2_id = sfo2.id;
+      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd.get_id(), 1, 10000000u );
+      samet_fund_id_type sf2_id = sfo2.get_id();
       BOOST_CHECK( sfo2.owner_account == ted_id );
       BOOST_CHECK( sfo2.asset_type == usd.id );
       BOOST_CHECK( sfo2.balance == 1 );
@@ -202,8 +202,8 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       expected_balance_ted_usd -= 1;
       check_balances();
 
-      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.id, 10, 1u ); // Account is whitelisted
-      samet_fund_id_type sf3_id = sfo3.id;
+      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.get_id(), 10, 1u ); // Account is whitelisted
+      samet_fund_id_type sf3_id = sfo3.get_id();
       BOOST_CHECK( sfo3.owner_account == sam_id );
       BOOST_CHECK( sfo3.asset_type == eur_id );
       BOOST_CHECK( sfo3.balance == 10 );
@@ -215,14 +215,14 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
 
       // Unable to create a samet fund with invalid data
       // Non-positive balance
-      BOOST_CHECK_THROW( create_samet_fund( sam_id, core.id, -1, 100u ), fc::exception );
-      BOOST_CHECK_THROW( create_samet_fund( ted_id, usd.id, 0, 10000000u ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( sam_id, core.get_id(), -1, 100u ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( ted_id, usd.get_id(), 0, 10000000u ), fc::exception );
       // Insufficient account balance
-      BOOST_CHECK_THROW( create_samet_fund( por_id, usd.id, 1, 100u ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( por_id, usd.get_id(), 1, 100u ), fc::exception );
       // Nonexistent asset type
       BOOST_CHECK_THROW( create_samet_fund( sam_id, no_asset_id, 1, 100u ), fc::exception );
       // Account is not whitelisted
-      BOOST_CHECK_THROW( create_samet_fund( ted_id, eur.id, 10, 1u ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( ted_id, eur.get_id(), 10, 1u ), fc::exception );
 
       check_balances();
 
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       // Unable to delete a fund that does not exist
       BOOST_CHECK_THROW( delete_samet_fund( sam_id, sf1_id ), fc::exception );
       // Unable to delete a fund that is not owned by him
-      BOOST_CHECK_THROW( delete_samet_fund( sam_id, sfo2.id ), fc::exception );
+      BOOST_CHECK_THROW( delete_samet_fund( sam_id, sfo2.get_id() ), fc::exception );
 
       BOOST_REQUIRE( !db.find( sf1_id ) );
       BOOST_REQUIRE( db.find( sf2_id ) );
@@ -361,7 +361,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       check_balances();
 
       // Sam is unable to recreate the fund
-      BOOST_CHECK_THROW( create_samet_fund( sam_id, eur.id, 10, 1u ), fc::exception );
+      BOOST_CHECK_THROW( create_samet_fund( sam_id, eur.get_id(), 10, 1u ), fc::exception );
       check_balances();
 
       generate_block();
@@ -389,12 +389,12 @@ BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
       // Make a whitelist
@@ -445,20 +445,20 @@ BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
       check_balances();
 
       // create samet funds
-      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core.id, 10000, 10000u ); // fee rate is 1%
-      samet_fund_id_type sf1_id = sfo1.id;
+      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core.get_id(), 10000, 10000u ); // fee rate is 1%
+      samet_fund_id_type sf1_id = sfo1.get_id();
 
       expected_balance_sam_core -= 10000;
       check_balances();
 
-      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd.id, 1, 10000000u ); // fee rate is 1000%
-      samet_fund_id_type sf2_id = sfo2.id;
+      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd.get_id(), 1, 10000000u ); // fee rate is 1000%
+      samet_fund_id_type sf2_id = sfo2.get_id();
 
       expected_balance_ted_usd -= 1;
       check_balances();
 
-      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.id, 10, 1u ); // Account is whitelisted
-      samet_fund_id_type sf3_id = sfo3.id;
+      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.get_id(), 10, 1u ); // Account is whitelisted
+      samet_fund_id_type sf3_id = sfo3.get_id();
 
       expected_balance_sam_eur -= 10;
       check_balances();
@@ -714,7 +714,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
          trx.operations.push_back( cop );
          processed_transaction ptx = PUSH_TX(db, trx, ~0);
          const operation_result& op_result = ptx.operation_results.front();
-         proposal_id_type pid = op_result.get<object_id_type>();
+         proposal_id_type pid { op_result.get<object_id_type>() };
 
          proposal_update_operation puo;
          puo.proposal = pid;
@@ -754,7 +754,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
          trx.operations.push_back( cop );
          processed_transaction ptx = PUSH_TX(db, trx, ~0);
          const operation_result& op_result = ptx.operation_results.front();
-         proposal_id_type pid = op_result.get<object_id_type>();
+         proposal_id_type pid { op_result.get<object_id_type>() };
          proposals.push_back( pid );
       };
 
@@ -1042,33 +1042,33 @@ BOOST_AUTO_TEST_CASE( samet_fund_apis_test )
       asset_id_type core_id;
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-      asset_id_type eur_id = eur.id;
+      asset_id_type eur_id = eur.get_id();
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
 
       // create samet funds
       const samet_fund_object& sfo1 = create_samet_fund( sam_id, core_id, 10000, 10000u ); // fee rate is 1%
-      samet_fund_id_type sf1_id = sfo1.id;
+      samet_fund_id_type sf1_id = sfo1.get_id();
 
       const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd_id, 1, 10000000u ); // fee rate is 1000%
-      samet_fund_id_type sf2_id = sfo2.id;
+      samet_fund_id_type sf2_id = sfo2.get_id();
 
       const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur_id, 10, 1u );
-      samet_fund_id_type sf3_id = sfo3.id;
+      samet_fund_id_type sf3_id = sfo3.get_id();
 
       const samet_fund_object& sfo4 = create_samet_fund( sam_id, eur_id, 10, 2u );
-      samet_fund_id_type sf4_id = sfo4.id;
+      samet_fund_id_type sf4_id = sfo4.get_id();
 
       const samet_fund_object& sfo5 = create_samet_fund( sam_id, usd_id, 100, 20u );
-      samet_fund_id_type sf5_id = sfo5.id;
+      samet_fund_id_type sf5_id = sfo5.get_id();
 
       const samet_fund_object& sfo6 = create_samet_fund( ted_id, usd_id, 1000, 200u );
-      samet_fund_id_type sf6_id = sfo6.id;
+      samet_fund_id_type sf6_id = sfo6.get_id();
 
       generate_block();
 
@@ -1179,7 +1179,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_account_history_test )
 
       // create samet funds
       const samet_fund_object& sfo1 = create_samet_fund( sam_id, core_id, 10000, 10000u ); // fee rate is 1%
-      samet_fund_id_type sf1_id = sfo1.id;
+      samet_fund_id_type sf1_id = sfo1.get_id();
 
       generate_block();
 

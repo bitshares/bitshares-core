@@ -8,17 +8,18 @@ jobs:
     name: Scan with SonarScanner
     strategy:
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.10.1
+        image: docker://elasticsearch:7.17.7
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Download and install latest SonarScanner CLI tool
       run: |
-        SONAR_SCANNER_VERSION=`curl https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
-                                    2>/dev/null | cut -f2 -d'"' | cut -f8 -d'/'`
+        SONAR_SCANNER_VERSION=`curl -w %{redirect_url} \
+             https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
+             2>/dev/null | cut -f8 -d'/'`
         SONAR_DOWNLOAD_PATH=https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
         curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip \
              $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
@@ -60,7 +61,7 @@ jobs:
         df -h
         sudo du -hs /mnt/*
         sudo ls -alr /mnt/
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
         submodules: recursive
@@ -68,6 +69,12 @@ jobs:
       run: |
         pwd
         df -h .
+        free
+        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
         sudo chmod a+rwx /_build/libraries /_build/programs /mnt/_build/tests
@@ -96,7 +103,7 @@ jobs:
     - run: |
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ccache
@@ -110,7 +117,7 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
+        programs/build_helpers/make_with_sonar bw-output -j 1 -C _build \
           witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
           app_test chain_test cli_test es_test
         df -h

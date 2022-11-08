@@ -175,15 +175,15 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Fund actors
          uint64_t initial_balance_core = 10000000;
-         transfer(committee_account, assetowner.id, asset(initial_balance_core));
-         transfer(committee_account, feedproducer.id, asset(initial_balance_core));
+         transfer(committee_account, assetowner.get_id(), asset(initial_balance_core));
+         transfer(committee_account, feedproducer.get_id(), asset(initial_balance_core));
          transfer(committee_account, michael_id, asset(initial_balance_core));
-         transfer(committee_account, paul.id, asset(initial_balance_core));
+         transfer(committee_account, paul.get_id(), asset(initial_balance_core));
 
          // 1. Create assets
          const uint16_t usd_fso_percent = 5 * GRAPHENE_1_PERCENT; // 5% Force-settlement offset fee %
          const uint16_t usd_fsf_percent = 3 * GRAPHENE_1_PERCENT; // 3% Force-settlement fee % (BSIP87)
-         create_smart_asset("USDBIT", assetowner.id, usd_fso_percent, usd_fsf_percent);
+         create_smart_asset("USDBIT", assetowner.get_id(), usd_fso_percent, usd_fsf_percent);
 
          generate_block();
          set_expiration(db, trx);
@@ -191,8 +191,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          const auto &bitusd = get_asset("USDBIT");
          const auto &core = asset_id_type()(db);
-         asset_id_type bitusd_id = bitusd.id;
-         asset_id_type core_id = core.id;
+         asset_id_type bitusd_id = bitusd.get_id();
+         asset_id_type core_id = core.get_id();
          const int64_t bitusd_unit = asset::scaled_precision(bitusd.precision).value; // 100 satoshi USDBIT in 1 USDBIT
 
          // 2. Publish a feed for the smart asset
@@ -212,7 +212,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          int64_t michael_initial_core = 8;
          const call_order_object &call_michael = *borrow(michael, bitusd.amount(michael_initial_usd),
                                                          core.amount(michael_initial_core));
-         call_order_id_type call_michael_id = call_michael.id;
+         call_order_id_type call_michael_id = call_michael.get_id();
 
          BOOST_CHECK_EQUAL(get_balance(michael, bitusd), michael_initial_usd);
          BOOST_CHECK_EQUAL(get_balance(michael, core), initial_balance_core - michael_initial_core);
@@ -226,7 +226,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          int64_t paul_initial_core = paul_initial_usd * 2 / 20; // 10000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
-         call_order_id_type call_paul_id = call_paul.id;
+         call_order_id_type call_paul_id = call_paul.get_id();
          BOOST_REQUIRE_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
 
          BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
@@ -237,7 +237,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 5. Paul transfers 200 bitUSD to Rachel
          ///////
          int64_t rachel_initial_usd = 200 * bitusd_unit;
-         transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
+         transfer(paul.get_id(), rachel.get_id(), asset(rachel_initial_usd, bitusd.get_id()));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
          BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
@@ -252,8 +252,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 20 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type rachel_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Check Rachel's balance
@@ -420,10 +420,10 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Fund actors
          uint64_t initial_balance_core = 10000000;
-         transfer(committee_account, assetowner.id, asset(initial_balance_core));
-         transfer(committee_account, feedproducer.id, asset(initial_balance_core));
+         transfer(committee_account, assetowner.get_id(), asset(initial_balance_core));
+         transfer(committee_account, feedproducer.get_id(), asset(initial_balance_core));
          transfer(committee_account, michael_id, asset(initial_balance_core));
-         transfer(committee_account, paul.id, asset(initial_balance_core));
+         transfer(committee_account, paul.get_id(), asset(initial_balance_core));
 
          ///////
          // 1. Create assets
@@ -433,13 +433,13 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Attempt and fail to create the smart asset with a force-settlement fee % before HARDFORK_CORE_BSIP87_TIME
          trx.clear();
-         REQUIRE_EXCEPTION_WITH_TEXT(create_smart_asset("USDBIT", assetowner.id, usd_fso_percent, usd_fsf_percent_0),
+         REQUIRE_EXCEPTION_WITH_TEXT(create_smart_asset("USDBIT", assetowner_id, usd_fso_percent, usd_fsf_percent_0),
                                      "cannot be set before Hardfork BSIP87");
 
 
          // Create the smart asset without a force-settlement fee %
          trx.clear();
-         create_smart_asset("USDBIT", assetowner.id, usd_fso_percent);
+         create_smart_asset("USDBIT", assetowner_id, usd_fso_percent);
 
          generate_block();
          set_expiration(db, trx);
@@ -454,7 +454,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 2. Publish a feed for the smart asset
          ///////
-         update_feed_producers(bitusd.id, {feedproducer_id});
+         update_feed_producers(bitusd.get_id(), {feedproducer_id});
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
          current_feed.maximum_short_squeeze_ratio = 1100;
@@ -472,7 +472,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          int64_t paul_initial_core = paul_initial_usd * 2 * 20; // 400000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
-         call_order_id_type call_paul_id = call_paul.id;
+         call_order_id_type call_paul_id = call_paul.get_id();
          BOOST_REQUIRE_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
 
          BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
@@ -483,7 +483,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 4. Paul gives Rachel 20 bitUSD and retains 80 bitUSD
          ///////
          int64_t rachel_initial_usd = 20 * bitusd_unit;
-         transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
+         transfer(paul.get_id(), rachel.get_id(), asset(rachel_initial_usd, bitusd.get_id()));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
          BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -498,8 +498,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 2 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type rachel_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -581,7 +581,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 8. Paul gives Michael 30 bitUSD and retains 50 bitUSD
          ///////
          int64_t michael_initial_usd = 30 * bitusd_unit;
-         transfer(paul.id, michael.id, asset(michael_initial_usd, bitusd.id));
+         transfer(paul.get_id(), michael.get_id(), asset(michael_initial_usd, bitusd.get_id()));
 
          // Check Michael's balance
          BOOST_CHECK_EQUAL(get_balance(michael, bitusd), michael_initial_usd);
@@ -598,8 +598,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t michael_settle_amount = 5 * bitusd_unit;
          result = force_settle(michael, bitusd.amount(michael_settle_amount));
 
-         force_settlement_id_type michael_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type michael_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(michael_settle_id(db).balance.amount.value, michael_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -668,7 +668,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 11. Paul gives Yanna 40 bitUSD and retains 10 bitUSD
          ///////
          int64_t yanna_initial_usd = 40 * bitusd_unit;
-         transfer(paul.id, yanna.id, asset(yanna_initial_usd, bitusd.id));
+         transfer(paul.get_id(), yanna.get_id(), asset(yanna_initial_usd, bitusd.get_id()));
 
          // Check Yanna's balance
          BOOST_CHECK_EQUAL(get_balance(yanna, bitusd), yanna_initial_usd);
@@ -686,8 +686,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t yanna_settle_amount = 10 * bitusd_unit;
          result = force_settle(yanna, bitusd.amount(yanna_settle_amount));
 
-         force_settlement_id_type yanna_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type yanna_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(yanna_settle_id(db).balance.amount.value, yanna_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -757,7 +757,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 14. Paul gives Vikram 10 bitUSD and retains 0 bitUSD
          ///////
          int64_t vikram_initial_usd = 10 * bitusd_unit;
-         transfer(paul.id, vikram.id, asset(vikram_initial_usd, bitusd.id));
+         transfer(paul.get_id(), vikram.get_id(), asset(vikram_initial_usd, bitusd.get_id()));
 
          // Check Yanna's balance
          BOOST_CHECK_EQUAL(get_balance(vikram, bitusd), vikram_initial_usd);
@@ -776,8 +776,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t vikram_settle_amount = 10 * bitusd_unit;
          result = force_settle(vikram, bitusd.amount(vikram_settle_amount));
 
-         force_settlement_id_type vikram_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type vikram_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(vikram_settle_id(db).balance.amount.value, vikram_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -860,9 +860,9 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // Rachel, Michael, and Yanna return their remaining bitUSD to Paul
          trx.clear();
-         transfer(rachel.id, paul.id, bitusd.amount(get_balance(rachel, bitusd)));
-         transfer(michael.id, paul.id, bitusd.amount(get_balance(michael, bitusd)));
-         transfer(yanna.id, paul.id, bitusd.amount(get_balance(yanna, bitusd)));
+         transfer(rachel.get_id(), paul.get_id(), bitusd.amount(get_balance(rachel, bitusd)));
+         transfer(michael.get_id(), paul.get_id(), bitusd.amount(get_balance(michael, bitusd)));
+         transfer(yanna.get_id(), paul.get_id(), bitusd.amount(get_balance(yanna, bitusd)));
 
          // Vikram has no bitUSD to transfer
          BOOST_CHECK_EQUAL(get_balance(vikram, bitusd), 0);
@@ -1059,14 +1059,14 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Fund actors
          uint64_t initial_balance_core = 10000000;
-         transfer(committee_account, assetowner.id, asset(initial_balance_core));
-         transfer(committee_account, feedproducer.id, asset(initial_balance_core));
-         transfer(committee_account, paul.id, asset(initial_balance_core));
+         transfer(committee_account, assetowner.get_id(), asset(initial_balance_core));
+         transfer(committee_account, feedproducer.get_id(), asset(initial_balance_core));
+         transfer(committee_account, paul.get_id(), asset(initial_balance_core));
 
          // 1. Create assets
          const uint16_t usd_fso_percent = 5 * GRAPHENE_1_PERCENT; // 5% Force-settlement offset fee %
          const uint16_t usd_fsf_percent = 100 * GRAPHENE_1_PERCENT; // 100% Force-settlement fee % (BSIP87)
-         create_smart_asset("USDBIT", assetowner.id, usd_fso_percent, usd_fsf_percent);
+         create_smart_asset("USDBIT", assetowner.get_id(), usd_fso_percent, usd_fsf_percent);
 
          generate_block();
          set_expiration(db, trx);
@@ -1080,7 +1080,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 2. Publish a feed for the smart asset
          ///////
-         update_feed_producers(bitusd.id, {feedproducer_id});
+         update_feed_producers(bitusd.get_id(), {feedproducer_id});
          price_feed current_feed;
          current_feed.maintenance_collateral_ratio = 1750;
          current_feed.maximum_short_squeeze_ratio = 1100;
@@ -1098,7 +1098,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          int64_t paul_initial_core = paul_initial_usd * 2 * 20; // 400000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
-         call_order_id_type call_paul_id = call_paul.id;
+         call_order_id_type call_paul_id = call_paul.get_id();
          BOOST_REQUIRE_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
 
          BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
@@ -1109,7 +1109,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 4. Paul gives Rachel 20 bitUSD and retains 80 bitUSD
          ///////
          int64_t rachel_initial_usd = 20 * bitusd_unit;
-         transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
+         transfer(paul.get_id(), rachel.get_id(), asset(rachel_initial_usd, bitusd.get_id()));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
          BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -1124,8 +1124,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 2 * bitusd_unit; // 200 satoshi bitusd
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
-                                                           .value.new_objects->begin();
+         force_settlement_id_type rachel_settle_id { *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin() };
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -1213,7 +1213,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Fund actors
          uint64_t initial_balance_core = 10000000;
-         transfer(committee_account, assetowner.id, asset(initial_balance_core));
+         transfer(committee_account, assetowner.get_id(), asset(initial_balance_core));
 
          // Confirm before hardfork activation
          BOOST_CHECK(db.head_block_time() < HARDFORK_CORE_BSIP87_TIME);
@@ -1228,7 +1228,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // Attempt to create the smart asset with a force-settlement fee %
          // The attempt should fail because it is before HARDFORK_CORE_BSIP87_TIME
          trx.clear();
-         REQUIRE_EXCEPTION_WITH_TEXT(create_smart_asset("USDBIT", assetowner.id, usd_fso_percent, usd_fsf_percent_0),
+         REQUIRE_EXCEPTION_WITH_TEXT(create_smart_asset("USDBIT", assetowner_id, usd_fso_percent, usd_fsf_percent_0),
                                      "cannot be set before Hardfork BSIP87");
 
 
@@ -1236,7 +1236,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 2. Asset owner fails to create the smart coin called bitUSD with a force-settlement fee % in a proposal
          ///////
          {
-            asset_create_operation create_op = create_smart_asset_op("USDBIT", assetowner.id, usd_fso_percent,
+            asset_create_operation create_op = create_smart_asset_op("USDBIT", assetowner_id, usd_fso_percent,
                                                                      usd_fsf_percent_0);
             proposal_create_operation cop;
             cop.review_period_seconds = 86400;
@@ -1256,7 +1256,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 3. Asset owner succeeds to create the smart coin called bitUSD without a force-settlement fee %
          ///////
          trx.clear();
-         create_smart_asset("USDBIT", assetowner.id, usd_fso_percent);
+         create_smart_asset("USDBIT", assetowner_id, usd_fso_percent);
 
          generate_block();
          set_expiration(db, trx);
@@ -1356,7 +1356,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const uint16_t fsf_percent_1 = 1 * GRAPHENE_1_PERCENT; // 1% Force-settlement fee % (BSIP87)
          const uint16_t fsf_percent_5 = 1 * GRAPHENE_1_PERCENT; // 5% Force-settlement fee % (BSIP87)
          trx.clear();
-         create_smart_asset("CNYBIT", assetowner.id, usd_fso_percent, fsf_percent_1);
+         create_smart_asset("CNYBIT", assetowner_id, usd_fso_percent, fsf_percent_1);
 
          generate_block();
          set_expiration(db, trx);
@@ -1374,7 +1374,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          {
             // Create the proposal
-            asset_create_operation create_op = create_smart_asset_op("RUBBIT", assetowner.id, usd_fso_percent,
+            asset_create_operation create_op = create_smart_asset_op("RUBBIT", assetowner_id, usd_fso_percent,
                                                                      fsf_percent_1);
             proposal_create_operation cop;
             cop.review_period_seconds = 86400;
@@ -1390,7 +1390,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
 
             // Approve the proposal
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = assetowner_id;
@@ -1460,7 +1460,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
 
             // Approve the proposal
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = assetowner_id;

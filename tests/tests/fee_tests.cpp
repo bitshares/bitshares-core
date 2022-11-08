@@ -99,8 +99,10 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
       transfer( committee_account,  izzy_id, _core(1000000) );
       transfer( committee_account,  jill_id, _core(1000000) );
 
-      asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id,   GRAPHENE_1_PERCENT, charge_market_fee ).id;
-      asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, 2*GRAPHENE_1_PERCENT, charge_market_fee ).id;
+      asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id,   GRAPHENE_1_PERCENT, charge_market_fee )
+                                     .get_id();
+      asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, 2*GRAPHENE_1_PERCENT, charge_market_fee )
+                                     .get_id();
 
       const share_type izzy_prec = asset::scaled_precision( asset_id_type(izzycoin_id)(db).precision );
       const share_type jill_prec = asset::scaled_precision( asset_id_type(jillcoin_id)(db).precision );
@@ -219,9 +221,9 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         const asset_object& alicecoin = create_user_issued_asset( "ALICECOIN", alice,  0 );
         const asset_object& aliceusd = create_user_issued_asset( "ALICEUSD", alice, 0 );
 
-        asset_id_type alicecoin_id = alicecoin.id;
-        asset_id_type aliceusd_id = aliceusd.id;
-        asset_id_type bobcoin_id = create_user_issued_asset( "BOBCOIN", bob, 0).id;
+        asset_id_type alicecoin_id = alicecoin.get_id();
+        asset_id_type aliceusd_id = aliceusd.get_id();
+        asset_id_type bobcoin_id = create_user_issued_asset( "BOBCOIN", bob, 0).get_id();
 
         // prepare users' balance
         issue_uia( alice, aliceusd.amount( 20000000 ) );
@@ -726,7 +728,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
       transfer( account_id_type(), bob_id, asset(bob_b0) );
 
       asset_id_type core_id = asset_id_type();
-      asset_id_type usd_id = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee ).id;
+      asset_id_type usd_id = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee ).get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -785,8 +787,8 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
 
          // Check non-overlapping
 
-         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->id;
-         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000) )->id;
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->get_id();
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000) )->get_id();
 
          BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - 1000 - order_create_fee );
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
@@ -861,7 +863,7 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
 
       asset_id_type core_id = asset_id_type();
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee );
-      asset_id_type usd_id = usd_obj.id;
+      asset_id_type usd_id = usd_obj.get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -951,8 +953,9 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          // Check non-overlapping
          // Alice creates order
          // Bob creates order which doesn't match
-         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->id;
-         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->get_id();
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )
+                                         ->get_id();
 
          alice_bc -= order_create_fee;
          alice_bc -= 1000;
@@ -1025,10 +1028,10 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
 
          // Check partial fill
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), exp, cer );
-         const limit_order_id_type ao2id = ao2->id;
+         const limit_order_id_type ao2id = ao2->get_id();
          const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao2id ) != nullptr );
+         BOOST_CHECK( db.find( ao2id ) != nullptr );
          BOOST_CHECK( bo2 == nullptr );
 
          // data after order created
@@ -1098,11 +1101,11 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          const limit_order_object* ao34 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
          const limit_order_object* ao35 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
 
-         const limit_order_id_type ao31id = ao31->id;
-         const limit_order_id_type ao32id = ao32->id;
-         const limit_order_id_type ao33id = ao33->id;
-         const limit_order_id_type ao34id = ao34->id;
-         const limit_order_id_type ao35id = ao35->id;
+         const limit_order_id_type ao31id = ao31->get_id();
+         const limit_order_id_type ao32id = ao32->get_id();
+         const limit_order_id_type ao33id = ao33->get_id();
+         const limit_order_id_type ao34id = ao34->get_id();
+         const limit_order_id_type ao35id = ao35->get_id();
 
          alice_bc -= 1000 * 5;
          alice_bu -= order_create_fee * 5;
@@ -1119,11 +1122,11 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          // Bob creating an order matching multiple Alice's orders
          const limit_order_object* bo31 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao34id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao35id ) != nullptr );
+         BOOST_CHECK( db.find( ao31id ) == nullptr );
+         BOOST_CHECK( db.find( ao32id ) != nullptr );
+         BOOST_CHECK( db.find( ao33id ) == nullptr );
+         BOOST_CHECK( db.find( ao34id ) != nullptr );
+         BOOST_CHECK( db.find( ao35id ) != nullptr );
          BOOST_CHECK( bo31 == nullptr );
 
          // data after order created
@@ -1144,11 +1147,11 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          // Bob creating an order matching multiple Alice's orders
          const limit_order_object* bo32 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao34id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao35id ) == nullptr );
+         BOOST_CHECK( db.find( ao31id ) == nullptr );
+         BOOST_CHECK( db.find( ao32id ) != nullptr );
+         BOOST_CHECK( db.find( ao33id ) == nullptr );
+         BOOST_CHECK( db.find( ao34id ) == nullptr );
+         BOOST_CHECK( db.find( ao35id ) == nullptr );
          BOOST_CHECK( bo32 != nullptr );
 
          // data after order created
@@ -1247,7 +1250,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       asset_id_type core_id = asset_id_type();
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee );
-      asset_id_type usd_id = usd_obj.id;
+      asset_id_type usd_id = usd_obj.get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -1308,16 +1311,17 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       // prepare orders
       BOOST_TEST_MESSAGE( "Creating orders those will never match: ao1, ao2, bo1, bo2 .." );
       // ao1: won't expire, won't match, fee in core
-      limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(100000, usd_id) )->id;
+      limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(100000, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao1_id ) != nullptr );
       // ao2: will expire, won't match, fee in core
-      limit_order_id_type ao2_id = create_sell_order( alice_id, asset(800), asset(100000, usd_id), exp )->id;
+      limit_order_id_type ao2_id = create_sell_order( alice_id, asset(800), asset(100000, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao2_id ) != nullptr );
       // bo1: won't expire, won't match, fee in usd
-      limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(1000, usd_id), asset(100000), max_exp, cer )->id;
+      limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(1000, usd_id), asset(100000), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo1_id ) != nullptr );
       // bo2: will expire, won't match, fee in usd
-      limit_order_id_type bo2_id = create_sell_order(   bob_id, asset(800, usd_id), asset(100000), exp, cer )->id;
+      limit_order_id_type bo2_id = create_sell_order(   bob_id, asset(800, usd_id), asset(100000), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo2_id ) != nullptr );
 
       alice_bc -= order_create_fee * 2;
@@ -1342,7 +1346,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // ao3: won't expire, partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao3 .." );
-      limit_order_id_type ao3_id = create_sell_order( alice_id, asset(900), asset(2700, usd_id) )->id;
+      limit_order_id_type ao3_id = create_sell_order( alice_id, asset(900), asset(2700, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao3_id ) != nullptr );
       create_sell_order( bob_id, asset(600, usd_id), asset(200) );
 
@@ -1363,7 +1367,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // ao4: will expire, will partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao4 .." );
-      limit_order_id_type ao4_id = create_sell_order( alice_id, asset(700), asset(1400, usd_id), exp )->id;
+      limit_order_id_type ao4_id = create_sell_order( alice_id, asset(700), asset(1400, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao4_id ) != nullptr );
       create_sell_order( bob_id, asset(200, usd_id), asset(100) );
 
@@ -1384,7 +1388,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // bo3: won't expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo3 .." );
-      limit_order_id_type bo3_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1500), max_exp, cer )->id;
+      limit_order_id_type bo3_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1500), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo3_id ) != nullptr );
       create_sell_order( alice_id, asset(450), asset(150, usd_id) );
 
@@ -1407,7 +1412,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // bo4: will expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo4 .." );
-      limit_order_id_type bo4_id = create_sell_order(   bob_id, asset(300, usd_id), asset(600), exp, cer )->id;
+      limit_order_id_type bo4_id = create_sell_order(   bob_id, asset(300, usd_id), asset(600), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo4_id ) != nullptr );
       create_sell_order( alice_id, asset(140), asset(70, usd_id) );
 
@@ -1430,7 +1435,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // ao5: won't expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao5 .." );
-      limit_order_id_type ao5_id = create_sell_order( alice_id, asset(606), asset(909, usd_id) )->id;
+      limit_order_id_type ao5_id = create_sell_order( alice_id, asset(606), asset(909, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao5_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -1446,7 +1451,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // ao6: will expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao6 .." );
-      limit_order_id_type ao6_id = create_sell_order( alice_id, asset(333), asset(444, usd_id), exp2 )->id;
+      limit_order_id_type ao6_id = create_sell_order( alice_id, asset(333), asset(444, usd_id), exp2 )->get_id();
       BOOST_CHECK( db.find( ao6_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -1462,7 +1467,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // bo5: won't expire, partially match after hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo5 .." );
-      limit_order_id_type bo5_id = create_sell_order(   bob_id, asset(255, usd_id), asset(408), max_exp, cer )->id;
+      limit_order_id_type bo5_id = create_sell_order(   bob_id, asset(255, usd_id), asset(408), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo5_id ) != nullptr );
 
       bob_bu -= order_create_fee;
@@ -1480,7 +1486,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       // bo6: will expire, partially match after hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo6 .." );
-      limit_order_id_type bo6_id = create_sell_order(   bob_id, asset(127, usd_id), asset(127), exp2, cer )->id;
+      limit_order_id_type bo6_id = create_sell_order(   bob_id, asset(127, usd_id), asset(127), exp2, cer )->get_id();
       BOOST_CHECK( db.find( bo6_id ) != nullptr );
 
       bob_bu -= order_create_fee;
@@ -1751,7 +1757,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
       int64_t cer_usd_amount = 3;
       price tmp_cer( asset( cer_core_amount ), asset( cer_usd_amount, asset_id_type(1) ) );
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee, tmp_cer );
-      asset_id_type usd_id = usd_obj.id;
+      asset_id_type usd_id = usd_obj.get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -1904,7 +1910,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          // Bob creates order which doesn't match
          BOOST_TEST_MESSAGE( "Creating non-overlapping orders" );
          BOOST_TEST_MESSAGE( "Creating ao1" );
-         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id), exp )->id;
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id), exp )->get_id();
 
          alice_bc -= order_create_fee;
          alice_bc -= 1000;
@@ -1973,7 +1979,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
 
          BOOST_TEST_MESSAGE( "Creating bo1" );
-         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )
+                                         ->get_id();
 
          bob_bu -= usd_create_fee;
          bob_bu -= 500;
@@ -2061,10 +2068,10 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          // Check partial fill
          BOOST_TEST_MESSAGE( "Creating ao2, then be partially filled by bo2" );
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), exp, cer );
-         const limit_order_id_type ao2id = ao2->id;
+         const limit_order_id_type ao2id = ao2->get_id();
          const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao2id ) != nullptr );
+         BOOST_CHECK( db.find( ao2id ) != nullptr );
          BOOST_CHECK( bo2 == nullptr );
 
          // data after order created
@@ -2140,11 +2147,11 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          const limit_order_object* ao34 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
          const limit_order_object* ao35 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
 
-         const limit_order_id_type ao31id = ao31->id;
-         const limit_order_id_type ao32id = ao32->id;
-         const limit_order_id_type ao33id = ao33->id;
-         const limit_order_id_type ao34id = ao34->id;
-         const limit_order_id_type ao35id = ao35->id;
+         const limit_order_id_type ao31id = ao31->get_id();
+         const limit_order_id_type ao32id = ao32->get_id();
+         const limit_order_id_type ao33id = ao33->get_id();
+         const limit_order_id_type ao34id = ao34->get_id();
+         const limit_order_id_type ao35id = ao35->get_id();
 
          alice_bc -= 1000 * 5;
          alice_bu -= usd_create_fee * 5;
@@ -2162,11 +2169,11 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_TEST_MESSAGE( "Creating bo31, completely fill ao31 and ao33, partially fill ao34" );
          const limit_order_object* bo31 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao34id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao35id ) != nullptr );
+         BOOST_CHECK( db.find( ao31id ) == nullptr );
+         BOOST_CHECK( db.find( ao32id ) != nullptr );
+         BOOST_CHECK( db.find( ao33id ) == nullptr );
+         BOOST_CHECK( db.find( ao34id ) != nullptr );
+         BOOST_CHECK( db.find( ao35id ) != nullptr );
          BOOST_CHECK( bo31 == nullptr );
 
          // data after order created
@@ -2189,11 +2196,11 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_TEST_MESSAGE( "Creating bo32, completely fill partially filled ao34 and new ao35, leave on market" );
          const limit_order_object* bo32 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao34id ) == nullptr );
-         BOOST_CHECK( db.find<limit_order_object>( ao35id ) == nullptr );
+         BOOST_CHECK( db.find( ao31id ) == nullptr );
+         BOOST_CHECK( db.find( ao32id ) != nullptr );
+         BOOST_CHECK( db.find( ao33id ) == nullptr );
+         BOOST_CHECK( db.find( ao34id ) == nullptr );
+         BOOST_CHECK( db.find( ao35id ) == nullptr );
          BOOST_CHECK( bo32 != nullptr );
 
          // data after order created
@@ -2303,7 +2310,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       int64_t cer_usd_amount = 3;
       price tmp_cer( asset( cer_core_amount ), asset( cer_usd_amount, asset_id_type(1) ) );
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee, tmp_cer );
-      asset_id_type usd_id = usd_obj.id;
+      asset_id_type usd_id = usd_obj.get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -2372,16 +2379,18 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // prepare orders
       BOOST_TEST_MESSAGE( "Creating orders those will never match: ao1, ao2, bo1, bo2 .." );
       // ao1: won't expire, won't match, fee in core
-      limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(100000, usd_id) )->id;
+      limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(100000, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao1_id ) != nullptr );
       // ao2: will expire, won't match, fee in core
-      limit_order_id_type ao2_id = create_sell_order( alice_id, asset(800), asset(100000, usd_id), exp )->id;
+      limit_order_id_type ao2_id = create_sell_order( alice_id, asset(800), asset(100000, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao2_id ) != nullptr );
       // bo1: won't expire, won't match, fee in usd
-      limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(1000, usd_id), asset(100000), max_exp, cer )->id;
+      limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(1000, usd_id), asset(100000), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo1_id ) != nullptr );
       // bo2: will expire, won't match, fee in usd
-      limit_order_id_type bo2_id = create_sell_order(   bob_id, asset(800, usd_id), asset(100000), exp, cer )->id;
+      limit_order_id_type bo2_id = create_sell_order(   bob_id, asset(800, usd_id), asset(100000), exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo2_id ) != nullptr );
 
       alice_bc -= order_create_fee * 2;
@@ -2406,7 +2415,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao3: won't expire, partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao3 .." ); // 1:30
-      limit_order_id_type ao3_id = create_sell_order( alice_id, asset(900), asset(27000, usd_id) )->id;
+      limit_order_id_type ao3_id = create_sell_order( alice_id, asset(900), asset(27000, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao3_id ) != nullptr );
       create_sell_order( bob_id, asset(6000, usd_id), asset(200) );
 
@@ -2427,7 +2436,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao4: will expire, will partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao4 .." ); // 1:20
-      limit_order_id_type ao4_id = create_sell_order( alice_id, asset(700), asset(14000, usd_id), exp )->id;
+      limit_order_id_type ao4_id = create_sell_order( alice_id, asset(700), asset(14000, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao4_id ) != nullptr );
       create_sell_order( bob_id, asset(2000, usd_id), asset(100) );
 
@@ -2448,7 +2457,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo3: won't expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo3 .." ); // 1:30
-      limit_order_id_type bo3_id = create_sell_order(   bob_id, asset(500, usd_id), asset(15000), max_exp, cer )->id;
+      limit_order_id_type bo3_id = create_sell_order(   bob_id, asset(500, usd_id), asset(15000), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo3_id ) != nullptr );
       create_sell_order( alice_id, asset(4500), asset(150, usd_id) );
 
@@ -2471,7 +2481,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo4: will expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo4 .." ); // 1:20
-      limit_order_id_type bo4_id = create_sell_order(   bob_id, asset(300, usd_id), asset(6000), exp, cer )->id;
+      limit_order_id_type bo4_id = create_sell_order(   bob_id, asset(300, usd_id), asset(6000), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo4_id ) != nullptr );
       create_sell_order( alice_id, asset(1400), asset(70, usd_id) );
 
@@ -2495,7 +2505,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao11: won't expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao11 .." ); // 1:18
-      limit_order_id_type ao11_id = create_sell_order( alice_id, asset(510), asset(9180, usd_id) )->id;
+      limit_order_id_type ao11_id = create_sell_order( alice_id, asset(510), asset(9180, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao11_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2511,7 +2521,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao12: will expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao12 .." ); // 1:16
-      limit_order_id_type ao12_id = create_sell_order( alice_id, asset(256), asset(4096, usd_id), exp2 )->id;
+      limit_order_id_type ao12_id = create_sell_order( alice_id, asset(256), asset(4096, usd_id), exp2 )->get_id();
       BOOST_CHECK( db.find( ao12_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2527,7 +2537,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo11: won't expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo11 .." ); // 1:18
-      limit_order_id_type bo11_id = create_sell_order(   bob_id, asset(388, usd_id), asset(6984), max_exp, cer )->id;
+      limit_order_id_type bo11_id = create_sell_order(   bob_id, asset(388, usd_id), asset(6984), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo11_id ) != nullptr );
 
       bob_bu -= usd_create_fee;
@@ -2545,7 +2556,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo12: will expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo12 .." ); // 1:17
-      limit_order_id_type bo12_id = create_sell_order(   bob_id, asset(213, usd_id), asset(3621), exp2, cer )->id;
+      limit_order_id_type bo12_id = create_sell_order(   bob_id, asset(213, usd_id), asset(3621), exp2, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo12_id ) != nullptr );
 
       bob_bu -= usd_create_fee;
@@ -2563,7 +2575,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao5: won't expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao5 .." ); // 1:15
-      limit_order_id_type ao5_id = create_sell_order( alice_id, asset(606), asset(9090, usd_id) )->id;
+      limit_order_id_type ao5_id = create_sell_order( alice_id, asset(606), asset(9090, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao5_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2580,7 +2592,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // ao6: will expire, partially match after hard fork 445, fee in core
       if( false ) { // only can have either ao5 or ao6, can't have both
       BOOST_TEST_MESSAGE( "Creating order ao6 .." ); // 3:40 = 1:13.33333
-      limit_order_id_type ao6_id = create_sell_order( alice_id, asset(333), asset(4440, usd_id), exp )->id;
+      limit_order_id_type ao6_id = create_sell_order( alice_id, asset(333), asset(4440, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao6_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2598,7 +2610,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // bo5: won't expire, partially match after hard fork 445, fee in usd
       if( false ) { // only can have either bo5 or bo6, can't have both
       BOOST_TEST_MESSAGE( "Creating order bo5 .." ); // 1:16
-      limit_order_id_type bo5_id = create_sell_order(   bob_id, asset(255, usd_id), asset(4080), max_exp, cer )->id;
+      limit_order_id_type bo5_id = create_sell_order(   bob_id, asset(255, usd_id), asset(4080), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo5_id ) != nullptr );
 
       bob_bu -= usd_create_fee;
@@ -2617,7 +2630,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo6: will expire, partially match after hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo6 .." ); // 1:10
-      limit_order_id_type bo6_id = create_sell_order(   bob_id, asset(127, usd_id), asset(1270), exp, cer )->id;
+      limit_order_id_type bo6_id = create_sell_order(   bob_id, asset(127, usd_id), asset(1270), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo6_id ) != nullptr );
       BOOST_CHECK( db.find( bo6_id ) != nullptr );
 
@@ -2731,16 +2744,18 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // prepare more orders
       BOOST_TEST_MESSAGE( "Creating more orders those will never match: ao7, ao8, bo7, bo8 .." ); // ~ 1:100
       // ao7: won't expire, won't match, fee in core
-      limit_order_id_type ao7_id = create_sell_order( alice_id, asset(1003), asset(100000, usd_id) )->id;
+      limit_order_id_type ao7_id = create_sell_order( alice_id, asset(1003), asset(100000, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao7_id ) != nullptr );
       // ao8: will expire, won't match, fee in core
-      limit_order_id_type ao8_id = create_sell_order( alice_id, asset(803), asset(100000, usd_id), exp1 )->id;
+      limit_order_id_type ao8_id = create_sell_order( alice_id, asset(803), asset(100000, usd_id), exp1 )->get_id();
       BOOST_CHECK( db.find( ao8_id ) != nullptr );
       // bo7: won't expire, won't match, fee in usd
-      limit_order_id_type bo7_id = create_sell_order(   bob_id, asset(1003, usd_id), asset(100000), max_exp, cer )->id;
+      limit_order_id_type bo7_id = create_sell_order(   bob_id, asset(1003, usd_id), asset(100000), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo7_id ) != nullptr );
       // bo8: will expire, won't match, fee in usd
-      limit_order_id_type bo8_id = create_sell_order(   bob_id, asset(803, usd_id), asset(100000), exp1, cer )->id;
+      limit_order_id_type bo8_id = create_sell_order(   bob_id, asset(803, usd_id), asset(100000), exp1, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo8_id ) != nullptr );
 
       alice_bc -= order_create_fee * 2;
@@ -2765,7 +2780,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao9: won't expire, partially match before hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao9 .." ); // 1:3
-      limit_order_id_type ao9_id = create_sell_order( alice_id, asset(909), asset(2727, usd_id) )->id;
+      limit_order_id_type ao9_id = create_sell_order( alice_id, asset(909), asset(2727, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao9_id ) != nullptr );
       create_sell_order( bob_id, asset(606, usd_id), asset(202) );
 
@@ -2786,7 +2801,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao10: will expire, will partially match before hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao10 .." ); // 1:2
-      limit_order_id_type ao10_id = create_sell_order( alice_id, asset(707), asset(1414, usd_id), exp )->id;
+      limit_order_id_type ao10_id = create_sell_order( alice_id, asset(707), asset(1414, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao10_id ) != nullptr );
       create_sell_order( bob_id, asset(202, usd_id), asset(101) );
 
@@ -2807,7 +2822,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo9: won't expire, will partially match before hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo9 .." ); // 1:3
-      limit_order_id_type bo9_id = create_sell_order(   bob_id, asset(505, usd_id), asset(1515), max_exp, cer )->id;
+      limit_order_id_type bo9_id = create_sell_order(   bob_id, asset(505, usd_id), asset(1515), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo9_id ) != nullptr );
       create_sell_order( alice_id, asset(453), asset(151, usd_id) );
 
@@ -2830,7 +2846,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo10: will expire, will partially match before hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo10 .." ); // 1:2
-      limit_order_id_type bo10_id = create_sell_order(   bob_id, asset(302, usd_id), asset(604), exp, cer )->id;
+      limit_order_id_type bo10_id = create_sell_order(   bob_id, asset(302, usd_id), asset(604), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo10_id ) != nullptr );
       create_sell_order( alice_id, asset(142), asset(71, usd_id) );
 
@@ -2853,7 +2869,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao13: won't expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao13 .." ); // 1:1.5
-      limit_order_id_type ao13_id = create_sell_order( alice_id, asset(424), asset(636, usd_id) )->id;
+      limit_order_id_type ao13_id = create_sell_order( alice_id, asset(424), asset(636, usd_id) )->get_id();
       BOOST_CHECK( db.find( ao13_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2869,7 +2885,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // ao14: will expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao14 .." ); // 1:1.2
-      limit_order_id_type ao14_id = create_sell_order( alice_id, asset(525), asset(630, usd_id), exp )->id;
+      limit_order_id_type ao14_id = create_sell_order( alice_id, asset(525), asset(630, usd_id), exp )->get_id();
       BOOST_CHECK( db.find( ao14_id ) != nullptr );
 
       alice_bc -= order_create_fee;
@@ -2885,7 +2901,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo13: won't expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo13 .." ); // 1:1.5
-      limit_order_id_type bo13_id = create_sell_order(   bob_id, asset(364, usd_id), asset(546), max_exp, cer )->id;
+      limit_order_id_type bo13_id = create_sell_order(   bob_id, asset(364, usd_id), asset(546), max_exp, cer )
+                                      ->get_id();
       BOOST_CHECK( db.find( bo13_id ) != nullptr );
 
       bob_bu -= usd_create_fee;
@@ -2903,7 +2920,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       // bo14: will expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo14 .." ); // 1:1.2
-      limit_order_id_type bo14_id = create_sell_order(   bob_id, asset(365, usd_id), asset(438), exp, cer )->id;
+      limit_order_id_type bo14_id = create_sell_order(   bob_id, asset(365, usd_id), asset(438), exp, cer )->get_id();
       BOOST_CHECK( db.find( bo14_id ) != nullptr );
 
       bob_bu -= usd_create_fee;
@@ -3435,7 +3452,7 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
 
       // Izzy creates STEALTH
       asset_id_type stealth_id = create_user_issued_asset( "STEALTH", izzy_id(db),
-         disable_confidential | transfer_restricted | override_authority | white_list | charge_market_fee ).id;
+         disable_confidential | transfer_restricted | override_authority | white_list | charge_market_fee ).get_id();
 
       /*
       // this is disabled because it doesn't work, our modify() is probably being overwritten by undo

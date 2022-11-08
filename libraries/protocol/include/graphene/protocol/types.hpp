@@ -149,11 +149,48 @@ using private_key_type = fc::ecc::private_key;
 using chain_id_type = fc::sha256;
 using ratio_type = boost::rational<int32_t>;
 
+/**
+ * @note
+ * If one of the following bits is set in asset issuer permissions,
+ * it means the asset issuer (or owner for bitassets) has the permission to update
+ * the corresponding flag, parameters or perform certain actions.
+ * - @ref charge_market_fee
+ * - @ref white_list
+ * - @ref override_authority
+ * - @ref transfer_restricted
+ * - @ref disable_force_settle
+ * - @ref global_settle
+ * - @ref disable_confidential
+ * - @ref witness_fed_asset
+ * - @ref committee_fed_asset
+ *
+ * @note
+ * If one of the following bits is set in asset issuer permissions,
+ * it means the asset issuer (or owner for bitassets) does NOT have the permission to update
+ * the corresponding flag, parameters or perform certain actions.
+ * This is to be compatible with old client software.
+ * - @ref lock_max_supply
+ * - @ref disable_new_supply
+ * - @ref disable_mcr_update
+ * - @ref disable_icr_update
+ * - @ref disable_mssr_update
+ * - @ref disable_bsrm_update
+ * - @ref disable_collateral_bidding
+ *
+ * @note
+ * For @ref disable_mcr_update, @ref disable_icr_update and @ref disable_mssr_update,
+ * if one of these is set in asset issuer permissions, and
+ * - if the bitasset owner has set a value for the corresponding parameter, the value can not be updated,
+ * - if the bitasset owner has not set a value for the corresponding parameter, the parameter can still be
+ *   updated by the price feed producers.
+ *
+ */
 enum asset_issuer_permission_flags {
-    /// @note If one of these bits is set in asset issuer permissions,
-    ///       it means the asset issuer (or owner for bitassets) has the permission to update
-    ///       the corresponding flag, parameters or perform certain actions.
-    ///@{
+    // Permission-enabling bits begin
+    // If one of the following bits is set in asset issuer permissions,
+    // it means the asset issuer (or owner for bitassets) has the permission to update
+    // the corresponding flag, parameters or perform certain actions.
+    // Note: This comment is copied and reformatted above for better Doxygen documentation formatting.
     charge_market_fee    = 0x01, ///< market trades in this asset may be charged
     white_list           = 0x02, ///< accounts must be whitelisted in order to hold or transact this asset
     override_authority   = 0x04, ///< issuer may transfer asset back to himself
@@ -163,33 +200,31 @@ enum asset_issuer_permission_flags {
     disable_confidential = 0x40, ///< disallow the asset to be used with confidential transactions
     witness_fed_asset    = 0x80, ///< the bitasset is to be fed by witnesses
     committee_fed_asset  = 0x100, ///< the bitasset is to be fed by the committee
-    ///@}
-    /// @note If one of these bits is set in asset issuer permissions,
-    ///       it means the asset issuer (or owner for bitassets) does NOT have the permission to update
-    ///       the corresponding flag, parameters or perform certain actions.
-    ///       This is to be compatible with old client software.
-    ///@{
+    // Permission-enabling bits end
+
+    // Permission-disabling bits begin
+    // If one of the following bits is set in asset issuer permissions,
+    // it means the asset issuer (or owner for bitassets) does NOT have the permission to update
+    // the corresponding flag, parameters or perform certain actions.
+    // This is to be compatible with old client software.
+    // Note: This comment is copied and reformatted above for better Doxygen documentation formatting.
     lock_max_supply      = 0x200, ///< the max supply of the asset can not be updated
     disable_new_supply   = 0x400, ///< unable to create new supply for the asset
-    /// @note These parameters are for issuer permission only.
-    ///       For each parameter, if it is set in issuer permission,
-    ///       it means the bitasset owner can not update the corresponding parameter.
-    ///@{
-    /// @note For each one of these parameters, if it is set in issuer permission, and
-    ///       * if the value of the parameter was set by the bitasset owner, it can not be updated,
-    ///       * if no value was set by the owner, the value can still be updated by the feed producers.
-    ///@{
+    // For disable_mcr_update, disable_icr_update and disable_mssr_update,
+    // if one of these is set in asset issuer permissions, and
+    // - if the bitasset owner has set a value for the corresponding parameter, the value can not be updated,
+    // - if the bitasset owner has not set a value for the corresponding parameter, the parameter can still be
+    //   updated by the price feed producers.
+    // Note: This comment is copied and reformatted above for better Doxygen documentation formatting.
     disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permission only
     disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permission only
     disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permission only
-    ///@}
     disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
-    ///@}
     disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
-    ///@}
+    // Permission-disabling bits end
 };
 
-// The bits that can be used in asset issuer permissions for non-UIA assets
+/// The bits that can be used in asset issuer permissions for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
         charge_market_fee
         | white_list
@@ -207,7 +242,7 @@ const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
         | disable_mssr_update
         | disable_bsrm_update
         | disable_collateral_bidding;
-// The "enable" bits for non-UIA assets
+/// The "enable" bits for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         charge_market_fee
         | white_list
@@ -218,7 +253,7 @@ const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         | disable_confidential
         | witness_fed_asset
         | committee_fed_asset;
-// The "disable" bits for non-UIA assets
+/// The "disable" bits for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
         lock_max_supply
         | disable_new_supply
@@ -227,7 +262,7 @@ const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
         | disable_mssr_update
         | disable_bsrm_update
         | disable_collateral_bidding;
-// The bits that can be used in asset issuer permissions for UIA assets
+/// The bits that can be used in asset issuer permissions for UIA assets
 const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
         charge_market_fee
         | white_list
@@ -236,26 +271,26 @@ const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
         | disable_confidential
         | lock_max_supply
         | disable_new_supply;
-// The bits that can be used in asset issuer permissions for UIA assets before hf48/75
+/// The bits that can be used in asset issuer permissions for UIA assets before hf48/75
 const static uint16_t DEFAULT_UIA_ASSET_ISSUER_PERMISSION =
         charge_market_fee
         | white_list
         | override_authority
         | transfer_restricted
         | disable_confidential;
-// The bits that can be used in asset issuer permissions for non-UIA assets but not for UIA assets
+/// The bits that can be used in asset issuer permissions for non-UIA assets but not for UIA assets
 const static uint16_t NON_UIA_ONLY_ISSUER_PERMISSION_MASK =
         ASSET_ISSUER_PERMISSION_MASK ^ UIA_ASSET_ISSUER_PERMISSION_MASK;
-// The bits that can be used in asset issuer permissions but can not be used in flags
+/// The bits that can be used in asset issuer permissions but can not be used in flags
 const static uint16_t PERMISSION_ONLY_MASK =
         global_settle
         | disable_mcr_update
         | disable_icr_update
         | disable_mssr_update
         | disable_bsrm_update;
-// The bits that can be used in flags for non-UIA assets
+/// The bits that can be used in flags for non-UIA assets
 const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & (uint16_t)(~PERMISSION_ONLY_MASK);
-// the bits that can be used in flags for UIA assets
+/// the bits that can be used in flags for UIA assets
 const static uint16_t UIA_VALID_FLAGS_MASK = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
 enum reserved_spaces {
@@ -291,6 +326,7 @@ struct public_key_type {
     friend bool operator == (const public_key_type& p1, const fc::ecc::public_key& p2);
     friend bool operator == (const public_key_type& p1, const public_key_type& p2);
     friend bool operator != (const public_key_type& p1, const public_key_type& p2);
+    friend bool operator <  (const public_key_type& p1, const public_key_type& p2);
 };
 
 class pubkey_comparator {

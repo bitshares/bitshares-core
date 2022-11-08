@@ -80,7 +80,7 @@ share_type asset_issue_operation::calculate_fee(const fee_parameters_type& k)con
 }
 
 share_type asset_create_operation::calculate_fee( const asset_create_operation::fee_parameters_type& param,
-                                                  optional<uint64_t> sub_asset_creation_fee )const
+                                                  const optional<uint64_t>& sub_asset_creation_fee )const
 {
    share_type core_fee_required = param.long_symbol;
 

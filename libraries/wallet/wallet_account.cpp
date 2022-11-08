@@ -35,14 +35,6 @@
 
 namespace graphene { namespace wallet { namespace detail {
 
-   std::string wallet_api_impl::account_id_to_string(account_id_type id) const
-   {
-      std::string account_id = fc::to_string(id.space_id)
-                               + "." + fc::to_string(id.type_id)
-                               + "." + fc::to_string(id.instance.value);
-      return account_id;
-   }
-
    signed_transaction wallet_api_impl::register_account(string name, public_key_type owner,
          public_key_type active, string  registrar_account, string  referrer_account,
          uint32_t referrer_percent, bool broadcast )
@@ -61,7 +53,7 @@ namespace graphene { namespace wallet { namespace detail {
             this->get_account( registrar_account );
       FC_ASSERT( registrar_account_object.is_lifetime_member() );
 
-      account_id_type registrar_account_id = registrar_account_object.id;
+      account_id_type registrar_account_id = registrar_account_object.get_id();
 
       account_object referrer_account_object =
             this->get_account( referrer_account );
@@ -122,7 +114,7 @@ namespace graphene { namespace wallet { namespace detail {
       {
          FC_ASSERT( !self.is_locked() );
 
-         account_id_type account_id = get_account(account).id;
+         account_id_type account_id = get_account(account).get_id();
 
          custom_operation op;
          account_storage_map store;
@@ -194,7 +186,7 @@ namespace graphene { namespace wallet { namespace detail {
 
    account_object wallet_api_impl::get_account(account_id_type id) const
    {
-      std::string account_id = account_id_to_string(id);
+      auto account_id = std::string(id);
 
       auto rec = _remote_db->get_accounts({account_id}, {}).front();
       FC_ASSERT(rec);
@@ -241,7 +233,7 @@ namespace graphene { namespace wallet { namespace detail {
 
          account_object registrar_account_object = get_account( registrar_account );
 
-         account_id_type registrar_account_id = registrar_account_object.id;
+         account_id_type registrar_account_id = registrar_account_object.get_id();
 
          account_object referrer_account_object = get_account( referrer_account );
          account_create_op.referrer = referrer_account_object.id;
@@ -329,9 +321,9 @@ namespace graphene { namespace wallet { namespace detail {
          {
             if( has_wildcard )
                continue;
-            for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
+            for( const public_key_type& pub : _wallet.extra_keys[ claimer.get_id() ] )
             {
-               addrs.push_back( pub );
+               addrs.push_back( address(pub) );
                auto it = _keys.find( pub );
                if( it != _keys.end() )
                {
@@ -351,16 +343,16 @@ namespace graphene { namespace wallet { namespace detail {
             optional< private_key_type > key = wif_to_key( wif_key );
             FC_ASSERT( key.valid(), "Invalid private key" );
             fc::ecc::public_key pk = key->get_public_key();
-            addrs.push_back( pk );
+            addrs.push_back( address(pk) );
             keys[addrs.back()] = *key;
             // see chain/balance_evaluator.cpp
-            addrs.push_back( pts_address( pk, false, 56 ) );
+            addrs.push_back( address( pts_address( pk, false ) ) ); // version = 56 (default)
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, true, 56 ) );
+            addrs.push_back( address( pts_address( pk, true ) ) ); // version = 56 (default)
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, false, 0 ) );
+            addrs.push_back( address( pts_address( pk, false, 0 ) ) );
             keys[addrs.back()] = *key;
-            addrs.push_back( pts_address( pk, true, 0 ) );
+            addrs.push_back( address( pts_address( pk, true, 0 ) ) );
             keys[addrs.back()] = *key;
          }
       }

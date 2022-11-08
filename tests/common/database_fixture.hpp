@@ -172,12 +172,12 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define ACTOR(name) \
    PREP_ACTOR(name) \
    const auto name = create_account(BOOST_PP_STRINGIZE(name), name ## _public_key); \
-   graphene::chain::account_id_type name ## _id = name.id; (void)name ## _id;
+   graphene::chain::account_id_type name ## _id = name.get_id(); (void)name ## _id;
 
 #define GET_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
    const account_object& name = get_account(BOOST_PP_STRINGIZE(name)); \
-   graphene::chain::account_id_type name ## _id = name.id; \
+   graphene::chain::account_id_type name ## _id = name.get_id(); \
    (void)name ##_id
 
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
@@ -585,6 +585,15 @@ struct database_fixture_init : database_fixture_base {
       asset_id_type mpa1_id(1);
       BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
       BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
+
+      BOOST_CHECK_EQUAL( account_id_type()(db).creation_block_num, 0 );
+      BOOST_CHECK( account_id_type()(db).creation_time == genesis_state.initial_timestamp );
+
+      BOOST_CHECK_EQUAL( asset_id_type()(db).creation_block_num, 0 );
+      BOOST_CHECK( asset_id_type()(db).creation_time == genesis_state.initial_timestamp );
+
+      BOOST_CHECK_EQUAL( mpa1_id(db).creation_block_num, 0 );
+      BOOST_CHECK( mpa1_id(db).creation_time == genesis_state.initial_timestamp );
    }
 
    static void init( database_fixture_init<F>& fixture )

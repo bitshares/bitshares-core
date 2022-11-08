@@ -37,12 +37,10 @@ namespace graphene { namespace chain {
     *
     * This is an implementation detail. The values here are set by committee_members to tune the blockchain parameters.
     */
-   class global_property_object : public graphene::db::abstract_object<global_property_object>
+   class global_property_object : public graphene::db::abstract_object<global_property_object,
+                                            implementation_ids, impl_global_property_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_global_property_object_type;
-
          chain_parameters           parameters;
          optional<chain_parameters> pending_parameters;
 
@@ -61,12 +59,10 @@ namespace graphene { namespace chain {
     * This is an implementation detail. The values here are calculated during normal chain operations and reflect the
     * current values of global blockchain properties.
     */
-   class dynamic_global_property_object : public abstract_object<dynamic_global_property_object>
+   class dynamic_global_property_object : public abstract_object<dynamic_global_property_object,
+                                                    implementation_ids, impl_dynamic_global_property_object_type>
    {
       public:
-         static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_dynamic_global_property_object_type;
-
          uint32_t          head_block_number = 0;
          block_id_type     head_block_id;
          time_point_sec    time;

@@ -154,7 +154,7 @@ namespace graphene { namespace protocol {
       asset               receives;
       asset               fee; // paid by receiving account
       price               fill_price;
-      bool                is_maker;
+      bool                is_maker = true;
 
       pair<asset_id_type,asset_id_type> get_market()const
       {

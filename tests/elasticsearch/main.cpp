@@ -31,9 +31,8 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
 #include "../common/init_unit_test_suite.hpp"
-
 #include "../common/database_fixture.hpp"
-
+#include "../common/elasticsearch.hpp"
 #include "../common/utils.hpp"
 
 #define ES_WAIT_TIME (fc::milliseconds(10000))
@@ -72,7 +71,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          es.query = query;
 
          string res;
@@ -86,7 +85,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             return (total == "5");
          });
 
-         es.endpoint = es.index_prefix + "*/data/_search";
+         es.endpoint = es.index_prefix + "*/_doc/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -96,7 +95,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
 
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
@@ -121,13 +120,15 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          // check the visitor data
          auto block_date = db.head_block_time();
-         std::string index_name = graphene::utilities::generateIndexName(block_date, es_index_prefix);
+         std::string index_name = es_index_prefix + block_date.to_iso_string().substr( 0, 7 ); // yyyy-MM
 
-         es.endpoint = index_name + "/data/2.9.12"; // we know last op is a transfer of amount 300
+         es.endpoint = index_name + "/_doc/2.9.12"; // we know last op is a transfer of amount 300
          res = graphene::utilities::getEndPoint(es);
          j = fc::json::from_string(res);
          auto last_transfer_amount = j["_source"]["operation_history"]["op_object"]["amount_"]["amount"].as_string();
          BOOST_CHECK_EQUAL(last_transfer_amount, "300");
+         auto last_transfer_payer = j["_source"]["operation_history"]["fee_payer"].as_string();
+         BOOST_CHECK_EQUAL(last_transfer_payer, "1.2.0");
 
          // To test credit offers
          generate_blocks( HARDFORK_CORE_2362_TIME );
@@ -143,12 +144,12 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          asset_id_type core_id;
 
          const asset_object& usd = create_user_issued_asset( "MYUSD" );
-         asset_id_type usd_id = usd.id;
+         asset_id_type usd_id = usd.get_id();
          issue_uia( sam, usd.amount(init_amount) );
          issue_uia( ted, usd.amount(init_amount) );
 
          const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
-         asset_id_type eur_id = eur.id;
+         asset_id_type eur_id = eur.get_id();
          issue_uia( sam, eur.amount(init_amount) );
          issue_uia( ted, eur.amount(init_amount) );
 
@@ -157,8 +158,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             flat_map<asset_id_type, price> collateral_map;
             collateral_map[usd_id] = price( asset(1), asset(1, usd_id) );
 
-            credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.id, 10000, 100, 3600, 0,
-                                                   false, db.head_block_time() + fc::days(1), collateral_map, {} );
+            credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.get_id(), 10000, 100, 3600,
+                                                   0, false, db.head_block_time() + fc::days(1), collateral_map, {} );
             propose( cop );
          }
 
@@ -169,7 +170,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          flat_map<asset_id_type, price> collateral_map1;
          collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
 
-         const credit_offer_object& coo1 = create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+         const credit_offer_object& coo1 = create_credit_offer( sam_id, core.get_id(), 10000, 100, 3600, 0, false,
                                               disable_time1, collateral_map1, {} );
 
          BOOST_CHECK( coo1.owner_account == sam_id );
@@ -196,7 +197,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
@@ -224,7 +225,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_obj_index_prefix;
 
-      // delete all first
+      // The head block number is 1
+      BOOST_CHECK_EQUAL( db.head_block_num(), 1u );
+
+      // delete all first, this will delete genesis data and data inserted at block 1
       auto delete_objects = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_objects); // require successful deletion
 
@@ -233,11 +237,11 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
-         create_bitasset("USD", account_id_type());
+         asset_id_type usd_id = create_bitasset("USD", account_id_type()).get_id();
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          es.query = query;
 
          string res;
@@ -251,19 +255,72 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "2");
          });
 
-         es.endpoint = es.index_prefix + "asset/data/_search";
+         es.endpoint = es.index_prefix + "asset/_doc/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_source"]["symbol"].as_string();
          BOOST_CHECK_EQUAL(first_id, "USD");
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
-         es.endpoint = es.index_prefix + "bitasset/data/_search";
-         es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""+bitasset_data_id+"\"}}] } } }";
+         es.endpoint = es.index_prefix + "bitasset/_doc/_search";
+         es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""
+                  + bitasset_data_id + "\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto bitasset_object_id = j["hits"]["hits"][size_t(0)]["_source"]["object_id"].as_string();
          BOOST_CHECK_EQUAL(bitasset_object_id, bitasset_data_id);
+
+         // create a limit order that expires at the next maintenance time
+         create_sell_order( account_id_type(), asset(1), asset(1, usd_id),
+                            db.get_dynamic_global_properties().next_maintenance_time );
+         generate_block();
+
+         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "1");
+         });
+
+         // maintenance, for budget records
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+         generate_block();
+
+         es.endpoint = es.index_prefix + "budget/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "1"); // new record inserted at the first maintenance block
+         });
+
+         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "0"); // the limit order expired, so the object is removed
+         });
+
       }
    }
    catch (fc::exception &e) {
@@ -297,6 +354,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
 
 
       }
+      // Note: this test case ends too quickly, sometimes causing an memory access violation on cleanup
    }
    catch (fc::exception &e) {
       edump((e.to_detail_string()));
@@ -324,11 +382,11 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          create_bitasset("USD", account_id_type()); // create op 0
          const account_object& dan = create_account("dan"); // create op 1
-         create_bitasset("CNY", dan.id); // create op 2
+         create_bitasset("CNY", dan.get_id()); // create op 2
          create_bitasset("BTC", account_id_type()); // create op 3
-         create_bitasset("XMR", dan.id); // create op 4
+         create_bitasset("XMR", dan.get_id()); // create op 4
          create_bitasset("EUR", account_id_type()); // create op 5
-         create_bitasset("OIL", dan.id); // create op 6
+         create_bitasset("OIL", dan.get_id()); // create op 6
 
          generate_block();
 

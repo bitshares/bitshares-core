@@ -4,7 +4,7 @@ add_library( graphene_account_history
              account_history_plugin.cpp
            )
 
-target_link_libraries( graphene_account_history graphene_chain graphene_app )
+target_link_libraries( graphene_account_history graphene_app graphene_chain )
 target_include_directories( graphene_account_history
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

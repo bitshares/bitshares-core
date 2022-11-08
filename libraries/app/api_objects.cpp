@@ -27,6 +27,30 @@
 
 namespace graphene { namespace app {
 
+order::order( const string& _price,
+              const string& _quote,
+              const string& _base,
+              const limit_order_id_type& _id,
+              const account_id_type& _oid,
+              const string& _oname,
+              const time_point_sec& _exp )
+: price( _price ),
+  quote( _quote ),
+  base( _base ),
+  id( _id ),
+  owner_id( _oid ),
+  owner_name( _oname ),
+  expiration( _exp )
+{
+   // Nothing to do
+}
+
+order_book::order_book( const string& _base, const string& _quote )
+: base( _base ), quote( _quote )
+{
+   // Do nothing else
+}
+
 market_ticker::market_ticker(const market_ticker_object& mto,
                              const fc::time_point_sec& now,
                              const asset_object& asset_base,
@@ -104,6 +128,12 @@ market_ticker::market_ticker(const fc::time_point_sec& now,
    percent_change = "0";
    base_volume = "0";
    quote_volume = "0";
+}
+
+maybe_signed_block_header::maybe_signed_block_header( const signed_block_header& bh, bool with_witness_signature )
+: block_header( bh ), // Slice intentionally
+  witness_signature( with_witness_signature ? bh.witness_signature : optional<signature_type>() )
+{ // Nothing else to do
 }
 
 } } // graphene::app

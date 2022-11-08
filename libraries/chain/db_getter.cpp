@@ -117,10 +117,10 @@ vector<authority> database::get_viable_custom_authorities(
          if (result.success)
             results.emplace_back(cust_auth.get().auth);
          else if (rejected_authorities != nullptr)
-            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
+            rejected_authorities->insert(std::make_pair(cust_auth.get().get_id(), std::move(result)));
       } catch (fc::exception& e) {
          if (rejected_authorities != nullptr)
-            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(e)));
+            rejected_authorities->insert(std::make_pair(cust_auth.get().get_id(), std::move(e)));
       }
    }
 
