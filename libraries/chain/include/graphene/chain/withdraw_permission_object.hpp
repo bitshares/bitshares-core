@@ -54,31 +54,37 @@ namespace graphene { namespace chain {
         asset              withdrawal_limit;
         /// The duration of a withdrawal period in seconds
         uint32_t           withdrawal_period_sec = 0;
-       /***
-        * The beginning of the next withdrawal period
-        * WARNING: Due to caching, this value does not always represent the start of the next or current period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        */
+        /**
+         * The beginning of the next withdrawal period.
+         * WARNING: Due to caching, this value does not always represent the start of the next or current period,
+         *   because it is only updated after a withdrawal operation such as claim.
+         * For the latest current period, use current_period().
+         */
         time_point_sec     period_start_time;
         /// The time at which this withdraw permission expires
         time_point_sec     expiration;
 
-       /***
-        * Tracks the total amount
-        * WARNING: Due to caching, this value does not always represent the total amount claimed during the current period; it may represent what was claimed during the last claimed period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        */
+        /**
+         * Tracks the total amount
+         * WARNING: Due to caching, this value does not always represent the total amount claimed during the
+         *   current period, it may represent what was claimed during the last claimed period, because it is only
+         *   updated after a withdrawal operation such as claim.
+         * For the latest current period, use current_period().
+         */
         share_type         claimed_this_period;
 
-       /***
-        * Determine how much is still available to be claimed during the period that contains a time of interest.  This object and function is mainly intended to be used with the "current" time as a parameter.  The current time can be obtained from the time of the current head of the blockchain.
-        */
+        /***
+         * Determine how much is still available to be claimed during the period that contains a time of interest.
+         * This object and function is mainly intended to be used with the "current" time as a parameter.
+         * The current time can be obtained from the time of the current head of the blockchain.
+         */
         asset              available_this_period( fc::time_point_sec current_time )const
         {
            if( current_time >= period_start_time + withdrawal_period_sec )
               return withdrawal_limit;
-           return asset(
-              ( withdrawal_limit.amount > claimed_this_period )
-              ? withdrawal_limit.amount - claimed_this_period
-              : 0, withdrawal_limit.asset_id );
+           return asset( ( withdrawal_limit.amount > claimed_this_period ) ?
+                            ( withdrawal_limit.amount - claimed_this_period ) : 0,
+                         withdrawal_limit.asset_id );
         }
    };
 

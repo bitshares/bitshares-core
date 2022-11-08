@@ -33,7 +33,7 @@ namespace graphene { namespace chain {
 
    /**
     * @brief database object to store HTLCs
-    * 
+    *
     * This object is stored in the database while an HTLC is active. The HTLC will
     * become inactive at expiration or when unlocked via the preimage.
     */
@@ -47,7 +47,7 @@ namespace graphene { namespace chain {
             asset_id_type asset_id;
          } transfer;
          struct condition_info {
-            struct hash_lock_info {  
+            struct hash_lock_info {
                htlc_hash preimage_hash;
                uint16_t preimage_size;
             } hash_lock;
@@ -91,13 +91,13 @@ namespace graphene { namespace chain {
          indexed_by<
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
 
-            ordered_unique< tag< by_expiration >, 
+            ordered_unique< tag< by_expiration >,
                   composite_key< htlc_object,
                   htlc_object::timelock_extractor,
                   member< object, object_id_type, &object::id > > >,
 
             ordered_unique< tag< by_from_id >,
-                  composite_key< htlc_object, 
+                  composite_key< htlc_object,
                   htlc_object::from_extractor,
                   member< object, object_id_type, &object::id > > >,
 
@@ -106,7 +106,6 @@ namespace graphene { namespace chain {
                   htlc_object::to_extractor,
                   member< object, object_id_type, &object::id > > >
       >
-
    > htlc_object_index_type;
 
    typedef generic_index< htlc_object, htlc_object_index_type > htlc_index;

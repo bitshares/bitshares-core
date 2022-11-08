@@ -864,7 +864,7 @@ FC_API(graphene::app::crypto_api,
      )
 FC_API(graphene::app::asset_api,
        (get_asset_holders)
-	   (get_asset_holders_count)
+       (get_asset_holders_count)
        (get_all_asset_holders)
      )
 FC_API(graphene::app::orders_api,

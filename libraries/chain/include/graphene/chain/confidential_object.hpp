@@ -56,7 +56,8 @@ typedef multi_index_container<
    blinded_balance_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_unique< tag<by_commitment>, member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >
+      ordered_unique< tag<by_commitment>,
+         member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >
    >
 > blinded_balance_object_multi_index_type;
 typedef generic_index<blinded_balance_object, blinded_balance_object_multi_index_type> blinded_balance_index;

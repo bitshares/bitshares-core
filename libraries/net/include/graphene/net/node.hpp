@@ -74,7 +74,7 @@ namespace graphene { namespace net {
           *  @throws exception if error validating the item, otherwise the item is
           *          safe to broadcast on.
           */
-         virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
+         virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode,
                                     std::vector<message_hash_type>& contained_transaction_msg_ids ) = 0;
 
          /**
@@ -130,13 +130,14 @@ namespace graphene { namespace net {
           *     &c.
           *   the last item in the list will be the hash of the most recent block on our preferred chain
           */
-         virtual std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point, 
-                                                                  uint32_t number_of_blocks_after_reference_point) = 0;
+         virtual std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point,
+                                                               uint32_t number_of_blocks_after_reference_point) = 0;
 
          /**
           *  Call this after the call to handle_message succeeds.
           *
-          *  @param item_type the type of the item we're synchronizing, will be the same as item passed to the sync_from() call
+          *  @param item_type the type of the item we're synchronizing, will be the same as item passed to the
+          *                   sync_from() call
           *  @param item_count the number of items known to the node that haven't been sent to handle_item() yet.
           *                    After `item_count` more calls to handle_item(), the node will be in sync
           */

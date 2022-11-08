@@ -32,7 +32,7 @@ using namespace graphene::utilities;
 using std::string;
 using std::vector;
 
-namespace graphene { namespace wallet { 
+namespace graphene { namespace wallet {
 
 using transaction_handle_type = uint32_t;
 
