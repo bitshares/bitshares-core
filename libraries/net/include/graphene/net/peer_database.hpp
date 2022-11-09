@@ -50,23 +50,20 @@ namespace graphene { namespace net {
     fc::time_point_sec                last_seen_time;
     fc::enum_type<uint8_t,potential_peer_last_connection_disposition> last_connection_disposition;
     fc::time_point_sec                last_connection_attempt_time;
-    uint32_t                          number_of_successful_connection_attempts;
-    uint32_t                          number_of_failed_connection_attempts;
+    uint32_t                          number_of_successful_connection_attempts = 0;
+    uint32_t                          number_of_failed_connection_attempts = 0;
     fc::optional<fc::exception>       last_error;
 
-    potential_peer_record() :
-      number_of_successful_connection_attempts(0),
-    number_of_failed_connection_attempts(0){}
+    potential_peer_record() = default;
 
-    potential_peer_record(fc::ip::endpoint endpoint,
-                          fc::time_point_sec last_seen_time = fc::time_point_sec(),
-                          potential_peer_last_connection_disposition last_connection_disposition = never_attempted_to_connect) :
-      endpoint(endpoint),
+    explicit potential_peer_record(
+       const fc::ip::endpoint& endpoint,
+       const fc::time_point_sec& last_seen_time = fc::time_point_sec(),
+       potential_peer_last_connection_disposition last_connection_disposition = never_attempted_to_connect )
+    : endpoint(endpoint),
       last_seen_time(last_seen_time),
-      last_connection_disposition(last_connection_disposition),
-      number_of_successful_connection_attempts(0),
-      number_of_failed_connection_attempts(0)
-    {}  
+      last_connection_disposition(last_connection_disposition)
+    {}
   };
 
   namespace detail
@@ -74,7 +71,9 @@ namespace graphene { namespace net {
     class peer_database_impl;
 
     class peer_database_iterator_impl;
-    class peer_database_iterator : public boost::iterator_facade<peer_database_iterator, const potential_peer_record, boost::forward_traversal_tag>
+    class peer_database_iterator : public boost::iterator_facade< peer_database_iterator,
+                                                                  const potential_peer_record,
+                                                                  boost::forward_traversal_tag>
     {
     public:
       peer_database_iterator();
@@ -87,7 +86,7 @@ namespace graphene { namespace net {
       void increment();
       bool equal(const peer_database_iterator& other) const;
       const potential_peer_record& dereference() const;
-    private:      
+    private:
       std::unique_ptr<peer_database_iterator_impl> my;
     };
   }

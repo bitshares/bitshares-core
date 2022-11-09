@@ -99,9 +99,10 @@ namespace graphene { namespace chain {
          uint64_t vp_committee = 0;     ///<  the final voting power for the committees.
          uint64_t vp_witness = 0;       ///<  the final voting power for the witnesses.
          uint64_t vp_worker = 0;        ///<  the final voting power for the workers.
-         /// timestamp of the last count of votes. 
-         /// if there is no statistics, the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
-         time_point_sec vote_tally_time; 
+         /// Timestamp of the last count of votes.
+         /// If there is no statistics,
+         /// the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
+         time_point_sec vote_tally_time;
          ///@}
 
          /// Whether this account owns some CORE asset and is voting
@@ -160,7 +161,8 @@ namespace graphene { namespace chain {
          account_id_type   owner;
          asset_id_type     asset_type;
          share_type        balance;
-         bool              maintenance_flag = false; ///< Whether need to process this balance object in maintenance interval
+         /// Whether need to process this balance object in maintenance interval
+         bool              maintenance_flag = false;
 
          asset get_balance()const { return asset(balance, asset_type); }
          void  adjust_balance(const asset& delta);
@@ -364,8 +366,10 @@ namespace graphene { namespace chain {
          virtual void about_to_modify( const object& before ) override;
          virtual void object_modified( const object& after  ) override;
 
-         const map< asset_id_type, const account_balance_object* >& get_account_balances( const account_id_type& acct )const;
-         const account_balance_object* get_account_balance( const account_id_type& acct, const asset_id_type& asset )const;
+         const map< asset_id_type, const account_balance_object* >& get_account_balances(
+                  const account_id_type& acct )const;
+         const account_balance_object* get_account_balance( const account_id_type& acct,
+                                                            const asset_id_type& asset )const;
 
       private:
          static const uint8_t  bits;
@@ -428,7 +432,7 @@ namespace graphene { namespace chain {
 
    struct by_maintenance_seq;
    struct by_voting_power_active;
-   
+
    /**
     * @ingroup object_index
     */

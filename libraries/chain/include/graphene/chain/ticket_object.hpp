@@ -84,8 +84,8 @@ class ticket_object : public abstract_object<ticket_object, protocol_ids, ticket
          return _seconds_to_downgrade[ static_cast<uint8_t>(i) ];
       }
       static uint8_t value_multiplier( ticket_type i, ticket_version version ) {
-         static constexpr uint32_t _value_multiplier_v1[] = { 1, 2, 4, 8, 8, 0 };
-         static constexpr uint32_t _value_multiplier_v2[] = { 0, 2, 4, 8, 8, 0 };
+         static constexpr uint8_t _value_multiplier_v1[] = { 1, 2, 4, 8, 8, 0 };
+         static constexpr uint8_t _value_multiplier_v2[] = { 0, 2, 4, 8, 8, 0 };
          return ( version == ticket_v1 ? _value_multiplier_v1[ static_cast<uint8_t>(i) ]
                                        : _value_multiplier_v2[ static_cast<uint8_t>(i) ] );
       }

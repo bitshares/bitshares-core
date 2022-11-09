@@ -68,7 +68,7 @@ namespace graphene { namespace chain {
          time_point_sec    time;
          witness_id_type   current_witness;
          time_point_sec    next_maintenance_time;
-         time_point_sec    last_vote_tally_time; 
+         time_point_sec    last_vote_tally_time;
          time_point_sec    last_budget_time;
          share_type        witness_budget;
          share_type        total_pob;

@@ -1211,7 +1211,7 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
 
    asset settled_amount = ( op.amount.amount == mia_dyn.current_supply )
                           ? asset( bitasset.settlement_fund, bitasset.options.short_backing_asset )
-                          : op.amount * bitasset.settlement_price; // round down, favors global settlement fund
+                          : ( op.amount * bitasset.settlement_price ); // round down, favors global settlement fund
    if( op.amount.amount != mia_dyn.current_supply )
    {
       // should be strictly < except for PM with zero outcome since in that case bitasset.settlement_fund is zero
