@@ -116,12 +116,11 @@ void database::debug_dump()
 
 void debug_apply_update( database& db, const fc::variant_object& vo )
 {
-   static const uint8_t
-      db_action_nil = 0,
-      db_action_create = 1,
-      db_action_write = 2,
-      db_action_update = 3,
-      db_action_delete = 4;
+   constexpr uint8_t db_action_nil = 0;
+   constexpr uint8_t db_action_create = 1;
+   constexpr uint8_t db_action_write = 2;
+   constexpr uint8_t db_action_update = 3;
+   constexpr uint8_t db_action_delete = 4;
 
    // "_action" : "create"   object must not exist, unspecified fields take defaults
    // "_action" : "write"    object may exist, is replaced entirely, unspecified fields take defaults

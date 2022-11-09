@@ -48,15 +48,16 @@ class special_authority_object : public graphene::db::abstract_object<special_au
 
 struct by_account;
 
-typedef multi_index_container<
+using special_authority_multi_idx_typ = multi_index_container<
    special_authority_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_unique< tag<by_account>, member< special_authority_object, account_id_type, &special_authority_object::account> >
+      ordered_unique< tag<by_account>,
+         member< special_authority_object, account_id_type, &special_authority_object::account> >
    >
-> special_authority_multi_index_type;
+>;
 
-typedef generic_index< special_authority_object, special_authority_multi_index_type > special_authority_index;
+using special_authority_index = generic_index< special_authority_object, special_authority_multi_idx_typ >;
 
 } } // graphene::chain
 
