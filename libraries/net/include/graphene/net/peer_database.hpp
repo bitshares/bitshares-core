@@ -86,7 +86,7 @@ namespace graphene { namespace net {
       void increment();
       bool equal(const peer_database_iterator& other) const;
       const potential_peer_record& dereference() const;
-    private:      
+    private:
       std::unique_ptr<peer_database_iterator_impl> my;
     };
   }
