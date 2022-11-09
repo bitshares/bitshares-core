@@ -104,12 +104,9 @@ typedef static_variant<
 /**
  * @brief Worker object contains the details of a blockchain worker. See @ref workers for details.
  */
-class worker_object : public abstract_object<worker_object>
+class worker_object : public abstract_object<worker_object, protocol_ids, worker_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id =  worker_object_type;
-
       /// ID of the account which owns this worker
       account_id_type worker_account;
       /// Time at which this worker begins receiving pay, if elected

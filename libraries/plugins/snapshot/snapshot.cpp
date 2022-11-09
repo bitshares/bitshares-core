@@ -72,6 +72,7 @@ void snapshot_plugin::plugin_initialize(const boost::program_options::variables_
          snapshot_block = options[OPT_BLOCK_NUM].as<uint32_t>();
       if( options.count(OPT_BLOCK_TIME) > 0 )
          snapshot_time = fc::time_point_sec::from_iso_string( options[OPT_BLOCK_TIME].as<std::string>() );
+      // connect with no group specified to process after the ones with a group specified
       database().applied_block.connect( [&]( const graphene::chain::signed_block& b ) {
          check_snapshot( b );
       });

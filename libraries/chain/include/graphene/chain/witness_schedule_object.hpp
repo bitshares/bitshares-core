@@ -27,12 +27,10 @@
 
 namespace graphene { namespace chain {
 
-class witness_schedule_object : public graphene::db::abstract_object<witness_schedule_object>
+class witness_schedule_object : public graphene::db::abstract_object<witness_schedule_object,
+                                          implementation_ids, impl_witness_schedule_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_witness_schedule_object_type;
-
       vector< witness_id_type > current_shuffled_witnesses;
 };
 

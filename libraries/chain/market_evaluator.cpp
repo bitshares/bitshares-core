@@ -47,14 +47,14 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
 
    if( _sell_asset->options.whitelist_markets.size() )
    {
-      GRAPHENE_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->id)
+      GRAPHENE_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->get_id())
                           != _sell_asset->options.whitelist_markets.end(),
                        limit_order_create_market_not_whitelisted,
                        "This market has not been whitelisted by the selling asset", );
    }
    if( _sell_asset->options.blacklist_markets.size() )
    {
-      GRAPHENE_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id)
+      GRAPHENE_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->get_id())
                           == _sell_asset->options.blacklist_markets.end(),
                        limit_order_create_market_blacklisted,
                        "This market has been blacklisted by the selling asset", );
@@ -119,7 +119,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.deferred_fee = _deferred_fee;
        obj.deferred_paid_fee = _deferred_paid_fee;
    });
-   limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
+   object_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled;
    if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_TIME )
       filled = db().apply_order_before_hardfork_625( new_order_object );
@@ -346,7 +346,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       });
    }
 
-   call_order_id_type call_order_id = call_ptr->id;
+   object_id_type call_order_id = call_ptr->id;
 
    if( _bitasset_data->is_prediction_market )
       return call_order_id;
@@ -381,7 +381,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
    //       the first call order may be unable to be updated if the second one is undercollateralized.
    // Note: check call orders, don't allow black swan, not for new limit order
    bool called_some = d.check_call_orders( *_debt_asset, false, false, _bitasset_data );
-   call_ptr = d.find(call_order_id);
+   call_ptr = d.find<call_order_object>(call_order_id);
    if( called_some )
    {
       // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.

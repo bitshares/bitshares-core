@@ -36,8 +36,7 @@ using namespace graphene::chain::test;
 BOOST_FIXTURE_TEST_SUITE( pob_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( hardfork_time_test )
-{
-   try {
+{ try {
 
       // Proceeds to a recent hard fork
       generate_blocks( HARDFORK_CORE_1270_TIME );
@@ -61,11 +60,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
       ticket_update_operation uop = make_ticket_update_op( tmp_ticket, lock_720_days, {} );
       BOOST_CHECK_THROW( propose( uop ), fc::exception );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
 { try {
@@ -170,7 +165,7 @@ BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
       // negative amount
       BOOST_CHECK_THROW( update_ticket( tick_1, liquid, asset(-1) ), fc::exception );
       // non-core asset
-      BOOST_CHECK_THROW( update_ticket( tick_1, liquid, asset(1, usd.id) ), fc::exception );
+      BOOST_CHECK_THROW( update_ticket( tick_1, liquid, asset(1, usd.get_id()) ), fc::exception );
       // too big amount
       BOOST_CHECK_THROW( update_ticket( tick_1, liquid, asset(2) ), fc::exception );
       // target type unchanged
@@ -198,9 +193,9 @@ BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
          BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       }
 
-      ticket_id_type tick_1_id = tick_1.id;
-      ticket_id_type tick_2_id = tick_2.id;
-      ticket_id_type tick_4_id = tick_4.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
+      ticket_id_type tick_2_id = tick_2.get_id();
+      ticket_id_type tick_4_id = tick_4.get_id();
 
       // Update ticket 1 to liquid
       generic_operation_result result = update_ticket( tick_1, liquid, asset(1) );
@@ -244,7 +239,7 @@ BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
       BOOST_CHECK( *result.updated_objects.begin() == tick_2_id );
       BOOST_CHECK_EQUAL( result.removed_objects.size(), 0u );
 
-      ticket_id_type new_ticket_id = *result.new_objects.begin();
+      ticket_id_type new_ticket_id { *result.new_objects.begin() };
       BOOST_CHECK( new_ticket_id > tick_4_id );
       BOOST_REQUIRE( db.find( new_ticket_id ) );
       BOOST_CHECK( new_ticket_id(db).account == sam_id );
@@ -269,11 +264,7 @@ BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
       BOOST_CHECK( new_ticket_id(db).target_type == lock_180_days );
       BOOST_CHECK( new_ticket_id(db).amount == asset(3) );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_CASE( one_lock_180_ticket )
 { try {
@@ -291,7 +282,7 @@ BOOST_AUTO_TEST_CASE( one_lock_180_ticket )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_180_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
@@ -386,7 +377,7 @@ BOOST_AUTO_TEST_CASE( one_lock_360_ticket )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_360_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_360_days );
@@ -517,7 +508,7 @@ BOOST_AUTO_TEST_CASE( one_lock_720_ticket )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_720_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
@@ -684,7 +675,7 @@ BOOST_AUTO_TEST_CASE( one_lock_720_ticket_if_blocks_missed )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_720_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
@@ -741,7 +732,7 @@ BOOST_AUTO_TEST_CASE( one_lock_forever_ticket )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_forever, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_forever );
@@ -930,7 +921,7 @@ BOOST_AUTO_TEST_CASE( one_lock_forever_ticket_if_blocks_missed )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_forever, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_forever );
@@ -993,7 +984,7 @@ BOOST_AUTO_TEST_CASE( one_lock_forever_ticket_if_too_many_blocks_missed )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_forever, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_forever );
@@ -2202,7 +2193,7 @@ BOOST_AUTO_TEST_CASE( cancel_charging_from_liquid )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_360_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_360_days );
@@ -2703,7 +2694,7 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( *result.updated_objects.begin() == tick_1_id );
 
       // the new ticket is stable
-      ticket_id_type tick_2_id = *result.new_objects.begin();
+      ticket_id_type tick_2_id { *result.new_objects.begin() };
 
       BOOST_REQUIRE( db.find( tick_2_id ) );
       BOOST_CHECK( tick_2_id(db).target_type == lock_180_days );
@@ -2847,7 +2838,7 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( *result.updated_objects.begin() == tick_1_id );
 
       // the new created ticket is freed already
-      ticket_id_type tick_3_id = *result.new_objects.begin();
+      ticket_id_type tick_3_id { *result.new_objects.begin() };
       BOOST_CHECK( *result.removed_objects.begin() == tick_3_id );
       BOOST_CHECK( !db.find( tick_3_id ) );
 
@@ -2961,10 +2952,10 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
       ted_balance -= 100000;
       BOOST_CHECK_EQUAL( db.get_balance( ted_id, asset_id_type() ).amount.value, ted_balance );
 
-      ticket_id_type tick_1_id = tick_1.id;
-      ticket_id_type tick_2_id = tick_2.id;
-      ticket_id_type tick_3_id = tick_3.id;
-      ticket_id_type tick_4_id = tick_4.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
+      ticket_id_type tick_2_id = tick_2.get_id();
+      ticket_id_type tick_3_id = tick_3.get_id();
+      ticket_id_type tick_4_id = tick_4.get_id();
 
       // one day passed
       generate_blocks( db.head_block_time() + fc::days(1) );
@@ -2990,7 +2981,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_5_id = *result.new_objects.begin();
+      ticket_id_type tick_5_id { *result.new_objects.begin() };
       BOOST_REQUIRE( db.find( tick_5_id ) );
       BOOST_CHECK( tick_5_id(db).target_type == lock_180_days ); // target type of the new ticket is set
       BOOST_CHECK( tick_5_id(db).current_type == liquid );
@@ -3085,7 +3076,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_6_id = *result.new_objects.begin();
+      ticket_id_type tick_6_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_6_id(db).target_type == lock_180_days );
       BOOST_CHECK( tick_6_id(db).current_type == lock_180_days );
       BOOST_CHECK( tick_6_id(db).status == withdrawing ); // 7 days to finish
@@ -3103,7 +3094,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_7_id = *result.new_objects.begin();
+      ticket_id_type tick_7_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_7_id(db).target_type == liquid );
       BOOST_CHECK( tick_7_id(db).current_type == liquid );
       BOOST_CHECK( tick_7_id(db).status == withdrawing ); // 180 days to finish
@@ -3127,7 +3118,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_51_id = *result.new_objects.begin();
+      ticket_id_type tick_51_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_51_id(db).target_type == liquid );
       BOOST_CHECK( tick_51_id(db).current_type == liquid );
       BOOST_CHECK( tick_51_id(db).status == withdrawing ); // 180 days to finish
@@ -3147,7 +3138,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_52_id = *result.new_objects.begin();
+      ticket_id_type tick_52_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_52_id(db).target_type == lock_forever );
       BOOST_CHECK( tick_52_id(db).current_type == lock_180_days );
       BOOST_CHECK( tick_52_id(db).status == charging ); // 15 days to next step
@@ -3214,7 +3205,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_8_id = *result.new_objects.begin();
+      ticket_id_type tick_8_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_8_id(db).target_type == lock_180_days );
       BOOST_CHECK( tick_8_id(db).current_type == liquid );
       BOOST_CHECK( tick_8_id(db).status == charging ); // 15 days to finish
@@ -3232,7 +3223,7 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_9_id = *result.new_objects.begin();
+      ticket_id_type tick_9_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_9_id(db).target_type == liquid );
       BOOST_CHECK( tick_9_id(db).current_type == lock_180_days );
       BOOST_CHECK( tick_9_id(db).status == withdrawing ); // 4 days to next step
@@ -3534,7 +3525,7 @@ BOOST_AUTO_TEST_CASE( hf2262_test )
 
       // create a ticket
       const ticket_object& tick_1 = create_ticket( sam_id, lock_180_days, asset(100) );
-      ticket_id_type tick_1_id = tick_1.id;
+      ticket_id_type tick_1_id = tick_1.get_id();
 
       BOOST_CHECK( tick_1_id(db).account == sam_id );
       BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
@@ -3592,7 +3583,7 @@ BOOST_AUTO_TEST_CASE( hf2262_test )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_2_id = *result.new_objects.begin();
+      ticket_id_type tick_2_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_2_id(db).target_type == liquid );
       BOOST_CHECK( tick_2_id(db).current_type == liquid );
       BOOST_CHECK( tick_2_id(db).status == withdrawing );
@@ -3629,7 +3620,7 @@ BOOST_AUTO_TEST_CASE( hf2262_test )
 
       BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
 
-      ticket_id_type tick_3_id = *result.new_objects.begin();
+      ticket_id_type tick_3_id { *result.new_objects.begin() };
       BOOST_CHECK( tick_3_id(db).target_type == liquid );
       BOOST_CHECK( tick_3_id(db).current_type == liquid );
       BOOST_CHECK( tick_3_id(db).status == withdrawing );
@@ -3650,7 +3641,7 @@ BOOST_AUTO_TEST_CASE( hf2262_test )
 
       // create a new ticket
       const ticket_object& tick_4 = create_ticket( sam_id, lock_360_days, asset(200) );
-      ticket_id_type tick_4_id = tick_4.id;
+      ticket_id_type tick_4_id = tick_4.get_id();
 
       BOOST_CHECK( tick_4_id(db).account == sam_id );
       BOOST_CHECK( tick_4_id(db).target_type == lock_360_days );

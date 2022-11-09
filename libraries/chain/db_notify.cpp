@@ -414,7 +414,7 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
         case base_object_type:
            return;
         case account_object_type:
-           accounts.insert( obj->id );
+           accounts.insert( account_id_type(obj->id) );
            break;
         case asset_object_type:{
            const auto* aobj = dynamic_cast<const asset_object*>(obj);
@@ -536,8 +536,8 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               break;
            } case impl_block_summary_object_type:
               break;
-             case impl_account_transaction_history_object_type: {
-              const auto* aobj = dynamic_cast<const account_transaction_history_object*>(obj);
+             case impl_account_history_object_type: {
+              const auto* aobj = dynamic_cast<const account_history_object*>(obj);
               accounts.insert( aobj->account );
               break;
            } case impl_chain_property_object_type:
@@ -599,7 +599,7 @@ void database::notify_changed_objects()
                                   MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( new_ids.size() )
+        if( !new_ids.empty() )
            GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
       }
 
@@ -616,7 +616,7 @@ void database::notify_changed_objects()
                                 MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( changed_ids.size() )
+        if( !changed_ids.empty() )
            GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
       }
 
@@ -637,7 +637,7 @@ void database::notify_changed_objects()
                                 MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( removed_ids.size() )
+        if( !removed_ids.empty() )
            GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted )
       }
    }

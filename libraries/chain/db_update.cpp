@@ -588,7 +588,7 @@ void database::clear_expired_htlcs()
       const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
       adjust_balance( obj.transfer.from, amount );
       // notify related parties
-      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+      htlc_refund_operation vop( obj.get_id(), obj.transfer.from, obj.transfer.to, amount,
          obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       push_applied_operation( vop );
       remove( obj );
@@ -750,7 +750,7 @@ void database::update_credit_offers_and_deals()
 
       // Notify related parties
       push_applied_operation( credit_deal_expired_operation (
-                                    deal.id, deal.offer_id, deal.offer_owner, deal.borrower,
+                                    deal.get_id(), deal.offer_id, deal.offer_owner, deal.borrower,
                                     asset( deal.debt_amount, deal.debt_asset ),
                                     asset( deal.collateral_amount, deal.collateral_asset ),
                                     deal.fee_rate ) );

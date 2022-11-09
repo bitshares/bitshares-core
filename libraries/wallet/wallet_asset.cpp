@@ -82,7 +82,7 @@ namespace graphene { namespace wallet { namespace detail {
          return fc::variant(asset_symbol_or_id, 1).as<asset_id_type>( 1 );
       opt_asset = _remote_db->lookup_asset_symbols( {asset_symbol_or_id} );
       FC_ASSERT( (opt_asset.size() > 0) && (opt_asset[0].valid()) );
-      return opt_asset[0]->id;
+      return opt_asset[0]->get_id();
    }
 
    signed_transaction wallet_api_impl::create_asset(string issuer, string symbol,

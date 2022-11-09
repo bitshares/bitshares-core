@@ -43,44 +43,47 @@ namespace graphene { namespace app {
          bool has_api_helper_indexes_plugin = false;
          bool has_market_history_plugin = false;
 
-         uint64_t api_limit_get_account_history_operations = 100;
-         uint64_t api_limit_get_account_history = 100;
-         uint64_t api_limit_get_grouped_limit_orders = 101;
-         uint64_t api_limit_get_relative_account_history = 100;
-         uint64_t api_limit_get_account_history_by_operations = 100;
-         uint64_t api_limit_get_asset_holders = 100;
-         uint64_t api_limit_get_key_references = 100;
-         uint64_t api_limit_get_htlc_by = 100;
-         uint64_t api_limit_get_full_accounts = 50;
-         uint64_t api_limit_get_full_accounts_lists = 500;
-         uint64_t api_limit_get_top_voters = 200;
-         uint64_t api_limit_get_call_orders = 300;
-         uint64_t api_limit_get_settle_orders = 300;
-         uint64_t api_limit_get_assets = 101;
-         uint64_t api_limit_get_limit_orders = 300;
-         uint64_t api_limit_get_limit_orders_by_account = 101;
-         uint64_t api_limit_get_order_book = 50;
-         uint64_t api_limit_list_htlcs = 100;
-         uint64_t api_limit_lookup_accounts = 1000;
-         uint64_t api_limit_lookup_witness_accounts = 1000;
-         uint64_t api_limit_lookup_committee_member_accounts = 1000;
-         uint64_t api_limit_lookup_vote_ids = 1000;
-         uint64_t api_limit_get_account_limit_orders = 101;
-         uint64_t api_limit_get_collateral_bids = 100;
-         uint64_t api_limit_get_top_markets = 100;
-         uint64_t api_limit_get_trade_history = 100;
-         uint64_t api_limit_get_trade_history_by_sequence = 100;
-         uint64_t api_limit_get_withdraw_permissions_by_giver = 101;
-         uint64_t api_limit_get_withdraw_permissions_by_recipient = 101;
-         uint64_t api_limit_get_tickets = 101;
-         uint64_t api_limit_get_liquidity_pools = 101;
-         uint64_t api_limit_get_liquidity_pool_history = 101;
-         uint64_t api_limit_get_samet_funds = 101;
-         uint64_t api_limit_get_credit_offers = 101;
+         uint32_t api_limit_get_account_history = 100;
+         uint32_t api_limit_get_account_history_operations = 100;
+         uint32_t api_limit_get_account_history_by_operations = 100;
+         uint32_t api_limit_get_relative_account_history = 100;
+         uint32_t api_limit_get_market_history = 200;
+         uint32_t api_limit_get_trade_history = 100;
+         uint32_t api_limit_get_trade_history_by_sequence = 100;
+         uint32_t api_limit_get_liquidity_pool_history = 101;
+         uint32_t api_limit_get_top_markets = 100;
+         uint32_t api_limit_get_assets = 101;
+         uint32_t api_limit_get_asset_holders = 100;
+         uint32_t api_limit_get_key_references = 100;
+         uint32_t api_limit_get_full_accounts = 50;
+         uint32_t api_limit_get_full_accounts_lists = 500;
+         uint32_t api_limit_get_full_accounts_subscribe = 100;
+         uint32_t api_limit_get_top_voters = 200;
+         uint32_t api_limit_get_limit_orders = 300;
+         uint32_t api_limit_get_limit_orders_by_account = 101;
+         uint32_t api_limit_get_account_limit_orders = 101;
+         uint32_t api_limit_get_grouped_limit_orders = 101;
+         uint32_t api_limit_get_order_book = 50;
+         uint32_t api_limit_get_call_orders = 300;
+         uint32_t api_limit_get_settle_orders = 300;
+         uint32_t api_limit_get_collateral_bids = 100;
+         uint32_t api_limit_lookup_accounts = 1000;
+         uint32_t api_limit_lookup_witness_accounts = 1000;
+         uint32_t api_limit_lookup_committee_member_accounts = 1000;
+         uint32_t api_limit_lookup_vote_ids = 1000;
+         uint32_t api_limit_list_htlcs = 100;
+         uint32_t api_limit_get_htlc_by = 100;
+         uint32_t api_limit_get_withdraw_permissions_by_giver = 101;
+         uint32_t api_limit_get_withdraw_permissions_by_recipient = 101;
+         uint32_t api_limit_get_tickets = 101;
+         uint32_t api_limit_get_liquidity_pools = 101;
+         uint32_t api_limit_get_samet_funds = 101;
+         uint32_t api_limit_get_credit_offers = 101;
+         uint32_t api_limit_get_storage_info = 101;
 
-         static const application_options& get_default()
+         static constexpr application_options get_default()
          {
-            static const application_options default_options;
+            constexpr application_options default_options;
             return default_options;
          }
    };
@@ -146,13 +149,15 @@ namespace graphene { namespace app {
          /// Emitted when syncing finishes (is_finished_syncing will return true)
          boost::signals2::signal<void()> syncing_finished;
 
-         const application_options& get_options();
+         const application_options& get_options() const;
 
          void enable_plugin( const string& name ) const;
 
          bool is_plugin_enabled(const string& name) const;
 
          std::shared_ptr<fc::thread> elasticsearch_thread;
+
+         const string& get_node_info() const;
 
    private:
          /// Add an available plugin
@@ -165,3 +170,48 @@ namespace graphene { namespace app {
    };
 
 } }
+
+FC_REFLECT( graphene::app::application_options,
+            ( enable_subscribe_to_all )
+            ( has_api_helper_indexes_plugin )
+            ( has_market_history_plugin )
+            ( api_limit_get_account_history )
+            ( api_limit_get_account_history_operations )
+            ( api_limit_get_account_history_by_operations )
+            ( api_limit_get_relative_account_history )
+            ( api_limit_get_market_history )
+            ( api_limit_get_trade_history )
+            ( api_limit_get_trade_history_by_sequence )
+            ( api_limit_get_liquidity_pool_history )
+            ( api_limit_get_top_markets )
+            ( api_limit_get_assets )
+            ( api_limit_get_asset_holders )
+            ( api_limit_get_key_references )
+            ( api_limit_get_full_accounts )
+            ( api_limit_get_full_accounts_lists )
+            ( api_limit_get_full_accounts_subscribe )
+            ( api_limit_get_top_voters )
+            ( api_limit_get_limit_orders )
+            ( api_limit_get_limit_orders_by_account )
+            ( api_limit_get_account_limit_orders )
+            ( api_limit_get_grouped_limit_orders )
+            ( api_limit_get_order_book )
+            ( api_limit_get_call_orders )
+            ( api_limit_get_settle_orders )
+            ( api_limit_get_collateral_bids )
+            ( api_limit_lookup_accounts )
+            ( api_limit_lookup_witness_accounts )
+            ( api_limit_lookup_committee_member_accounts )
+            ( api_limit_lookup_vote_ids )
+            ( api_limit_list_htlcs )
+            ( api_limit_get_htlc_by )
+            ( api_limit_get_withdraw_permissions_by_giver )
+            ( api_limit_get_withdraw_permissions_by_recipient )
+            ( api_limit_get_tickets )
+            ( api_limit_get_liquidity_pools )
+            ( api_limit_get_samet_funds )
+            ( api_limit_get_credit_offers )
+            ( api_limit_get_storage_info )
+          )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::app::application_options )

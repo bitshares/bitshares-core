@@ -103,7 +103,8 @@ void template_plugin::plugin_set_program_options(
 
 void template_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().applied_block.connect( [&]( const signed_block& b) {
+   // connect with group 0 by default to process before some special steps (e.g. snapshot or next_object_id)
+   database().applied_block.connect( 0, [this]( const signed_block& b) {
       my->on_block(b);
    } );
 

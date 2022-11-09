@@ -36,12 +36,9 @@ namespace graphene { namespace chain {
  *  @ingroup protocol
  *
  */
-class samet_fund_object : public abstract_object<samet_fund_object>
+class samet_fund_object : public abstract_object<samet_fund_object, protocol_ids, samet_fund_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id  = samet_fund_object_type;
-
       account_id_type owner_account;         ///< Owner of the fund
       asset_id_type   asset_type;            ///< Asset type in the fund
       share_type      balance;               ///< Usable amount in the fund

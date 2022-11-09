@@ -97,7 +97,7 @@ namespace detail {
       }
 
       initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
-      initial_state.initial_balances.push_back({nathan_key.get_public_key(),
+      initial_state.initial_balances.push_back({address(nathan_key.get_public_key()),
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
       initial_state.initial_chain_id = fc::sha256::hash( "BOGUS" );
@@ -146,12 +146,38 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->add_seed_nodes(seeds);
    }
 
+   if( _options->count( "p2p-advertise-peer-algorithm" ) > 0 )
+   {
+      std::string algo = _options->at("p2p-advertise-peer-algorithm").as<string>();
+      std::vector<std::string> list;
+      if( algo == "list" && _options->count("p2p-advertise-peer-endpoint") > 0 )
+         list = _options->at("p2p-advertise-peer-endpoint").as<std::vector<std::string>>();
+      else if( algo == "exclude_list" && _options->count("p2p-exclude-peer-endpoint") > 0 )
+         list = _options->at("p2p-exclude-peer-endpoint").as<std::vector<std::string>>();
+      _p2p_network->set_advertise_algorithm( algo, list );
+   }
+
    if( _options->count("p2p-endpoint") > 0 )
-      _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
-   else
-      _p2p_network->listen_on_port(0, false);
+      _p2p_network->set_listen_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()),
+                                         true );
+   // else try to listen on the default port first, if failed, use a random port
+
+   if( _options->count("p2p-inbound-endpoint") > 0 )
+      _p2p_network->set_inbound_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-inbound-endpoint")
+                                              .as<string>()) );
+
+   if ( _options->count("p2p-accept-incoming-connections") > 0 )
+      _p2p_network->set_accept_incoming_connections( _options->at("p2p-accept-incoming-connections").as<bool>() );
+
+   if ( _options->count("p2p-connect-to-new-peers") > 0 )
+      _p2p_network->set_connect_to_new_peers( _options->at( "p2p-connect-to-new-peers" ).as<bool>() );
+
    _p2p_network->listen_to_p2p_network();
-   ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
+   fc::ip::endpoint listening_endpoint = _p2p_network->get_actual_listening_endpoint();
+   if( listening_endpoint.port() != 0 )
+      ilog( "Configured p2p node to listen on ${ip}", ("ip", listening_endpoint) );
+   else
+      ilog( "Configured p2p node to not listen for incoming connections" );
 
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
@@ -163,14 +189,6 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 {
    auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
    auto login = std::make_shared<graphene::app::login_api>( _self );
-   login->enable_api("database_api");
-
-   wsc->register_api(login->database());
-   wsc->register_api(fc::api<graphene::app::login_api>(login));
-   c->set_session_data( wsc );
-
-   std::string username = "*";
-   std::string password = "*";
 
     // Try to extract login information from "Authorization" header if present
    std::string auth = c->get_request_header("Authorization");
@@ -184,11 +202,21 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
       FC_ASSERT(parts.size() == 2);
 
-      username = parts[0];
-      password = parts[1];
+      const string& username = parts[0];
+      const string& password = parts[1];
+      login->login(username, password);
    }
+   else
+      login->login("", "");
 
-   login->login(username, password);
+   // API set ID 0. Note: changing it may break client applications
+   if( login->is_database_api_allowed() )
+      wsc->register_api(login->database());
+   else
+      wsc->register_api(login->dummy());
+   // API set ID 1. Note: changing it may break client applications
+   wsc->register_api(fc::api<graphene::app::login_api>(login));
+   c->set_session_data( wsc );
 }
 
 void application_impl::reset_websocket_server()
@@ -265,6 +293,9 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
    else
       ilog("API helper indexes plugin is not enabled");
 
+   if (_options->count("api-node-info") > 0)
+      _node_info = _options->at("api-node-info").as<string>();
+
    if( _options->count("api-access") > 0 )
    {
 
@@ -282,14 +313,12 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
       // TODO:  Remove this generous default access policy
       // when the UI logs in properly
       _apiaccess = api_access();
-      api_access_info wild_access;
-      wild_access.password_hash_b64 = "*";
-      wild_access.password_salt_b64 = "*";
-      wild_access.allowed_apis.push_back( "database_api" );
-      wild_access.allowed_apis.push_back( "network_broadcast_api" );
-      wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "orders_api" );
-      wild_access.allowed_apis.push_back( "custom_operations_api" );
+      api_access_info wild_access("*", "*");
+      wild_access.allowed_apis.insert( "database_api" );
+      wild_access.allowed_apis.insert( "network_broadcast_api" );
+      wild_access.allowed_apis.insert( "history_api" );
+      wild_access.allowed_apis.insert( "orders_api" );
+      wild_access.allowed_apis.insert( "custom_operations_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }
 
@@ -299,139 +328,151 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
 void application_impl::set_api_limit() {
    if (_options->count("api-limit-get-account-history-operations") > 0) {
       _app_options.api_limit_get_account_history_operations =
-            _options->at("api-limit-get-account-history-operations").as<uint64_t>();
+            _options->at("api-limit-get-account-history-operations").as<uint32_t>();
    }
    if(_options->count("api-limit-get-account-history") > 0){
       _app_options.api_limit_get_account_history =
-            _options->at("api-limit-get-account-history").as<uint64_t>();
+            _options->at("api-limit-get-account-history").as<uint32_t>();
    }
    if(_options->count("api-limit-get-grouped-limit-orders") > 0){
       _app_options.api_limit_get_grouped_limit_orders =
-            _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
+            _options->at("api-limit-get-grouped-limit-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-market-history") > 0){
+      _app_options.api_limit_get_market_history =
+            _options->at("api-limit-get-market-history").as<uint32_t>();
    }
    if(_options->count("api-limit-get-relative-account-history") > 0){
       _app_options.api_limit_get_relative_account_history =
-            _options->at("api-limit-get-relative-account-history").as<uint64_t>();
+            _options->at("api-limit-get-relative-account-history").as<uint32_t>();
    }
    if(_options->count("api-limit-get-account-history-by-operations") > 0){
       _app_options.api_limit_get_account_history_by_operations =
-            _options->at("api-limit-get-account-history-by-operations").as<uint64_t>();
+            _options->at("api-limit-get-account-history-by-operations").as<uint32_t>();
    }
    if(_options->count("api-limit-get-asset-holders") > 0){
       _app_options.api_limit_get_asset_holders =
-            _options->at("api-limit-get-asset-holders").as<uint64_t>();
+            _options->at("api-limit-get-asset-holders").as<uint32_t>();
    }
    if(_options->count("api-limit-get-key-references") > 0){
       _app_options.api_limit_get_key_references =
-            _options->at("api-limit-get-key-references").as<uint64_t>();
+            _options->at("api-limit-get-key-references").as<uint32_t>();
    }
    if(_options->count("api-limit-get-htlc-by") > 0) {
       _app_options.api_limit_get_htlc_by =
-            _options->at("api-limit-get-htlc-by").as<uint64_t>();
+            _options->at("api-limit-get-htlc-by").as<uint32_t>();
    }
    if(_options->count("api-limit-get-full-accounts") > 0) {
       _app_options.api_limit_get_full_accounts =
-            _options->at("api-limit-get-full-accounts").as<uint64_t>();
+            _options->at("api-limit-get-full-accounts").as<uint32_t>();
    }
    if(_options->count("api-limit-get-full-accounts-lists") > 0) {
       _app_options.api_limit_get_full_accounts_lists =
-            _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
+            _options->at("api-limit-get-full-accounts-lists").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-full-accounts-subscribe") > 0) {
+      _app_options.api_limit_get_full_accounts_subscribe =
+            _options->at("api-limit-get-full-accounts-subscribe").as<uint32_t>();
    }
    if(_options->count("api-limit-get-top-voters") > 0) {
       _app_options.api_limit_get_top_voters =
-            _options->at("api-limit-get-top-voters").as<uint64_t>();
+            _options->at("api-limit-get-top-voters").as<uint32_t>();
    }
    if(_options->count("api-limit-get-call-orders") > 0) {
       _app_options.api_limit_get_call_orders =
-            _options->at("api-limit-get-call-orders").as<uint64_t>();
+            _options->at("api-limit-get-call-orders").as<uint32_t>();
    }
    if(_options->count("api-limit-get-settle-orders") > 0) {
       _app_options.api_limit_get_settle_orders =
-            _options->at("api-limit-get-settle-orders").as<uint64_t>();
+            _options->at("api-limit-get-settle-orders").as<uint32_t>();
    }
    if(_options->count("api-limit-get-assets") > 0) {
       _app_options.api_limit_get_assets =
-            _options->at("api-limit-get-assets").as<uint64_t>();
+            _options->at("api-limit-get-assets").as<uint32_t>();
    }
    if(_options->count("api-limit-get-limit-orders") > 0){
       _app_options.api_limit_get_limit_orders =
-            _options->at("api-limit-get-limit-orders").as<uint64_t>();
+            _options->at("api-limit-get-limit-orders").as<uint32_t>();
    }
    if(_options->count("api-limit-get-limit-orders-by-account") > 0){
       _app_options.api_limit_get_limit_orders_by_account =
-            _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
+            _options->at("api-limit-get-limit-orders-by-account").as<uint32_t>();
    }
    if(_options->count("api-limit-get-order-book") > 0){
       _app_options.api_limit_get_order_book =
-            _options->at("api-limit-get-order-book").as<uint64_t>();
+            _options->at("api-limit-get-order-book").as<uint32_t>();
    }
    if(_options->count("api-limit-list-htlcs") > 0){
       _app_options.api_limit_list_htlcs =
-            _options->at("api-limit-list-htlcs").as<uint64_t>();
+            _options->at("api-limit-list-htlcs").as<uint32_t>();
    }
    if(_options->count("api-limit-lookup-accounts") > 0) {
       _app_options.api_limit_lookup_accounts =
-            _options->at("api-limit-lookup-accounts").as<uint64_t>();
+            _options->at("api-limit-lookup-accounts").as<uint32_t>();
    }
    if(_options->count("api-limit-lookup-witness-accounts") > 0) {
       _app_options.api_limit_lookup_witness_accounts =
-            _options->at("api-limit-lookup-witness-accounts").as<uint64_t>();
+            _options->at("api-limit-lookup-witness-accounts").as<uint32_t>();
    }
    if(_options->count("api-limit-lookup-committee-member-accounts") > 0) {
       _app_options.api_limit_lookup_committee_member_accounts =
-            _options->at("api-limit-lookup-committee-member-accounts").as<uint64_t>();
+            _options->at("api-limit-lookup-committee-member-accounts").as<uint32_t>();
    }
    if(_options->count("api-limit-lookup-vote-ids") > 0) {
       _app_options.api_limit_lookup_vote_ids =
-            _options->at("api-limit-lookup-vote-ids").as<uint64_t>();
+            _options->at("api-limit-lookup-vote-ids").as<uint32_t>();
    }
    if(_options->count("api-limit-get-account-limit-orders") > 0) {
       _app_options.api_limit_get_account_limit_orders =
-            _options->at("api-limit-get-account-limit-orders").as<uint64_t>();
+            _options->at("api-limit-get-account-limit-orders").as<uint32_t>();
    }
    if(_options->count("api-limit-get-collateral-bids") > 0) {
       _app_options.api_limit_get_collateral_bids =
-            _options->at("api-limit-get-collateral-bids").as<uint64_t>();
+            _options->at("api-limit-get-collateral-bids").as<uint32_t>();
    }
    if(_options->count("api-limit-get-top-markets") > 0) {
       _app_options.api_limit_get_top_markets =
-            _options->at("api-limit-get-top-markets").as<uint64_t>();
+            _options->at("api-limit-get-top-markets").as<uint32_t>();
    }
    if(_options->count("api-limit-get-trade-history") > 0) {
       _app_options.api_limit_get_trade_history =
-            _options->at("api-limit-get-trade-history").as<uint64_t>();
+            _options->at("api-limit-get-trade-history").as<uint32_t>();
    }
    if(_options->count("api-limit-get-trade-history-by-sequence") > 0) {
       _app_options.api_limit_get_trade_history_by_sequence =
-            _options->at("api-limit-get-trade-history-by-sequence").as<uint64_t>();
+            _options->at("api-limit-get-trade-history-by-sequence").as<uint32_t>();
    }
    if(_options->count("api-limit-get-withdraw-permissions-by-giver") > 0) {
       _app_options.api_limit_get_withdraw_permissions_by_giver =
-            _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint64_t>();
+            _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint32_t>();
    }
    if(_options->count("api-limit-get-withdraw-permissions-by-recipient") > 0) {
       _app_options.api_limit_get_withdraw_permissions_by_recipient =
-            _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
+            _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint32_t>();
    }
    if(_options->count("api-limit-get-tickets") > 0) {
       _app_options.api_limit_get_tickets =
-            _options->at("api-limit-get-tickets").as<uint64_t>();
+            _options->at("api-limit-get-tickets").as<uint32_t>();
    }
    if(_options->count("api-limit-get-liquidity-pools") > 0) {
       _app_options.api_limit_get_liquidity_pools =
-            _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
+            _options->at("api-limit-get-liquidity-pools").as<uint32_t>();
    }
    if(_options->count("api-limit-get-liquidity-pool-history") > 0) {
       _app_options.api_limit_get_liquidity_pool_history =
-            _options->at("api-limit-get-liquidity-pool-history").as<uint64_t>();
+            _options->at("api-limit-get-liquidity-pool-history").as<uint32_t>();
    }
    if(_options->count("api-limit-get-samet-funds") > 0) {
       _app_options.api_limit_get_samet_funds =
-            _options->at("api-limit-get-samet-funds").as<uint64_t>();
+            _options->at("api-limit-get-samet-funds").as<uint32_t>();
    }
    if(_options->count("api-limit-get-credit-offers") > 0) {
       _app_options.api_limit_get_credit_offers =
-            _options->at("api-limit-get-credit-offers").as<uint64_t>();
+            _options->at("api-limit-get-credit-offers").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-storage-info") > 0) {
+      _app_options.api_limit_get_storage_info =
+            _options->at("api-limit-get-storage-info").as<uint32_t>();
    }
 }
 
@@ -1135,13 +1176,31 @@ void application::set_program_options(boost::program_options::options_descriptio
    const auto& default_opts = application_options::get_default();
    configuration_file_options.add_options()
          ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
-          "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
+          "Whether to enable P2P network (default: true). Note: if delayed_node plugin is enabled, "
           "this option will be ignored and P2P network will always be disabled.")
-         ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
+         ("p2p-accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
+          "Whether to accept incoming P2P connections (default: true)")
+         ("p2p-endpoint", bpo::value<string>(),
+          "The endpoint (local IP address:port) on which the node will listen for P2P connections. "
+          "Specify 0.0.0.0 as address to listen on all IP addresses")
+         ("p2p-inbound-endpoint", bpo::value<string>(),
+          "The endpoint (external IP address:port) that other P2P peers should connect to. "
+          "If the address is unknown or dynamic, specify 0.0.0.0")
+         ("p2p-connect-to-new-peers", bpo::value<bool>()->implicit_value(true),
+          "Whether the node will connect to new P2P peers advertised by other peers (default: true)")
+         ("p2p-advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
+          "Determines which P2P peers are advertised in response to address requests from other peers. "
+          "Algorithms: 'all', 'nothing', 'list', exclude_list'. (default: all)")
+         ("p2p-advertise-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to advertise, only takes effect when algorithm "
+          "is 'list' (may specify multiple times)")
+         ("p2p-exclude-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to not advertise, only takes effect when algorithm "
+          "is 'exclude_list' (may specify multiple times)")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
-          "P2P nodes to connect to on startup (may specify multiple times)")
+          "The endpoint (IP address:port) of the P2P peer to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
-          "JSON array of P2P nodes to connect to on startup")
+          "JSON array of P2P peers to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->default_value(
                vector<string>(1, "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]"),
                "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]")->composing(),
@@ -1159,6 +1218,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(),
           "Block signing key to use for init witnesses, overrides genesis file, for debug")
+         ("api-node-info", bpo::value<string>(),
+          "A string defined by the node operator, which can be retrieved via the login_api::get_info API")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
           "Number of IO threads, default to 0 for auto-configuration")
@@ -1168,107 +1229,116 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
          ("api-limit-get-account-history-operations",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history_operations),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history_operations),
           "For history_api::get_account_history_operations to set max limit value")
          ("api-limit-get-account-history",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history),
           "For history_api::get_account_history to set max limit value")
          ("api-limit-get-grouped-limit-orders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_grouped_limit_orders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_grouped_limit_orders),
           "For orders_api::get_grouped_limit_orders to set max limit value")
+         ("api-limit-get-market-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_market_history),
+          "Maximum number of records to return for the history_api::get_market_history API")
          ("api-limit-get-relative-account-history",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_relative_account_history),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_relative_account_history),
           "For history_api::get_relative_account_history to set max limit value")
          ("api-limit-get-account-history-by-operations",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history_by_operations),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history_by_operations),
           "For history_api::get_account_history_by_operations to set max limit value")
          ("api-limit-get-asset-holders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_asset_holders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_asset_holders),
           "For asset_api::get_asset_holders to set max limit value")
          ("api-limit-get-key-references",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_key_references),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_key_references),
           "For database_api_impl::get_key_references to set max limit value")
          ("api-limit-get-htlc-by",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_htlc_by),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_htlc_by),
           "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
          ("api-limit-get-full-accounts",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_full_accounts),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts),
           "For database_api_impl::get_full_accounts to set max accounts to query at once")
          ("api-limit-get-full-accounts-lists",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_full_accounts_lists),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts_lists),
           "For database_api_impl::get_full_accounts to set max items to return in the lists")
+         ("api-limit-get-full-accounts-subscribe",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts_subscribe),
+          "Maximum number of accounts allowed to subscribe per connection with the get_full_accounts API")
          ("api-limit-get-top-voters",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_top_voters),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_top_voters),
           "For database_api_impl::get_top_voters to set max limit value")
          ("api-limit-get-call-orders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_call_orders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_call_orders),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_settle_orders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_settle_orders),
           "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set max limit value")
          ("api-limit-get-assets",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_assets),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_assets),
           "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
          ("api-limit-get-limit-orders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_limit_orders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_limit_orders),
           "For database_api_impl::get_limit_orders to set max limit value")
          ("api-limit-get-limit-orders-by-account",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_limit_orders_by_account),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_limit_orders_by_account),
           "For database_api_impl::get_limit_orders_by_account to set max limit value")
          ("api-limit-get-order-book",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_order_book),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_order_book),
           "For database_api_impl::get_order_book to set max limit value")
          ("api-limit-list-htlcs",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_list_htlcs),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_list_htlcs),
           "For database_api_impl::list_htlcs to set max limit value")
          ("api-limit-lookup-accounts",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_accounts),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_accounts),
           "For database_api_impl::lookup_accounts to set max limit value")
          ("api-limit-lookup-witness-accounts",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_witness_accounts),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_witness_accounts),
           "For database_api_impl::lookup_witness_accounts to set max limit value")
          ("api-limit-lookup-committee-member-accounts",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_committee_member_accounts),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_committee_member_accounts),
           "For database_api_impl::lookup_committee_member_accounts to set max limit value")
          ("api-limit-lookup-vote-ids",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_vote_ids),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_vote_ids),
           "For database_api_impl::lookup_vote_ids to set max limit value")
          ("api-limit-get-account-limit-orders",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_limit_orders),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_limit_orders),
           "For database_api_impl::get_account_limit_orders to set max limit value")
          ("api-limit-get-collateral-bids",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_collateral_bids),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_collateral_bids),
           "For database_api_impl::get_collateral_bids to set max limit value")
          ("api-limit-get-top-markets",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_top_markets),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_top_markets),
           "For database_api_impl::get_top_markets to set max limit value")
          ("api-limit-get-trade-history",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_trade_history),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_trade_history),
           "For database_api_impl::get_trade_history to set max limit value")
          ("api-limit-get-trade-history-by-sequence",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_trade_history_by_sequence),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_trade_history_by_sequence),
           "For database_api_impl::get_trade_history_by_sequence to set max limit value")
          ("api-limit-get-withdraw-permissions-by-giver",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_giver),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_giver),
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_recipient),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_recipient),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
          ("api-limit-get-tickets",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_tickets),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_tickets),
           "Set maximum limit value for database APIs which query for tickets")
          ("api-limit-get-liquidity-pools",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_liquidity_pools),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_liquidity_pools),
           "Set maximum limit value for database APIs which query for liquidity pools")
          ("api-limit-get-liquidity-pool-history",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_liquidity_pool_history),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_liquidity_pool_history),
           "Set maximum limit value for APIs which query for history of liquidity pools")
          ("api-limit-get-samet-funds",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_samet_funds),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_samet_funds),
           "Set maximum limit value for database APIs which query for SameT Funds")
          ("api-limit-get-credit-offers",
-          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_credit_offers),
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_credit_offers),
           "Set maximum limit value for database APIs which query for credit offers or credit deals")
+         ("api-limit-get-storage-info",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_storage_info),
+          "Set maximum limit value for APIs which query for account storage info")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1368,10 +1438,17 @@ void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_p
    my->add_available_plugin(p);
 }
 
-const application_options& application::get_options()
+const application_options& application::get_options() const
 {
    return my->_app_options;
 }
 
+const string& application::get_node_info() const
+{
+   return my->_node_info;
+}
+
 // namespace detail
 } }
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::application_options )

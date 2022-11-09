@@ -6,7 +6,7 @@ add_library( graphene_custom_operations
         custom_evaluators.cpp
            )
 
-target_link_libraries( graphene_custom_operations graphene_chain graphene_app )
+target_link_libraries( graphene_custom_operations graphene_app graphene_chain )
 target_include_directories( graphene_custom_operations
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

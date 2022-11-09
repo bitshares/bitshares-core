@@ -148,9 +148,9 @@ BOOST_AUTO_TEST_CASE( get_signatures_non_immediate_owner )
       const account_object& nathan = create_account("nathan", nathan_key1.get_public_key() );
       const account_object& ashley = create_account("ashley", ashley_key1.get_public_key() );
       const account_object& oliver = create_account("oliver", oliver_key1.get_public_key() );
-      account_id_type nathan_id = nathan.id;
-      account_id_type ashley_id = ashley.id;
-      account_id_type oliver_id = oliver.id;
+      account_id_type nathan_id = nathan.get_id();
+      account_id_type ashley_id = ashley.get_id();
+      account_id_type oliver_id = oliver.get_id();
 
       try {
          account_update_operation op;
@@ -759,8 +759,8 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
 }
 
 BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
-{
-   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).get_id();
+{ try {
+   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).id;
 
    uint32_t objects_changed = 0;
    auto callback = [&]( const variant& v )
@@ -773,7 +773,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
 
    // subscribe to an account which has same instance ID as UIATEST
    vector<string> collision_ids;
-   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id ) ) ) );
+   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id.instance() ) ) ) );
    db_api.get_accounts( collision_ids );
 
    generate_block();
@@ -789,7 +789,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
    fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
    BOOST_CHECK_EQUAL( objects_changed, 0 ); // UIATEST did not change in this block, so no notification
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
@@ -901,7 +901,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 #undef SUB_NOTIF_TEST_START_ID_DISABLE_AUTO_SUB
 
       vector<object_id_type> account_ids;
-      account_ids.push_back( alice_id );
+      account_ids.push_back( alice.id );
       db_api1.get_objects( account_ids );         // db_api1  subscribe to Alice
       db_api11.get_objects( account_ids, true );  // db_api11 subscribe to Alice
       db_api21.get_objects( account_ids, false ); // db_api21 doesn't subscribe to Alice
@@ -1105,7 +1105,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    vector<worker_object> results;
 
    const auto& worker1 = create_worker( connie_id, 1000, fc::days(10) );
-   worker_id_type worker1_id = worker1.id;
+   worker_id_type worker1_id { worker1.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 1 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 0 );
@@ -1123,7 +1123,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
 
    const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
-   worker_id_type worker2_id = worker2.id;
+   worker_id_type worker2_id { worker2.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 2 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
@@ -1134,7 +1134,7 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
    BOOST_CHECK( db_api.get_all_workers(false).front().id == worker2_id );
 
    const auto& worker3 = create_worker( wolverine_id, 1000, fc::days(100) );
-   worker_id_type worker3_id = worker3.id;
+   worker_id_type worker3_id { worker3.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 3 );
    BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
@@ -1185,13 +1185,13 @@ BOOST_AUTO_TEST_CASE( get_workers_by_account )
    vector<worker_object> results;
 
    const auto& worker1 = create_worker( connie_id );
-   worker_id_type worker1_id = worker1.id;
+   worker_id_type worker1_id { worker1.id };
 
    const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
-   worker_id_type worker2_id = worker2.id;
+   worker_id_type worker2_id { worker2.id };
 
    const auto& worker3 = create_worker( whitney_id, 1000, fc::days(100) );
-   worker_id_type worker3_id = worker3.id;
+   worker_id_type worker3_id { worker3.id };
 
    BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("connie").size(), 1 );
    BOOST_CHECK( db_api.get_workers_by_account("connie").front().id == worker1_id );
@@ -1290,7 +1290,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    o = results.back();
 
    // Get the No. 101-201 orders
-   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 101 );
    for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
@@ -1301,7 +1301,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    o = results.back();
 
    // Get the No. 201- orders
-   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 50 );
    for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
@@ -1311,7 +1311,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(150)));
 
    // Get the No. 201-210 orders
-   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.id );
+   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.get_id() );
    BOOST_CHECK_EQUAL( results2.size(), 10 );
    for (size_t i = 0 ; i < results2.size() - 1 ; ++i)
    {
@@ -1322,12 +1322,12 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    BOOST_CHECK(results2.back().sell_price == price(core.amount(100), bitcny.amount(170)));
 
    // Buyer has 70 orders, all IDs are greater than sellers
-   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.id );
+   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 70 );
    o = results.back();
 
    // All seller's order IDs are smaller, so querying with a buyer's ID will get nothing
-   results = db_api.get_limit_orders_by_account( seller.name, 90, o.id );
+   results = db_api.get_limit_orders_by_account( seller.name, 90, o.get_id() );
    BOOST_CHECK_EQUAL( results.size(), 0 );
 
    // Watcher has no order
@@ -1479,6 +1479,139 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
 
 } FC_LOG_AND_RETHROW() }
 
+/// Tests get_block, get_block_header, get_block_header_batch
+BOOST_AUTO_TEST_CASE( get_block_tests )
+{ try {
+
+   const auto& get_block_id = []( const graphene::app::maybe_signed_block_header& header )
+   {
+      signed_block_header signed_header( static_cast<block_header>( header ) );
+      if( header.witness_signature.valid() )
+         signed_header.witness_signature = *header.witness_signature;
+      return signed_header.id();
+   };
+
+   generate_block();
+
+   ACTORS( (nathan) );
+   auto block1 = generate_block( ~graphene::chain::database::skip_witness_signature );
+   auto block2 = generate_block( ~graphene::chain::database::skip_witness_signature );
+
+   fund( nathan_id(db) );
+   auto block3 = generate_block( ~graphene::chain::database::skip_witness_signature );
+
+   idump( (block1)(block2)(block3) );
+
+   uint32_t head_block_num = db.head_block_num();
+
+   graphene::app::database_api db_api(db);
+   auto head_block = db_api.get_block( head_block_num );
+   idump( (head_block) );
+   BOOST_REQUIRE( head_block.valid() );
+   BOOST_CHECK_EQUAL( head_block->block_num(), head_block_num );
+   BOOST_CHECK_EQUAL( head_block->transactions.size(), 1U );
+   BOOST_CHECK( head_block->witness_signature != signature_type() );
+   BOOST_CHECK( head_block->id() == block3.id() );
+
+   auto head_block_header = db_api.get_block_header( head_block_num, true );
+   idump( (head_block_header) );
+   BOOST_REQUIRE( head_block_header.valid() );
+   BOOST_CHECK_EQUAL( head_block_header->block_num(), head_block_num );
+   BOOST_REQUIRE( head_block_header->witness_signature.valid() );
+   BOOST_CHECK( *head_block_header->witness_signature == head_block->witness_signature );
+   BOOST_CHECK( get_block_id( *head_block_header ) == head_block->id() );
+
+   auto head_block_header2 = db_api.get_block_header( head_block_num );
+   idump( (head_block_header2) );
+   BOOST_REQUIRE( head_block_header2.valid() );
+   BOOST_CHECK_EQUAL( head_block_header2->block_num(), head_block_num );
+   BOOST_CHECK( head_block_header2->previous == head_block->previous );
+   BOOST_CHECK( head_block_header2->timestamp == head_block->timestamp );
+   BOOST_CHECK( head_block_header2->witness == head_block->witness );
+   BOOST_CHECK( head_block_header2->transaction_merkle_root == head_block->transaction_merkle_root );
+   BOOST_CHECK( !head_block_header2->witness_signature.valid() );
+   BOOST_CHECK( get_block_id( *head_block_header2 ) != head_block->id() );
+
+   auto head_block_header3 = db_api.get_block_header( head_block_num, false );
+   idump( (head_block_header3) );
+   BOOST_REQUIRE( head_block_header3.valid() );
+   BOOST_CHECK_EQUAL( head_block_header3->block_num(), head_block_num );
+   BOOST_CHECK( head_block_header3->previous == head_block->previous );
+   BOOST_CHECK( head_block_header3->timestamp == head_block->timestamp );
+   BOOST_CHECK( head_block_header3->witness == head_block->witness );
+   BOOST_CHECK( head_block_header3->transaction_merkle_root == head_block->transaction_merkle_root );
+   BOOST_CHECK( !head_block_header3->witness_signature.valid() );
+   BOOST_CHECK( get_block_id( *head_block_header3 ) == get_block_id( *head_block_header2 ) );
+
+   auto previous_block = db_api.get_block( head_block_num - 1 );
+   BOOST_REQUIRE( previous_block.valid() );
+   BOOST_CHECK_EQUAL( previous_block->block_num(), head_block_num - 1 );
+   BOOST_CHECK_EQUAL( previous_block->transactions.size(), 0 );
+   BOOST_CHECK( previous_block->id() == head_block->previous );
+   BOOST_CHECK( previous_block->witness_signature != signature_type() );
+   BOOST_CHECK( previous_block->witness_signature != head_block->witness_signature );
+   BOOST_CHECK( previous_block->id() == block2.id() );
+
+   auto previous_block_header = db_api.get_block_header( head_block_num - 1, true );
+   BOOST_REQUIRE( previous_block_header.valid() );
+   BOOST_CHECK_EQUAL( previous_block_header->block_num(), head_block_num - 1 );
+   BOOST_REQUIRE( previous_block_header->witness_signature.valid() );
+   BOOST_CHECK( *previous_block_header->witness_signature == previous_block->witness_signature );
+   BOOST_CHECK( get_block_id( *previous_block_header ) == previous_block->id() );
+
+   auto next_block = db_api.get_block( head_block_num + 1 );
+   BOOST_CHECK( !next_block.valid() );
+
+   auto next_block_header = db_api.get_block_header( head_block_num + 1, true );
+   BOOST_CHECK( !next_block_header.valid() );
+
+   const auto block_headers = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                               head_block_num - 1 }, true );
+   BOOST_REQUIRE_EQUAL( block_headers.size(), 3U );
+   BOOST_CHECK_THROW( block_headers.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers.at( head_block_num ) ) == head_block->id() );
+   BOOST_REQUIRE( block_headers.at( head_block_num )->witness_signature.valid() );
+   BOOST_CHECK( *block_headers.at( head_block_num )->witness_signature == head_block->witness_signature );
+   BOOST_REQUIRE( block_headers.at( head_block_num - 1 ).valid() );
+   BOOST_CHECK( block_headers.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers.at( head_block_num - 1 ) ) == previous_block->id() );
+   BOOST_REQUIRE( block_headers.at( head_block_num - 1 )->witness_signature.valid() );
+   BOOST_CHECK( *block_headers.at( head_block_num - 1 )->witness_signature == previous_block->witness_signature );
+
+   const auto block_headers2 = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                                head_block_num - 1 } );
+   BOOST_REQUIRE_EQUAL( block_headers2.size(), 3U );
+   BOOST_CHECK_THROW( block_headers2.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers2.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers2.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers2.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers2.at( head_block_num ) ) == get_block_id( *head_block_header2 ) );
+   BOOST_CHECK( !block_headers2.at( head_block_num )->witness_signature.valid() );
+   BOOST_REQUIRE( block_headers2.at( head_block_num - 1 ).valid() );
+   BOOST_CHECK( block_headers2.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers2.at( head_block_num - 1 ) ) != previous_block->id() );
+   BOOST_CHECK( !block_headers2.at( head_block_num - 1 )->witness_signature.valid() );
+
+   const auto block_headers3 = db_api.get_block_header_batch( { head_block_num, head_block_num + 1,
+                                                                head_block_num - 1 }, false );
+   BOOST_REQUIRE_EQUAL( block_headers3.size(), 3U );
+   BOOST_CHECK_THROW( block_headers3.at( head_block_num + 2 ), std::out_of_range );
+   BOOST_CHECK( !block_headers3.at( head_block_num + 1 ).valid() );
+   BOOST_REQUIRE( block_headers3.at( head_block_num ).valid() );
+   BOOST_CHECK( block_headers3.at( head_block_num )->block_num() == head_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers3.at( head_block_num ) ) == get_block_id( *head_block_header2 ) );
+   BOOST_CHECK( !block_headers3.at( head_block_num )->witness_signature.valid() );
+   BOOST_REQUIRE( block_headers3.at( head_block_num - 1 ).valid() );
+   BOOST_CHECK( block_headers3.at( head_block_num - 1 )->block_num() == previous_block_header->block_num() );
+   BOOST_CHECK( get_block_id( *block_headers3.at( head_block_num - 1 ) )
+                   == get_block_id( *block_headers2.at( head_block_num - 1 ) ) );
+   BOOST_CHECK( !block_headers3.at( head_block_num - 1 )->witness_signature.valid() );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(verify_account_authority)
 {
       try {
@@ -1559,7 +1692,7 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       try {
          account_update_operation op;
          op.account = nathan.id;
-         op.active = authority(3, nathan_public_key, 1, alice.id, 1, bob.id, 1);
+         op.active = authority(3, nathan_public_key, 1, alice.get_id(), 1, bob.get_id(), 1);
          op.owner = *op.active;
          trx.operations.push_back(op);
          sign(trx, nathan_private_key);
@@ -1631,8 +1764,8 @@ BOOST_AUTO_TEST_CASE( get_call_orders_by_account ) {
       int64_t init_balance(1000000);
       transfer(committee_account, caller_id, asset(init_balance));
 
-      update_feed_producers(usd, {feedproducer.id});
-      update_feed_producers(cny, {feedproducer.id});
+      update_feed_producers(usd, {feedproducer.get_id()});
+      update_feed_producers(cny, {feedproducer.get_id()});
 
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
@@ -1670,13 +1803,13 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
 
       const auto &usd = create_bitasset("USD", creator_id);
       const auto &core = asset_id_type()(db);
-      asset_id_type usd_id = usd.id;
+      asset_id_type usd_id = usd.get_id();
 
       int64_t init_balance(1000000);
       transfer(committee_account, settler_id, asset(init_balance));
       transfer(committee_account, caller_id, asset(init_balance));
 
-      update_feed_producers(usd, {feedproducer.id});
+      update_feed_producers(usd, {feedproducer.get_id()});
 
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
@@ -1687,7 +1820,7 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
       borrow(caller, usd.amount(1000), asset(15000));
       generate_block();
 
-      transfer(caller.id, settler.id, asset(200, usd_id));
+      transfer(caller.get_id(), settler.get_id(), asset(200, usd_id));
 
       auto result = force_settle( settler, usd_id(db).amount(4));
       generate_block();
@@ -1721,11 +1854,11 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
    BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
 
-   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).id;
+   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).get_id();
    update_feed_producers( bitusd_id, { nathan_id } );
-   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).id;
+   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).get_id();
    update_feed_producers( bitdan_id, { nathan_id } );
-   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).id;
+   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).get_id();
    update_feed_producers( btc_id, { nathan_id } );
 
    oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
@@ -1852,10 +1985,22 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    opt.has_market_history_plugin = true;
    graphene::app::database_api db_api( db, &opt);
 
+   // check get_next_object_id
+   auto next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                             graphene::market_history::order_history_object_type,
+                                             false );
+   BOOST_CHECK( std::string(next_id) == "5.0.0" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.0" );
+
    ACTORS((bob)(alice));
 
    const auto& eur = create_user_issued_asset("EUR");
+   asset_id_type eur_id = eur.get_id();
    const auto& usd = create_user_issued_asset("USD");
+   asset_id_type usd_id = usd.get_id();
 
    issue_uia( bob_id, usd.amount(1000000) );
    issue_uia( alice_id, eur.amount(1000000) );
@@ -1863,8 +2008,28 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    // maker create an order
    create_sell_order(bob, usd.amount(200), eur.amount(210));
 
+   // btw check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.0" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.1" );
+
    // taker match it
    create_sell_order(alice, eur.amount(210), usd.amount(200));
+
+   // btw check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.0" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
 
    generate_block();
 
@@ -1906,6 +2071,56 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "buy", history[0].type );
    BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   // maker create an order
+   create_sell_order(bob, asset(200,usd_id), asset(210,eur_id));
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
+   BOOST_CHECK_THROW( db_api.get_next_object_id( 1,100,true ), fc::exception );
+   BOOST_CHECK_THROW( db_api.get_next_object_id( 10,0,false ), fc::exception );
+
+   generate_block();
+   // check get_next_object_id
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( MARKET_HISTORY_SPACE_ID,
+                                        graphene::market_history::order_history_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "5.0.2" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        false );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
+   next_id = db_api.get_next_object_id( protocol_ids,
+                                        limit_order_object_type,
+                                        true );
+   BOOST_CHECK( std::string(next_id) == "1.7.3" );
 
 } FC_LOG_AND_RETHROW() }
 

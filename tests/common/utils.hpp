@@ -23,9 +23,6 @@
  */
 #pragma once
 
-#include <fc/thread/thread.hpp>
-#include <boost/test/included/unit_test.hpp>
-
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
       #define _WIN32_WINNT 0x0501

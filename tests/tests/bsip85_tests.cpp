@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
       // Should succeed
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       trx.operations.clear();
-      proposal_id_type prop_id = ptx.operation_results[0].get<object_id_type>();
+      proposal_id_type prop_id { ptx.operation_results[0].get<object_id_type>() };
 
       // The maker fee discount percent is still 0
       BOOST_CHECK_EQUAL( db.get_global_properties().parameters.get_maker_fee_discount_percent(), 0 );
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE( bsip85_maker_fee_discount_test )
       int64_t cer_usd_amount = 31;
       price tmp_cer( asset( cer_core_amount ), asset( cer_usd_amount, asset_id_type(1) ) );
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee, tmp_cer );
-      asset_id_type usd_id = usd_obj.id;
+      asset_id_type usd_id = usd_obj.get_id();
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
@@ -185,11 +185,11 @@ BOOST_AUTO_TEST_CASE( bsip85_maker_fee_discount_test )
          BOOST_TEST_MESSAGE( "Creating ao1, then be filled by bo1" );
          // pays fee in core
          const limit_order_object* ao1 = create_sell_order( alice_id, asset(1000), asset(200, usd_id) );
-         const limit_order_id_type ao1id = ao1->id;
+         const limit_order_id_type ao1id = ao1->get_id();
          // pays fee in usd
          const limit_order_object* bo1 = create_sell_order(   bob_id, asset(200, usd_id), asset(1000), max_exp, cer );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao1id ) == nullptr );
+         BOOST_CHECK( db.find( ao1id ) == nullptr );
          BOOST_CHECK( bo1 == nullptr );
 
          // data after order created
@@ -218,11 +218,11 @@ BOOST_AUTO_TEST_CASE( bsip85_maker_fee_discount_test )
          BOOST_TEST_MESSAGE( "Creating ao2, then be partially filled by bo2" );
          // pays fee in usd
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
-         const limit_order_id_type ao2id = ao2->id;
+         const limit_order_id_type ao2id = ao2->get_id();
          // pays fee in core
          const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
 
-         BOOST_CHECK( db.find<limit_order_object>( ao2id ) != nullptr );
+         BOOST_CHECK( db.find( ao2id ) != nullptr );
          BOOST_CHECK( bo2 == nullptr );
 
          // data after order created
