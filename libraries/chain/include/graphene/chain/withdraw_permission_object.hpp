@@ -92,32 +92,33 @@ namespace graphene { namespace chain {
    struct by_authorized;
    struct by_expiration;
 
-   typedef multi_index_container<
+   using withdraw_permission_obj_mlt_idx = multi_index_container<
       withdraw_permission_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_from>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::withdraw_from_account>,
+               member< withdraw_permission_object, account_id_type,
+                       &withdraw_permission_object::withdraw_from_account >,
                member< object, object_id_type, &object::id >
             >
          >,
          ordered_unique< tag<by_authorized>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account>,
+               member< withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account >,
                member< object, object_id_type, &object::id >
             >
          >,
          ordered_unique< tag<by_expiration>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration>,
+               member< withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration >,
                member< object, object_id_type, &object::id >
             >
          >
       >
-   > withdraw_permission_object_multi_index_type;
+   >;
 
-   typedef generic_index<withdraw_permission_object, withdraw_permission_object_multi_index_type> withdraw_permission_index;
+   using withdraw_permission_index = generic_index<withdraw_permission_object, withdraw_permission_obj_mlt_idx>;
 
 
 } } // graphene::chain
