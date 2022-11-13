@@ -86,6 +86,7 @@ class elasticsearch_plugin_impl
       std::unique_ptr<graphene::utilities::es_client> es;
 
       vector <string> bulk_lines; //  vector of op lines
+      size_t approximate_bulk_size = 0;
 
       bulk_struct bulk_line_struct;
 
@@ -220,6 +221,9 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
 void elasticsearch_plugin_impl::send_bulk()
 {
+   if( !is_sync )
+      ilog( "Sending ${n} lines of bulk data to ElasticSearch, approximate size ${s}",
+            ("n",bulk_lines.size())("s",approximate_bulk_size) );
    if( !es->send_bulk( bulk_lines ) )
    {
       elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:",
@@ -233,6 +237,7 @@ void elasticsearch_plugin_impl::send_bulk()
             "Error populating ES database, we are going to keep trying." );
    }
    bulk_lines.clear();
+   approximate_bulk_size = 0;
    bulk_lines.reserve(limit_documents);
 }
 
@@ -435,7 +440,10 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
       auto prepare = graphene::utilities::createBulk(bulk_header, std::move(bulk_line));
       std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk_lines));
 
-      if( bulk_lines.size() >= limit_documents )
+      approximate_bulk_size += bulk_lines.back().size();
+
+      if( bulk_lines.size() >= limit_documents
+            || approximate_bulk_size >= graphene::utilities::es_client::request_size_threshold )
          send_bulk();
    }
    cleanObjects(ath, account_id);
