@@ -130,7 +130,7 @@ class es_objects_plugin_impl
       vector<std::string> bulk_lines;
       size_t approximate_bulk_size = 0;
 
-      uint32_t block_number;
+      uint32_t block_number = 0;
       fc::time_point_sec block_time;
       bool is_es_version_7_or_above = true;
 
@@ -348,8 +348,10 @@ void es_objects_plugin_impl::send_bulk_if_ready( bool force )
    bool log_by_next = ( docs_sent_total >= next_log_count || fc::time_point::now() >= next_log_time );
    if( log_by_next || limit_documents == _options.bulk_replay || force )
    {
-      ilog( "Sending ${n} lines of bulk data to ElasticSearch, this batch ${b}, total ${t}, approximate size ${s}",
-            ("n",bulk_lines.size())("b",docs_sent_batch)("t",docs_sent_total)("s",approximate_bulk_size) );
+      ilog( "Sending ${n} lines of bulk data to ElasticSearch at block {blk}, "
+            "this batch ${b}, total ${t}, approximate size ${s}",
+            ("n",bulk_lines.size())("blk",block_number)
+            ("b",docs_sent_batch)("t",docs_sent_total)("s",approximate_bulk_size) );
       next_log_count = docs_sent_total + log_count_threshold;
       next_log_time = fc::time_point::now() + fc::seconds(log_time_threshold);
    }
