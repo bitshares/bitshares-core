@@ -221,9 +221,8 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
 void elasticsearch_plugin_impl::send_bulk( uint32_t block_num )
 {
-   if( !is_sync )
-      ilog( "Sending ${n} lines of bulk data to ElasticSearch at block ${b}, approximate size ${s}",
-            ("n",bulk_lines.size())("b",block_num)("s",approximate_bulk_size) );
+   ilog( "Sending ${n} lines of bulk data to ElasticSearch at block ${b}, approximate size ${s}",
+         ("n",bulk_lines.size())("b",block_num)("s",approximate_bulk_size) );
    if( !es->send_bulk( bulk_lines ) )
    {
       elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:",
