@@ -105,6 +105,9 @@ public:
    bool del( const std::string& path ) const;
    std::string get( const std::string& path ) const;
    std::string query( const std::string& path, const std::string& query ) const;
+
+   /// When doing bulk operations, call @ref send_bulk when the approximate size of pending data reaches this value.
+   static constexpr size_t request_size_threshold = 4 * 1024 * 1024; // 4MB
 private:
    std::string base_url;
    std::string auth;
