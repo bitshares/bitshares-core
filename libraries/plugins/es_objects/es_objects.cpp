@@ -348,7 +348,7 @@ void es_objects_plugin_impl::send_bulk_if_ready( bool force )
    bool log_by_next = ( docs_sent_total >= next_log_count || fc::time_point::now() >= next_log_time );
    if( log_by_next || limit_documents == _options.bulk_replay || force )
    {
-      ilog( "Sending ${n} lines of bulk data to ElasticSearch at block {blk}, "
+      ilog( "Sending ${n} lines of bulk data to ElasticSearch at block ${blk}, "
             "this batch ${b}, total ${t}, approximate size ${s}",
             ("n",bulk_lines.size())("blk",block_number)
             ("b",docs_sent_batch)("t",docs_sent_total)("s",approximate_bulk_size) );
