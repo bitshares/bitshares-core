@@ -342,10 +342,10 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
           (*_delay_after_accumulator)(delay_after.count());
           if (total_duration > fc::milliseconds(500))
           {
-            ilog("Call to method node_delegate::${method} took ${total_duration}us, longer than our target maximum of 500ms",
+            dlog("Call to method node_delegate::${method} took ${total_duration}us, longer than our target maximum of 500ms",
                  ("method", _method_name)
                  ("total_duration", total_duration.count()));
-            ilog("Actual execution took ${execution_duration}us, with a ${delegate_delay}us delay before the delegate thread started "
+            dlog("Actual execution took ${execution_duration}us, with a ${delegate_delay}us delay before the delegate thread started "
                  "executing the method, and a ${p2p_delay}us delay after it finished before the p2p thread started processing the response",
                  ("execution_duration", actual_execution_time)
                  ("delegate_delay", delay_before)
