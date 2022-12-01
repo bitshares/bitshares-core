@@ -40,12 +40,10 @@ namespace graphene { namespace chain {
     *  committee_members were separated into a separate object to make iterating over
     *  the set of committee_member easy.
     */
-   class committee_member_object : public abstract_object<committee_member_object>
+   class committee_member_object : public abstract_object<committee_member_object,
+                                             protocol_ids, committee_member_object_type>
    {
       public:
-         static constexpr uint8_t space_id = protocol_ids;
-         static constexpr uint8_t type_id  = committee_member_object_type;
-
          account_id_type  committee_member_account;
          vote_id_type     vote_id;
          uint64_t         total_votes = 0;

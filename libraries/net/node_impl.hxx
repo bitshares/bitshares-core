@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ *
+ * The MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 #pragma once
 
 #define P2P_IN_DEDICATED_THREAD
@@ -17,10 +40,15 @@
 #endif
 
 #include <memory>
-#include <mutex>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <fc/thread/thread.hpp>
+#include <fc/thread/mutex.hpp>
+#include <fc/thread/scoped_lock.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
+#include <fc/network/rate_limiting.hpp>
 #include <graphene/chain/config.hpp>
 #include <graphene/protocol/types.hpp>
 #include <graphene/net/node.hpp>
@@ -146,7 +174,7 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::find(key); 
    }
-};   
+};
 
 class blockchain_tied_message_cache
 {
@@ -314,10 +342,10 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
           (*_delay_after_accumulator)(delay_after.count());
           if (total_duration > fc::milliseconds(500))
           {
-            ilog("Call to method node_delegate::${method} took ${total_duration}us, longer than our target maximum of 500ms",
+            dlog("Call to method node_delegate::${method} took ${total_duration}us, longer than our target maximum of 500ms",
                  ("method", _method_name)
                  ("total_duration", total_duration.count()));
-            ilog("Actual execution took ${execution_duration}us, with a ${delegate_delay}us delay before the delegate thread started "
+            dlog("Actual execution took ${execution_duration}us, with a ${delegate_delay}us delay before the delegate thread started "
                  "executing the method, and a ${p2p_delay}us delay after it finished before the p2p thread started processing the response",
                  ("execution_duration", actual_execution_time)
                  ("delegate_delay", delay_before)
@@ -366,8 +394,10 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
 struct node_configuration
 {
    fc::ip::endpoint listen_endpoint;
+   fc::optional<fc::ip::endpoint> inbound_endpoint;
    bool accept_incoming_connections = true;
-   bool wait_if_endpoint_is_busy = true;
+   bool connect_to_new_peers = true;
+   bool wait_if_endpoint_is_busy = false;
    /**
     * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
     * on the network.  This is now a private key/public key pair, where the public key is used
@@ -379,9 +409,19 @@ struct node_configuration
 
 class node_impl : public peer_connection_delegate, public std::enable_shared_from_this<node_impl>
 {
-    public:
+public:
+   class address_builder
+   {
+   public:
+      static std::shared_ptr<address_builder> create_default_address_builder();
+      void build( node_impl* impl, address_message& ) const;
+      virtual bool should_advertise(const  fc::ip::endpoint& in ) const = 0;
+      virtual ~address_builder() = default;
+   };
+
 #ifdef P2P_IN_DEDICATED_THREAD
       std::shared_ptr<fc::thread> _thread = std::make_shared<fc::thread>("p2p");
+      std::shared_ptr<fc::thread> get_thread() const { return _thread; }
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;
@@ -394,14 +434,9 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// Stores the endpoint we're listening on.  This will be the same as
       /// _node_configuration.listen_endpoint, unless that endpoint was already
       /// in use.
+      /// This will be 0.0.0.0:0 if the node is configured to not listen.
+      // Note: updating the type to optional may break 3rd-party client applications.
       fc::ip::endpoint     _actual_listening_endpoint;
-
-      /// We determine whether we're firewalled by asking other nodes.  Store the result here.
-      firewalled_state     _is_firewalled = firewalled_state::unknown;
-      /// If we're behind NAT, our listening endpoint address will appear different to the rest of the world.
-      /// Store it here.
-      fc::optional<fc::ip::endpoint> _publicly_visible_listening_endpoint;
-      fc::time_point       _last_firewall_check_message_sent;
 
       /// Used by the task that manages connecting to peers
       /// @{
@@ -515,7 +550,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// The /n/ most recent blocks we've accepted (currently tuned to the max number of connections)
       boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted { _maximum_number_of_connections };
 
-      uint32_t _sync_item_type;
+      uint32_t _sync_item_type = 0;
       /// The number of items we still need to fetch while syncing
       uint32_t _total_num_of_unfetched_items = 0;
       /// List of all block numbers where there are hard forks
@@ -529,7 +564,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// Number of connections last reported to the client (to avoid sending duplicate messages)
       uint32_t _last_reported_number_of_conns = 0;
 
-      bool _peer_advertising_disabled = false;
+      std::shared_ptr<address_builder> _address_builder = address_builder::create_default_address_builder();
 
       fc::future<void> _fetch_updated_peer_lists_loop_done;
 
@@ -581,6 +616,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// used to prevent us from starting new tasks while we're shutting down
       bool _node_is_shutting_down = false;
 
+      /// Maximum number of addresses to handle at one time
+      size_t _max_addrs_to_handle_at_once = MAX_ADDRESSES_TO_HANDLE_AT_ONCE;
       /// Maximum number of blocks to handle at one time
       size_t _max_blocks_to_handle_at_once = MAX_BLOCKS_TO_HANDLE_AT_ONCE;
       /// Maximum number of sync blocks to prefetch
@@ -598,7 +635,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void schedule_next_update_seed_nodes_task();
       /// @}
 
-      node_impl(const std::string& user_agent);
+      explicit node_impl(const std::string& user_agent);
       ~node_impl() override;
 
       void save_node_configuration();
@@ -629,9 +666,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       bool is_accepting_new_connections();
       bool is_wanting_new_connections();
       uint32_t get_number_of_connections();
-      peer_connection_ptr get_peer_by_node_id(const node_id_t& id);
+      peer_connection_ptr get_peer_by_node_id(const node_id_t& id) const;
 
-      bool is_already_connected_to_id(const node_id_t& node_id);
       bool merge_address_info_with_potential_peer_database( const std::vector<address_info> addresses );
       void display_current_connections();
       uint32_t calculate_unsynced_block_count_from_all_peers();
@@ -647,7 +683,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
 
-      void on_connection_accepted_message( peer_connection* originating_peer, const connection_accepted_message& );
+      void on_connection_accepted_message( peer_connection* originating_peer,
+                                           const connection_accepted_message& ) const;
 
       void on_connection_rejected_message( peer_connection* originating_peer,
                                            const connection_rejected_message& connection_rejected_message_received );
@@ -664,7 +701,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
                                                      const blockchain_item_ids_inventory_message& blockchain_item_ids_inventory_message_received );
 
       void on_fetch_items_message( peer_connection* originating_peer,
-                                   const fetch_items_message& fetch_items_message_received ) const;
+                                   const fetch_items_message& fetch_items_message_received );
 
       void on_item_not_available_message( peer_connection* originating_peer,
                                           const item_not_available_message& item_not_available_message_received );
@@ -680,14 +717,6 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       void on_current_time_reply_message( peer_connection* originating_peer,
                                           const current_time_reply_message& current_time_reply_message_received );
-
-      void forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state);
-
-      void on_check_firewall_message(peer_connection* originating_peer,
-                                     const check_firewall_message& check_firewall_message_received);
-
-      void on_check_firewall_reply_message(peer_connection* originating_peer,
-                                           const check_firewall_reply_message& check_firewall_reply_message_received);
 
       void on_connection_closed(peer_connection* originating_peer) override;
 
@@ -724,13 +753,24 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void accept_loop();
       void send_hello_message(const peer_connection_ptr& peer);
       void connect_to_task(peer_connection_ptr new_peer, const fc::ip::endpoint& remote_endpoint);
-      bool is_connection_to_endpoint_in_progress(const fc::ip::endpoint& remote_endpoint);
+      bool is_connected_to_endpoint(const fc::ip::endpoint& remote_endpoint) const;
 
       void move_peer_to_active_list(const peer_connection_ptr& peer);
       void move_peer_to_closing_list(const peer_connection_ptr& peer);
       void move_peer_to_terminating_list(const peer_connection_ptr& peer);
 
-      peer_connection_ptr get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint );
+      /***
+       * Look for an active connection at the given address
+       * @param remote_endpoint the address we are interested in
+       * @returns the connection, or peer_connection_ptr() if not found
+       */
+      peer_connection_ptr get_active_conn_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const;
+      /***
+       * Look for a connection that is either active or currently in the handshaking process
+       * @param remote_endpoint the address we are interested in
+       * @returns the connection, or peer_connection_ptr() if not found
+       */
+      peer_connection_ptr get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint ) const;
 
       void dump_node_status();
 
@@ -748,13 +788,16 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void listen_to_p2p_network();
       void connect_to_p2p_network(node_impl_ptr self);
       void add_node( const fc::ip::endpoint& ep );
+      void set_advertise_algorithm( const std::string& algo,
+            const std::vector<std::string>& advertise_or_exclude_list );
       void add_seed_node( const std::string& seed_string );
       void resolve_seed_node_and_add( const std::string& seed_string );
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
-      void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
-      void accept_incoming_connections(bool accept);
-      void listen_on_port( uint16_t port, bool wait_if_not_available );
+      void set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
+      void set_inbound_endpoint( const fc::ip::endpoint& ep );
+      void set_accept_incoming_connections(bool accept);
+      void set_connect_to_new_peers( bool connect );
 
       fc::ip::endpoint         get_actual_listening_endpoint() const;
       std::vector<peer_status> get_connected_peers() const;
@@ -768,16 +811,17 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void set_advanced_node_parameters( const fc::variant_object& params );
 
       fc::variant_object         get_advanced_node_parameters();
-      message_propagation_data   get_transaction_propagation_data( const graphene::net::transaction_id_type& transaction_id );
-      message_propagation_data   get_block_propagation_data( const graphene::net::block_id_type& block_id );
+      message_propagation_data   get_tx_propagation_data(
+                                       const graphene::net::transaction_id_type& transaction_id ) const;
+      message_propagation_data   get_block_propagation_data( const graphene::net::block_id_type& block_id ) const;
 
       node_id_t                  get_node_id() const;
       void                       set_allowed_peers( const std::vector<node_id_t>& allowed_peers );
       void                       clear_peer_database();
-      void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second );
-      void                       disable_peer_advertising();
+      void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second,
+                                                            uint32_t download_bytes_per_second );
       fc::variant_object         get_call_statistics() const;
-      message                    get_message_for_item(const item_id& item) override;
+      graphene::net::message     get_message_for_item(const item_id& item) override;
 
       fc::variant_object         network_get_info() const;
       fc::variant_object         network_get_usage_stats() const;
@@ -793,7 +837,10 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
 }}} // end of namespace graphene::net::detail
 
-FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
-                                                 (accept_incoming_connections)
-                                                 (wait_if_endpoint_is_busy)
-                                                 (private_key))
+FC_REFLECT( graphene::net::detail::node_configuration,
+            (listen_endpoint)
+            (inbound_endpoint)
+            (accept_incoming_connections)
+            (connect_to_new_peers)
+            (wait_if_endpoint_is_busy)
+            (private_key) )

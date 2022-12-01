@@ -44,7 +44,7 @@ BOOST_FIXTURE_TEST_SUITE( uia_tests, database_fixture )
 BOOST_AUTO_TEST_CASE( create_advanced_uia )
 {
    try {
-      asset_id_type test_asset_id = db.get_index<asset_object>().get_next_id();
+      asset_id_type test_asset_id { db.get_index<asset_object>().get_next_id() };
       asset_create_operation creator;
       creator.issuer = account_id_type();
       creator.fee = asset();
@@ -143,7 +143,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_whitelist_test )
 { try {
    ACTORS( (dan)(eric)(sam) );
    const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, white_list | override_authority );
-   asset_id_type advanced_id = advanced.id;
+   asset_id_type advanced_id = advanced.get_id();
    BOOST_TEST_MESSAGE( "Issuing 1000 ADVANCED to dan" );
    issue_uia( dan, advanced.amount( 1000 ) );
    BOOST_TEST_MESSAGE( "Checking dan's balance" );
@@ -223,11 +223,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_whitelist_test )
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
 {
    try {
-      account_id_type izzy_id = create_account("izzy").id;
+      account_id_type izzy_id = create_account("izzy").get_id();
       const asset_id_type uia_id = create_user_issued_asset(
-         "ADVANCED", izzy_id(db), white_list ).id;
-      account_id_type nathan_id = create_account("nathan").id;
-      account_id_type vikram_id = create_account("vikram").id;
+         "ADVANCED", izzy_id(db), white_list ).get_id();
+      account_id_type nathan_id = create_account("nathan").get_id();
+      account_id_type vikram_id = create_account("vikram").get_id();
       trx.clear();
 
       asset_issue_operation op;
@@ -306,10 +306,10 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
    try {
       INVOKE(issue_whitelist_uia);
       const asset_object& advanced = get_asset("ADVANCED");
-      const asset_id_type uia_id = advanced.id;
+      const asset_id_type uia_id = advanced.get_id();
       const account_object& nathan = get_account("nathan");
       const account_object& dan = create_account("dan");
-      account_id_type izzy_id = get_account("izzy").id;
+      account_id_type izzy_id = get_account("izzy").get_id();
       upgrade_to_lifetime_member(dan);
       trx.clear();
 
@@ -382,10 +382,11 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
          op.asset_to_update = advanced.id;
          op.new_options = advanced.options;
          op.new_options.blacklist_authorities.clear();
-         op.new_options.blacklist_authorities.insert(dan.id);
+         op.new_options.blacklist_authorities.insert(dan.get_id());
          trx.operations.back() = op;
          PUSH_TX( db, trx, ~0 );
-         BOOST_CHECK(advanced.options.blacklist_authorities.find(dan.id) != advanced.options.blacklist_authorities.end());
+         BOOST_CHECK(advanced.options.blacklist_authorities.find(dan.get_id())
+                     != advanced.options.blacklist_authorities.end());
       }
 
       BOOST_TEST_MESSAGE( "Attempting to transfer from dan back to nathan" );
@@ -669,11 +670,14 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       do
       {
          if ( (c >= 48 && c <= 57) ) // numbers
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true), "Failed on good ASCII value " + std::to_string(c) );
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true),
+                                 "Failed on good ASCII value " + std::to_string(c) );
          else if ( c >= 65 && c <= 90) // letters
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true), "Failed on good ASCII value " + std::to_string(c) );
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true),
+                                 "Failed on good ASCII value " + std::to_string(c) );
          else                       // everything else
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false), "Failed on bad ASCII value " + std::to_string(c) );
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false),
+                                 "Failed on bad ASCII value " + std::to_string(c) );
          c++;
       } while (c != 0);
    }

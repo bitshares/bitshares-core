@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
 
    {
       // set margin call fee ratio
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    transfer(committee_account, borrower_id, asset(init_balance));
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -85,10 +85,10 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7, tcr 200% > 175%
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500), 2000);
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 500% collateral, call price is 25/1.75 CORE/USD = 100/7, no tcr
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(25000));
    transfer(borrower, seller, bitusd.amount(1000));
@@ -117,18 +117,18 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    price mc( asset(10*175), asset(1*100, usd_id) );
 
    // This sell order above MSSP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
-   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->id;
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->get_id();
    // This buy order at MSSP will be matched only if no margin call (margin call takes precedence)
-   limit_order_id_type buy_med = create_sell_order(buyer2, asset(33000), bitusd.amount(3000))->id;
+   limit_order_id_type buy_med = create_sell_order(buyer2, asset(33000), bitusd.amount(3000))->get_id();
    // This buy order above MSSP will be matched with a sell order (limit order with better price takes precedence)
-   limit_order_id_type buy_high = create_sell_order(buyer3, asset(111), bitusd.amount(10))->id;
+   limit_order_id_type buy_high = create_sell_order(buyer3, asset(111), bitusd.amount(10))->get_id();
 
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(buyer2, bitusd) );
@@ -155,16 +155,16 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    // buy orders won't change
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 33000 );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_high )->for_sale.value, 111 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_med )->for_sale.value, 33000 );
+   BOOST_CHECK_EQUAL( db.find( buy_high )->for_sale.value, 111 );
 
    // the settle order will match with call, at mssp: 1/11 = 1000/11000
-   const call_order_object* tmp_call = db.find<call_order_object>( call_id );
+   const call_order_object* tmp_call = db.find( call_id );
    BOOST_CHECK( tmp_call != nullptr );
 
    // call will receive call_to_cover, pay 11*call_to_cover
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // the settle order then will match with call2, at mssp: 1/11 = 1000/11000
-   const call_order_object* tmp_call2 = db.find<call_order_object>( call2_id );
+   const call_order_object* tmp_call2 = db.find( call2_id );
    BOOST_CHECK( tmp_call2 != nullptr );
 
    // call2 will receive call2_to_cover, pay 11*call2_to_cover
@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
 
    {
       // set margin call fee ratio
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    transfer(committee_account, borrower_id, asset(init_balance));
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -262,13 +262,13 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/175 CORE/USD = 6/70, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 285% collateral
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(7), asset(1), 1700);
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 285% collateral
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(14), asset(2), 1700);
-   call_order_id_type call3_id = call3.id;
+   call_order_id_type call3_id = call3.get_id();
    transfer(borrower, seller, bitusd.amount(100000));
 
    // adjust price feed to get call orders into margin call territory
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) == nullptr );
 
    // the settle order will match with call2, at mssp: 100/11,
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle2_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle2_id ) == nullptr );
 
    // the settle order will match with call, at mssp: 100/11
@@ -391,7 +391,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle3_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle3_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle3_id ) == nullptr );
 
    // the settle order will match with call, at mssp
@@ -422,7 +422,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle4_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle4_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle4_id ) == nullptr );
 
    // the settle order will match with call, at mssp
@@ -465,7 +465,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
 
    {
       // set margin call fee ratio
@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -496,15 +496,15 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7, tcr 200% > 175%
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500), 2000);
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 500% collateral, call price is 25/1.75 CORE/USD = 100/7, no tcr
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(25000));
    // create a small position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7, no tcr
    const call_order_object& call4 = *borrow( borrower4, bitusd.amount(10), asset(160) );
-   call_order_id_type call4_id = call4.id;
+   call_order_id_type call4_id = call4.get_id();
 
    transfer(borrower, seller, bitusd.amount(1000));
    transfer(borrower2, seller, bitusd.amount(1000));
@@ -528,28 +528,28 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    BOOST_CHECK_EQUAL( 10, get_balance(borrower4, bitusd) );
 
    // This sell order above MSSP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
-   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->id;
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->get_id();
 
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 80, get_balance(buyer, core) );
 
    // Create a sell order which will be matched with several call orders later, price 1/9
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(500), core.amount(4500) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 500 );
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(500), core.amount(4500) )->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_id )->for_sale.value, 500 );
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(2400) );
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    // prepare price feed to get call and call2 (but not call3) into margin call territory
@@ -590,7 +590,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // the limit order then will match with call2, at limit order's price: 1/9
-   const call_order_object* tmp_call2 = db.find<call_order_object>( call2_id );
+   const call_order_object* tmp_call2 = db.find( call2_id );
    BOOST_CHECK( tmp_call2 != nullptr );
 
    // if the limit is big enough, call2 will receive call2_to_cover, pay 9*call2_to_cover
@@ -604,7 +604,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
 
    // call4 will match with the settle order, since it has no tcr, it will be fully closed
    // match price is 1/11
-   const call_order_object* tmp_call4 = db.find<call_order_object>( call4_id );
+   const call_order_object* tmp_call4 = db.find( call4_id );
    BOOST_CHECK( tmp_call4 == nullptr );
 
    // borrower4 balance changes
@@ -627,7 +627,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
 
    // sell_id is completely filled
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+   BOOST_CHECK( !db.find( sell_id ) );
 
    // settle order is not fully filled
    BOOST_CHECK( db.find( settle_id ) != nullptr );
@@ -638,7 +638,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
                       get_balance(seller, core) ); // 500*9 + 10*10.7 + call2_cover2 * 10.7
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
 
    // Can not reduce CR of a call order to trigger a margin call but not get fully filled and final CR <= ICR
    BOOST_CHECK_THROW( borrow( borrower_id(db), asset(10000, usd_id), asset(160000), 1700), fc::exception );
@@ -687,7 +687,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
 
    {
       // set margin call fee ratio
@@ -711,7 +711,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -720,16 +720,16 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7, tcr 200% > 175%
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500), 2000);
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 500% collateral, call price is 25/1.75 CORE/USD = 100/7, no tcr
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(25000));
-   call_order_id_type call3_id = call3.id;
+   call_order_id_type call3_id = call3.get_id();
    // create a small position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7, no tcr
    const call_order_object& call4 = *borrow( borrower4, bitusd.amount(10), asset(160) );
-   call_order_id_type call4_id = call4.id;
+   call_order_id_type call4_id = call4.get_id();
 
    transfer(borrower, seller, bitusd.amount(1000));
    transfer(borrower2, seller, bitusd.amount(1000));
@@ -753,28 +753,28 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    BOOST_CHECK_EQUAL( 10, get_balance(borrower4, bitusd) );
 
    // This sell order above MSSP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
-   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->id;
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->get_id();
 
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 80, get_balance(buyer, core) );
 
    // Create a sell order which will be matched with several call orders later, price 1/9
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(500), core.amount(4500) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 500 );
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(500), core.amount(4500) )->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_id )->for_sale.value, 500 );
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(2400) );
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    BOOST_CHECK_EQUAL( 2400, settle_id(db).balance.amount.value );
@@ -805,7 +805,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    generate_block();
 
    // firstly the limit order will match with call, at limit order's price: 1/9
-   const call_order_object* tmp_call = db.find<call_order_object>( call_id );
+   const call_order_object* tmp_call = db.find( call_id );
    BOOST_CHECK( tmp_call != nullptr );
 
    // call will receive call_to_cover, pay 9*call_to_cover
@@ -820,7 +820,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, usd_id) );
 
    // the limit order then will match with call2, at limit order's price: 1/9
-   const call_order_object* tmp_call2 = db.find<call_order_object>( call2_id );
+   const call_order_object* tmp_call2 = db.find( call2_id );
    BOOST_CHECK( tmp_call2 != nullptr );
 
    // if the limit is big enough, call2 will receive call2_to_cover, pay 9*call2_to_cover
@@ -833,7 +833,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower2_id, usd_id) );
 
    // sell_id is completely filled
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+   BOOST_CHECK( !db.find( sell_id ) );
 
    // all call orders are still there
    BOOST_CHECK( db.find( call_id ) != nullptr );
@@ -863,14 +863,14 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    BOOST_CHECK_EQUAL( 25000, call3_id(db).collateral.value );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
 
    // pass the hard fork time
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    // call4 will match with the settle order, since it has no tcr, it will be fully closed
    // match price is 1/11
-   const call_order_object* tmp_call4 = db.find<call_order_object>( call4_id );
+   const call_order_object* tmp_call4 = db.find( call4_id );
    BOOST_CHECK( tmp_call4 == nullptr );
 
    // borrower4 balance changes
@@ -902,7 +902,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
                       get_balance(seller_id, asset_id_type()) ); // 500*9 + 10*10.7 + call2_cover2 * 10.7
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
 
    // generate a block
    generate_block();
@@ -930,7 +930,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
 
    {
       // set margin call fee ratio
@@ -953,7 +953,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
    transfer(committee_account, borrower5_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -962,19 +962,19 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700, tcr 200% > 175%
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500), 2000);
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 500% collateral, call price is 25/175 CORE/USD = 100/700, no tcr
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(25000));
-   call_order_id_type call3_id = call3.id;
+   call_order_id_type call3_id = call3.get_id();
    // create a small position with 320% collateral, call price is 16/175 CORE/USD = 64/700, no tcr
    const call_order_object& call4 = *borrow( borrower4, bitusd.amount(1000), asset(160) );
-   call_order_id_type call4_id = call4.id;
+   call_order_id_type call4_id = call4.get_id();
    // create yet another position with 900% collateral, call price is 45/175 CORE/USD = 180/700, no tcr
    const call_order_object& call5 = *borrow( borrower5, bitusd.amount(100000), asset(45000));
-   call_order_id_type call5_id = call5.id;
+   call_order_id_type call5_id = call5.get_id();
 
    transfer(borrower, seller, bitusd.amount(100000));
    transfer(borrower2, seller, bitusd.amount(100000));
@@ -1002,36 +1002,36 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    share_type expected_seller_usd_balance = 300000;
 
    // This sell order above MCOP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(700), core.amount(150))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(700), core.amount(150))->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 700 );
    expected_seller_usd_balance -= 700;
 
    BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
-   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(1000))->id;
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(1000))->get_id();
 
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 80, get_balance(buyer, core) );
 
    // Create a sell order which will be matched with several call orders later, price 100/9
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(100000), core.amount(9000) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 100000 );
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(100000), core.amount(9000) )->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_id )->for_sale.value, 100000 );
    expected_seller_usd_balance -= 100000;
 
    // Create another sell order which will trigger a blackswan event if matched, price 100/21
    limit_order_id_type sell_swan;
    if( i == 1 )
    {
-      sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(21) )->id;
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+      sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(21) )->get_id();
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 100 );
       expected_seller_usd_balance -= 100;
    }
    else if( i == 2 )
    {
-      sell_swan = create_sell_order(seller, bitusd.amount(10000), core.amount(2100) )->id;
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+      sell_swan = create_sell_order(seller, bitusd.amount(10000), core.amount(2100) )->get_id();
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 10000 );
       expected_seller_usd_balance -= 10000;
    }
 
@@ -1040,7 +1040,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) != nullptr );
    expected_seller_usd_balance -= 40000;
 
@@ -1049,7 +1049,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle2_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle2_id ) != nullptr );
    expected_seller_usd_balance -= 10000;
 
@@ -1058,7 +1058,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle3_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle3_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle3_id ) != nullptr );
    expected_seller_usd_balance -= 3;
 
@@ -1072,7 +1072,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle4_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle4_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle4_id ) != nullptr );
    expected_seller_usd_balance -= 5;
 
@@ -1139,7 +1139,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    expected_margin_call_fees += margin_call_fee_limit_2;
 
    // sell_id is completely filled
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+   BOOST_CHECK( !db.find( sell_id ) );
 
    // now call4 has the lowest CR
    // call4 will match with the settle order, since it is small and has too few collateral, it will be fully closed
@@ -1270,16 +1270,16 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( expected_seller_core_balance.value, get_balance(seller, core) );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
 
    // sell_high is not matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 700 );
 
    // sell_swan is not matched
    if( i == 1 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 100 );
    else if( i == 2 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 10000 );
 
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
@@ -1296,16 +1296,16 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_TEST_MESSAGE( "Check again" );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find( buy_low )->for_sale.value, 80 );
 
    // sell_high is not matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
+   BOOST_CHECK_EQUAL( db.find( sell_high )->for_sale.value, 700 );
 
    // sell_swan is not matched
    if( i == 1 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 100 );
    else if( i == 2 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+      BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 10000 );
 
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
@@ -1340,7 +1340,7 @@ BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
+   asset_id_type usd_id = bitusd.get_id();
    asset_id_type core_id;
 
    {
@@ -1362,7 +1362,7 @@ BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
    transfer(committee_account, borrower_id, asset(init_balance));
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1371,13 +1371,13 @@ BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 360% collateral, call price is 18/175 CORE/USD = 72/700, no tcr
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(18000) );
-   call_order_id_type call2_id = call2.id;
+   call_order_id_type call2_id = call2.get_id();
    // create yet another position with 800% collateral, call price is 40/175 CORE/USD = 160/700, no tcr
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(40000) );
-   call_order_id_type call3_id = call3.id;
+   call_order_id_type call3_id = call3.get_id();
 
    transfer(borrower, seller, bitusd.amount(100000));
    transfer(borrower2, seller, bitusd.amount(100000));
@@ -1401,15 +1401,15 @@ BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower3, bitusd) );
 
    // Create a sell order which will trigger a blackswan event if matched, price 100/16
-   limit_order_id_type sell_swan = create_sell_order(seller2, bitusd.amount(10000), core.amount(1600) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+   limit_order_id_type sell_swan = create_sell_order(seller2, bitusd.amount(10000), core.amount(1600) )->get_id();
+   BOOST_CHECK_EQUAL( db.find( sell_swan )->for_sale.value, 10000 );
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(200000) );
    BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
    BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
    BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
-   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
    BOOST_CHECK( db.find( settle_id ) != nullptr );
    BOOST_CHECK_EQUAL( 200000, settle_id(db).balance.amount.value );
 

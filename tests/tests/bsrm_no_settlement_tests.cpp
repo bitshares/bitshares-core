@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -99,11 +99,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(1000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(1000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       f.settlement_price = price( asset(10,mpa_id), asset(22) );
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // borrower3 create debt position right above ICR
       const call_order_object* call3_ptr = borrow( borrower3, asset(1000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // borrower adjust debt position to right at MSSR
       // 1000 * (22/10) * 1.25 = 2750
@@ -169,19 +169,19 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
 
       // seller2 sells more, this order won't be filled in the beginning either
       const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
 
       // seller2 sells more, this order won't be filled
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(100,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
@@ -264,7 +264,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // seller sells more
       sell_low = create_sell_order( seller, asset(1000,mpa_id), asset(100) );
       BOOST_REQUIRE( sell_low );
-      limit_order_id_type sell_low_id = sell_low->id;
+      limit_order_id_type sell_low_id = sell_low->get_id();
 
       auto final_check = [&]
       {
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -368,11 +368,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       f.settlement_price = price( asset(1000,mpa_id), asset(22) );
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       // borrower3 create debt position right above ICR
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // borrower adjust debt position to right at MSSR
       // 100000 * (22/1000) * 1.25 = 2750
@@ -438,19 +438,19 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(10000,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled in the beginning either
       const limit_order_object* sell_high = create_sell_order( seller2, asset(10000,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(10000,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 10000 );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 250000 );
@@ -610,7 +610,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -633,11 +633,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(1000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(1000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       f.settlement_price = price( asset(10,mpa_id), asset(22) );
@@ -655,7 +655,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // borrower3 create debt position right above ICR
       const call_order_object* call3_ptr = borrow( borrower3, asset(1000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // borrower adjust debt position to right at MSSR
       // 1000 * (22/10) * 1.25 = 2750
@@ -703,19 +703,19 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
 
       // seller2 sells more, this order won't be filled in the beginning either
       const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
 
       // seller2 sells more, this order won't be filled
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(100,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
@@ -725,7 +725,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
 
       // seller settles some
       auto result = force_settle( seller, asset(111,mpa_id) );
-      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
       BOOST_CHECK( !db.find(settle_id) );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2389 ); // 2500 - 111
@@ -888,7 +888,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -911,11 +911,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       f.settlement_price = price( asset(1000,mpa_id), asset(22) );
@@ -933,7 +933,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       // borrower3 create debt position right above ICR
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // borrower adjust debt position to right at MSSR
       // 100000 * (22/1000) * 1.25 = 2750
@@ -981,19 +981,19 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(10000,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled in the beginning either
       const limit_order_object* sell_high = create_sell_order( seller2, asset(10000,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(10000,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 10000 );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 250000 );
@@ -1003,7 +1003,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
 
       // seller settles some
       auto result = force_settle( seller, asset(11100,mpa_id) );
-      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      force_settlement_id_type settle_id { *result.get<extendable_operation_result>().value.new_objects->begin() };
 
       auto final_check = [&]
       {
@@ -1099,7 +1099,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -1122,16 +1122,16 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(1000, mpa_id), asset(2750) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(1000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // 1000 * (22/10) * 1.9 = 4180
       const call_order_object* call3_ptr = borrow( borrower3, asset(1000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(1000,mpa_id) );
@@ -1145,21 +1145,21 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       // seller2 sells some
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(100,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
       expected_seller2_balance_mpa -= 100;
 
       // seller2 sells more
       const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
       expected_seller2_balance_mpa -= 100;
 
       // seller2 sells more, due to MCFR, this order won't be filled if no order is selling lower
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
       expected_seller2_balance_mpa -= 100;
 
@@ -1176,7 +1176,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(111,mpa_id), asset(230) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 111 );
          expected_seller_balance_mpa -= 111;
       }
@@ -1184,7 +1184,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(111,mpa_id), asset(210) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 111 );
          expected_seller_balance_mpa -= 111;
       }
@@ -1192,7 +1192,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(900,mpa_id), asset(1870) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 900 );
          expected_seller_balance_mpa -= 900;
       }
@@ -1200,7 +1200,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(920,mpa_id), asset(1870) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 920 );
          expected_seller_balance_mpa -= 920;
       }
@@ -1208,7 +1208,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(1000,mpa_id), asset(1870) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 1000 );
          expected_seller_balance_mpa -= 1000;
       }
@@ -1216,7 +1216,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(1050,mpa_id), asset(1870) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 1050 );
          expected_seller_balance_mpa -= 1050;
       }
@@ -1224,7 +1224,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(1800,mpa_id), asset(1870*2) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 1800 );
          expected_seller_balance_mpa -= 1800;
       }
@@ -1232,7 +1232,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       {
          sell_low = create_sell_order( seller, asset(2000,mpa_id), asset(1870) );
          BOOST_REQUIRE( sell_low );
-         sell_low_id = sell_low->id;
+         sell_low_id = sell_low->get_id();
          BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 2000 );
          expected_seller_balance_mpa -= 2000;
       }
@@ -2218,7 +2218,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == bsrm_type::no_settlement );
 
@@ -2241,11 +2241,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       // borrowers borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(2100) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       f.settlement_price = price( asset(1000,mpa_id), asset(22) );
@@ -2263,7 +2263,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       // borrower3 create debt position right above ICR
       const call_order_object* call3_ptr = borrow( borrower3, asset(100000, mpa_id), asset(4181) );
       BOOST_REQUIRE( call3_ptr );
-      call_order_id_type call3_id = call3_ptr->id;
+      call_order_id_type call3_id = call3_ptr->get_id();
 
       // borrower adjust debt position to right at MSSR
       // 100000 * (22/1000) * 1.25 = 2750
@@ -2308,19 +2308,19 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(10000,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
-      limit_order_id_type sell_mid_id = sell_mid->id;
+      limit_order_id_type sell_mid_id = sell_mid->get_id();
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled in the beginning either
       const limit_order_object* sell_high = create_sell_order( seller2, asset(10000,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
+      limit_order_id_type sell_high_id = sell_high->get_id();
       BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 10000 );
 
       // seller2 sells more, this order won't be filled
       const limit_order_object* sell_highest = create_sell_order( seller2, asset(10000,mpa_id), asset(285) );
       BOOST_REQUIRE( sell_highest );
-      limit_order_id_type sell_highest_id = sell_highest->id;
+      limit_order_id_type sell_highest_id = sell_highest->get_id();
       BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 10000 );
 
       BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 20000 ); // 50000 - 10000 - 10000 - 10000

@@ -111,7 +111,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Initialize actors
          ACTORS((jill)(izzy));
-         account_id_type issuer_id = jill.id;
+         account_id_type issuer_id = jill.get_id();
          fc::ecc::private_key issuer_private_key = jill_private_key;
 
          // Initialize tokens
@@ -273,12 +273,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
             // Approve the proposal
             trx.clear();
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = jill.id;
             pup.proposal = pid;
-            pup.active_approvals_to_add.insert(jill.id);
+            pup.active_approvals_to_add.insert(jill.get_id());
             trx.operations.push_back(pup);
             set_expiration(db, trx);
             sign(trx, jill_private_key);
@@ -329,12 +329,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
             // Approve the proposal
             trx.clear();
-            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+            proposal_id_type pid { processed.operation_results[0].get<object_id_type>() };
 
             proposal_update_operation pup;
             pup.fee_paying_account = jill.id;
             pup.proposal = pid;
-            pup.active_approvals_to_add.insert(jill.id);
+            pup.active_approvals_to_add.insert(jill.get_id());
             trx.operations.push_back(pup);
             set_expiration(db, trx);
             sign(trx, jill_private_key);
@@ -372,7 +372,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          ACTORS((smartissuer)(feedproducer));
 
          // Initialize tokens
-         create_bitasset("SMARTBIT", smartissuer.id);
+         create_bitasset("SMARTBIT", smartissuer.get_id());
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
          const asset_object &bitsmart = get_asset("SMARTBIT");
@@ -492,11 +492,11 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
                                                                     charlie2coin_market_fee_percent);
 
          const uint16_t bitsmart1coin_market_fee_percent = 7 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT1", smartissuer.id, bitsmart1coin_market_fee_percent);
+         create_bitasset("SMARTBIT1", smartissuer.get_id(), bitsmart1coin_market_fee_percent);
 
 
          const uint16_t bitsmart2coin_market_fee_percent = 8 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT2", smartissuer.id, bitsmart2coin_market_fee_percent);
+         create_bitasset("SMARTBIT2", smartissuer.get_id(), bitsmart2coin_market_fee_percent);
 
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
@@ -765,7 +765,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
-         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             izzycoin.amount(300 *
                                                                                             IZZY_PRECISION));
@@ -774,13 +774,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order_before = db.find(alice_order_id);
          BOOST_CHECK(alice_order_before != nullptr);
 
          // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
-         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.get_id(),
+                                                                          izzycoin.amount(300 * IZZY_PRECISION),
                                                                           jillcoin.amount(
                                                                                   10 *
                                                                                   JILL_PRECISION));
@@ -789,12 +790,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type bob_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that the orders were filled by ensuring that they are no longer on the order books
-         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order = db.find(alice_order_id);
          BOOST_CHECK(alice_order == nullptr);
-         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         const limit_order_object* bob_order = db.find(bob_order_id);
          BOOST_CHECK(bob_order == nullptr);
 
 
@@ -930,7 +931,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
-         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             izzycoin.amount(300 *
                                                                                             IZZY_PRECISION));
@@ -939,13 +940,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order_before = db.find(alice_order_id);
          BOOST_CHECK(alice_order_before != nullptr);
 
          // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
-         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.get_id(),
+                                                                          izzycoin.amount(300 * IZZY_PRECISION),
                                                                           jillcoin.amount(
                                                                                   10 *
                                                                                   JILL_PRECISION));
@@ -954,12 +956,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type bob_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that the orders were filled by ensuring that they are no longer on the order books
-         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order = db.find(alice_order_id);
          BOOST_CHECK(alice_order == nullptr);
-         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         const limit_order_object* bob_order = db.find(bob_order_id);
          BOOST_CHECK(bob_order == nullptr);
 
 
@@ -1095,7 +1097,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
-         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             izzycoin.amount(300 *
                                                                                             IZZY_PRECISION));
@@ -1104,13 +1106,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order_before = db.find(alice_order_id);
          BOOST_CHECK(alice_order_before != nullptr);
 
          // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
-         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.get_id(),
+                                                                          izzycoin.amount(300 * IZZY_PRECISION),
                                                                           jillcoin.amount(
                                                                                   10 *
                                                                                   JILL_PRECISION));
@@ -1119,12 +1122,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type bob_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that the orders were filled by ensuring that they are no longer on the order books
-         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order = db.find(alice_order_id);
          BOOST_CHECK(alice_order == nullptr);
-         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         const limit_order_object* bob_order = db.find(bob_order_id);
          BOOST_CHECK(bob_order == nullptr);
 
 
@@ -1229,7 +1232,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
-         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             izzycoin.amount(300 *
                                                                                             IZZY_PRECISION));
@@ -1238,13 +1241,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order_before = db.find(alice_order_id);
          BOOST_CHECK(alice_order_before != nullptr);
 
          // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
-         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.get_id(),
+                                                                          izzycoin.amount(300 * IZZY_PRECISION),
                                                                           jillcoin.amount(
                                                                                   10 *
                                                                                   JILL_PRECISION));
@@ -1253,12 +1257,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type bob_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that the orders were filled by ensuring that they are no longer on the order books
-         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object* alice_order = db.find(alice_order_id);
          BOOST_CHECK(alice_order == nullptr);
-         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         const limit_order_object* bob_order = db.find(bob_order_id);
          BOOST_CHECK(bob_order == nullptr);
 
 
@@ -1309,7 +1313,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer.get_id(), smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
 
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
@@ -1318,7 +1322,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const auto &core = asset_id_type()(db);
 
-         update_feed_producers(smartbit, {feedproducer.id});
+         update_feed_producers(smartbit, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.settlement_price = smartbit.amount(100) / core.amount(100);
@@ -1402,7 +1406,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
 
          BOOST_TEST_MESSAGE("Issuing 300 SMARTBIT to bob");
-         transfer(committee_account, bob.id, asset(10000000));
+         transfer(committee_account, bob.get_id(), asset(10000000));
          publish_feed(smartbit, feedproducer, current_feed); // Publish a recent feed
          borrow(bob, smartbit.amount(300 * SMARTBIT_PRECISION), asset(2 * 300 * SMARTBIT_PRECISION));
          BOOST_TEST_MESSAGE("Checking bob's balance");
@@ -1410,7 +1414,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 SMARTBIT
-         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             smartbit.amount(300 * SMARTBIT_PRECISION));
          trx.clear();
@@ -1418,27 +1422,27 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type alice_order_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object *alice_order_before = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object *alice_order_before = db.find(alice_order_id);
          BOOST_CHECK(alice_order_before != nullptr);
 
 
          // Bob is willing to sell 300 SMARTBIT for at least 10 JILLCOIN
          limit_order_create_operation bob_sell_op
-                 = create_sell_operation(bob.id, smartbit.amount(300 * SMARTBIT_PRECISION),
+                 = create_sell_operation(bob.get_id(), smartbit.amount(300 * SMARTBIT_PRECISION),
                                          jillcoin.amount(10 * JILL_PRECISION));
          trx.clear();
          trx.operations.push_back(bob_sell_op);
          asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type bob_order_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that the orders were filled by ensuring that they are no longer on the order books
-         const limit_order_object *alice_order = db.find<limit_order_object>(alice_order_id);
+         const limit_order_object *alice_order = db.find(alice_order_id);
          BOOST_CHECK(alice_order == nullptr);
-         const limit_order_object *bob_order = db.find<limit_order_object>(bob_order_id);
+         const limit_order_object *bob_order = db.find(bob_order_id);
          BOOST_CHECK(bob_order == nullptr);
 
 
@@ -1503,7 +1507,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer.get_id(), smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
          generate_block();
@@ -1511,7 +1515,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const auto &core = asset_id_type()(db);
 
-         update_feed_producers(smartbit, {feedproducer.id});
+         update_feed_producers(smartbit, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.settlement_price = smartbit.amount(100) / core.amount(100);
@@ -1601,7 +1605,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
 
          BOOST_TEST_MESSAGE("Issuing 600 SMARTBIT to bob");
-         transfer(committee_account, bob.id, asset(2 * 1000 * SMARTBIT_PRECISION));
+         transfer(committee_account, bob.get_id(), asset(2 * 1000 * SMARTBIT_PRECISION));
          publish_feed(smartbit, feedproducer, current_feed); // Publish a recent feed
          borrow(bob, smartbit.amount(600 * SMARTBIT_PRECISION), asset(2 * 600 * SMARTBIT_PRECISION));
          BOOST_TEST_MESSAGE("Checking bob's balance");
@@ -1609,7 +1613,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 SMARTBIT
-         limit_order_create_operation order_1_op = create_sell_operation(alice.id,
+         limit_order_create_operation order_1_op = create_sell_operation(alice.get_id(),
                                                                             jillcoin.amount(10 * JILL_PRECISION),
                                                                             smartbit.amount(300 * SMARTBIT_PRECISION));
          trx.clear();
@@ -1617,28 +1621,28 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_1_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_1_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object *order_1_before = db.find<limit_order_object>(order_1_id);
+         const limit_order_object *order_1_before = db.find(order_1_id);
          BOOST_CHECK(order_1_before != nullptr);
 
 
          // Bob is willing to sell 600 SMARTBIT for at least 20 JILLCOIN
          limit_order_create_operation order_2_op
-                 = create_sell_operation(bob.id, smartbit.amount(600 * SMARTBIT_PRECISION),
+                 = create_sell_operation(bob.get_id(), smartbit.amount(600 * SMARTBIT_PRECISION),
                                          jillcoin.amount(20 * JILL_PRECISION));
          trx.clear();
          trx.operations.push_back(order_2_op);
          asset order_2_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_2_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_2_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that order 1 was completely filled by ensuring that they it is no longer on the order book
-         const limit_order_object *order_1 = db.find<limit_order_object>(order_1_id);
+         const limit_order_object *order_1 = db.find(order_1_id);
          BOOST_CHECK(order_1 == nullptr);
          // Check that order 2  was partially filled by ensuring that they it is still on the order book
-         const limit_order_object *order_2 = db.find<limit_order_object>(order_2_id);
+         const limit_order_object *order_2 = db.find(order_2_id);
          BOOST_CHECK(order_2 != nullptr);
 
 
@@ -1678,7 +1682,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_REQUIRE_EQUAL(get_balance(charlie, jillcoin), 5 * JILL_PRECISION);
 
          // Charlie is is willing to sell 5 JILLCOIN for at least 150 SMARTBIT
-         limit_order_create_operation order_3_op = create_sell_operation(charlie.id,
+         limit_order_create_operation order_3_op = create_sell_operation(charlie.get_id(),
                                                                          jillcoin.amount(5 * JILL_PRECISION),
                                                                          smartbit.amount(150 * SMARTBIT_PRECISION));
          trx.clear();
@@ -1686,14 +1690,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset charlie_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, charlie_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_3_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_3_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Order 3 should be completely filled
-         const limit_order_object *order_3 = db.find<limit_order_object>(order_3_id);
+         const limit_order_object *order_3 = db.find(order_3_id);
          BOOST_CHECK(order_3 == nullptr);
 
          // Order 2 should be partially filled and still present on the order books
-         const limit_order_object *order_2_after = db.find<limit_order_object>(order_2_id);
+         const limit_order_object *order_2_after = db.find(order_2_id);
          BOOST_CHECK(order_2_after != nullptr);
 
          // Check the new balance of the taker
@@ -1766,7 +1770,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer.get_id(), smartbit_market_fee_percent,
                          charge_market_fee, 4);
 
          uint16_t jill_maker_fee_percent = jill_market_fee_percent;
@@ -1782,7 +1786,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const auto &core = asset_id_type()(db);
 
-         update_feed_producers(smartbit, {feedproducer.id});
+         update_feed_producers(smartbit, {feedproducer.get_id()});
 
          price_feed current_feed;
          current_feed.settlement_price = smartbit.amount(100) / core.amount(100);
@@ -1803,7 +1807,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
 
          BOOST_TEST_MESSAGE("Issuing 600 SMARTBIT to bob");
-         transfer(committee_account, bob.id, asset(2 * 1000 * SMARTBIT_PRECISION));
+         transfer(committee_account, bob.get_id(), asset(2 * 1000 * SMARTBIT_PRECISION));
          publish_feed(smartbit, feedproducer, current_feed); // Publish a recent feed
          borrow(bob, smartbit.amount(600 * SMARTBIT_PRECISION), asset(2 * 600 * SMARTBIT_PRECISION));
          BOOST_TEST_MESSAGE("Checking bob's balance");
@@ -1811,7 +1815,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Alice and Bob place orders which match, and are completely filled by each other
          // Alice is willing to sell 10 JILLCOIN for at least 300 SMARTBIT
-         limit_order_create_operation order_1_op = create_sell_operation(alice.id,
+         limit_order_create_operation order_1_op = create_sell_operation(alice.get_id(),
                                                                          jillcoin.amount(10 * JILL_PRECISION),
                                                                          smartbit.amount(300 * SMARTBIT_PRECISION));
          trx.clear();
@@ -1819,28 +1823,28 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, alice_private_key);
          processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_1_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_1_id { ptx.operation_results[0].get<object_id_type>() };
 
-         const limit_order_object *order_1_before = db.find<limit_order_object>(order_1_id);
+         const limit_order_object *order_1_before = db.find(order_1_id);
          BOOST_CHECK(order_1_before != nullptr);
 
 
          // Bob is willing to sell 600 SMARTBIT for at least 20 JILLCOIN
          limit_order_create_operation order_2_op
-                 = create_sell_operation(bob.id, smartbit.amount(600 * SMARTBIT_PRECISION),
+                 = create_sell_operation(bob.get_id(), smartbit.amount(600 * SMARTBIT_PRECISION),
                                          jillcoin.amount(20 * JILL_PRECISION));
          trx.clear();
          trx.operations.push_back(order_2_op);
          asset order_2_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, bob_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_2_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_2_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Check that order 1 was completely filled by ensuring that they it is no longer on the order book
-         const limit_order_object *order_1 = db.find<limit_order_object>(order_1_id);
+         const limit_order_object *order_1 = db.find(order_1_id);
          BOOST_CHECK(order_1 == nullptr);
          // Check that order 2  was partially filled by ensuring that they it is still on the order book
-         const limit_order_object *order_2 = db.find<limit_order_object>(order_2_id);
+         const limit_order_object *order_2 = db.find(order_2_id);
          BOOST_CHECK(order_2 != nullptr);
 
 
@@ -1900,7 +1904,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_REQUIRE_EQUAL(get_balance(charlie, jillcoin), 5 * JILL_PRECISION);
 
          // Charlie is is willing to sell 5 JILLCOIN for at least 150 SMARTBIT
-         limit_order_create_operation order_3_op = create_sell_operation(charlie.id,
+         limit_order_create_operation order_3_op = create_sell_operation(charlie.get_id(),
                                                                          jillcoin.amount(5 * JILL_PRECISION),
                                                                          smartbit.amount(150 * SMARTBIT_PRECISION));
          trx.clear();
@@ -1908,14 +1912,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          asset charlie_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, charlie_private_key);
          ptx = PUSH_TX(db, trx); // No exception should be thrown
-         limit_order_id_type order_3_id = ptx.operation_results[0].get<object_id_type>();
+         limit_order_id_type order_3_id { ptx.operation_results[0].get<object_id_type>() };
 
          // Order 3 should be completely filled
-         const limit_order_object *order_3 = db.find<limit_order_object>(order_3_id);
+         const limit_order_object *order_3 = db.find(order_3_id);
          BOOST_CHECK(order_3 == nullptr);
 
          // Order 2 should be partially filled and still present on the order books
-         const limit_order_object *order_2_after = db.find<limit_order_object>(order_2_id);
+         const limit_order_object *order_2_after = db.find(order_2_id);
          BOOST_CHECK(order_2_after != nullptr);
 
          // Check the new balance of the taker

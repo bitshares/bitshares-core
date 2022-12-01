@@ -32,21 +32,19 @@ namespace graphene { namespace db {
 object_database::object_database()
 :_undo_db(*this)
 {
-   _index.resize(255);
+   _index.resize(_index_size);
    _undo_db.enable();
 }
-
-object_database::~object_database(){}
 
 void object_database::close()
 {
 }
 
-const object* object_database::find_object( object_id_type id )const
+const object* object_database::find_object( const object_id_type& id )const
 {
    return get_index(id.space(),id.type()).find( id );
 }
-const object& object_database::get_object( object_id_type id )const
+const object& object_database::get_object( const object_id_type& id )const
 {
    return get_index(id.space(),id.type()).get( id );
 }

@@ -91,6 +91,10 @@ $outFile->close();
 sub cleanupDoxygenType
 {
   my($type) = @_;
+  $type =~ s/std:://g;
+  $type =~ s/, less<>//g;
+  $type =~ s/const //g;
+  $type =~ s/ &//g;
   $type =~ s/< /</g;
   $type =~ s/ >/>/g;
   return $type;

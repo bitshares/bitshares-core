@@ -26,7 +26,7 @@
 #include <graphene/protocol/asset.hpp>
 #include <graphene/protocol/memo.hpp>
 
-namespace graphene { namespace protocol { 
+namespace graphene { namespace protocol {
 
    struct additional_asset_options
    {
@@ -191,7 +191,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_create_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct fee_parameters_type {
          uint64_t symbol3        = 500000 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint64_t symbol4        = 300000 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint64_t long_symbol    = 5000   * GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -208,9 +208,10 @@ namespace graphene { namespace protocol {
 
       /// Options common to all assets.
       ///
-      /// @note common_options.core_exchange_rate technically needs to store the asset ID of this new asset. Since this
-      /// ID is not known at the time this operation is created, create this price as though the new asset has instance
-      /// ID 1, and the chain will overwrite it with the new asset's ID.
+      /// @note
+      /// common_options.core_exchange_rate technically needs to store the asset ID of this new asset. Since this
+      /// ID is not known at the time this operation is created, create this price as though the new asset has
+      /// instance ID 1, and the chain will overwrite it with the new asset's ID.
       asset_options              common_options;
       /// Options only available for BitAssets. MUST be non-null if and only if the asset is market-issued.
       optional<bitasset_options> bitasset_opts;
@@ -220,7 +221,8 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_parameters_type& k, optional<uint64_t> sub_asset_creation_fee )const;
+      share_type      calculate_fee( const fee_parameters_type& k,
+                                     const optional<uint64_t>& sub_asset_creation_fee )const;
    };
 
    /**
@@ -251,10 +253,12 @@ namespace graphene { namespace protocol {
     * @brief Schedules a market-issued asset for automatic settlement
     * @ingroup operations
     *
-    * Holders of market-issued assests may request a forced settlement for some amount of their asset. This means that
-    * the specified sum will be locked by the chain and held for the settlement period, after which time the chain will
+    * Holders of market-issued assests may request a forced settlement for some amount of their asset.
+    * This means that the specified sum will be locked by the chain and held for the settlement period,
+    * after which time the chain will
     * choose a margin posision holder and buy the settled asset using the margin's collateral. The price of this sale
-    * will be based on the feed price for the market-issued asset being settled. The exact settlement price will be the
+    * will be based on the feed price for the market-issued asset being settled.
+    * The exact settlement price will be the
     * feed price at the time of settlement with an offset in favor of the margin position, where the offset is a
     * blockchain parameter set in the global_property_object.
     *
@@ -262,9 +266,9 @@ namespace graphene { namespace protocol {
     */
    struct asset_settle_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct fee_parameters_type {
          /** this fee should be high to encourage small settlement requests to
-          * be performed on the market rather than via forced settlement. 
+          * be performed on the market rather than via forced settlement.
           *
           * Note that in the event of a black swan or prediction market close out
           * everyone will have to pay this fee.
@@ -356,7 +360,7 @@ namespace graphene { namespace protocol {
          fc::optional<bool> skip_core_exchange_rate;
       };
 
-      struct fee_parameters_type { 
+      struct fee_parameters_type {
          uint64_t fee            = 500 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10;
       };
@@ -444,10 +448,11 @@ namespace graphene { namespace protocol {
     *
     * Price feed providers use this operation to publish their price feeds for market-issued assets. A price feed is
     * used to tune the market for a particular market-issued asset. For each value in the feed, the median across all
-    * committee_member feeds for that asset is calculated and the market for the asset is configured with the median of that
-    * value.
+    * committee_member feeds for that asset is calculated and the market for the asset is configured with the median
+    * of that value.
     *
-    * The feed in the operation contains three prices: a call price limit, a short price limit, and a settlement price.
+    * The feed in the operation contains three prices: a call price limit, a short price limit,
+    * and a settlement price.
     * The call limit price is structured as (collateral asset) / (debt asset) and the short limit price is structured
     * as (asset for sale) / (collateral asset). Note that the asset IDs are opposite to eachother, so if we're
     * publishing a feed for USD, the call limit price will be CORE/USD and the short limit price will be USD/CORE. The
@@ -479,8 +484,8 @@ namespace graphene { namespace protocol {
     */
    struct asset_issue_operation : public base_operation
    {
-      struct fee_parameters_type { 
-         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+      struct fee_parameters_type {
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -713,7 +718,8 @@ FC_REFLECT( graphene::protocol::asset_publish_feed_operation,
             (fee)(publisher)(asset_id)(feed)(extensions) )
 FC_REFLECT( graphene::protocol::asset_settle_operation, (fee)(account)(amount)(extensions) )
 FC_REFLECT( graphene::protocol::asset_settle_cancel_operation, (fee)(settlement)(account)(amount) )
-FC_REFLECT( graphene::protocol::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price)(extensions) )
+FC_REFLECT( graphene::protocol::asset_global_settle_operation,
+            (fee)(issuer)(asset_to_settle)(settle_price)(extensions) )
 FC_REFLECT( graphene::protocol::asset_issue_operation,
             (fee)(issuer)(asset_to_issue)(issue_to_account)(memo)(extensions) )
 FC_REFLECT( graphene::protocol::asset_reserve_operation,
@@ -739,7 +745,8 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_op
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_feed_producers_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(
+   graphene::protocol::asset_update_feed_producers_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_issue_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_reserve_operation::fee_parameters_type )

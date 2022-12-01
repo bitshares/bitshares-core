@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE( bsrm_hardfork_protection_test )
       // Able to create asset without new data
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& samcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type samcoin_id = samcoin.id;
+      asset_id_type samcoin_id = samcoin.get_id();
 
       BOOST_CHECK_EQUAL( samcoin.options.market_fee_percent, 100 );
       BOOST_CHECK_EQUAL( samcoin.bitasset_data(db).options.minimum_feeds, 3 );
@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
 
       vector<operation> ops;
 
-      asset_id_type samcoin_id = create_user_issued_asset( "SAMCOIN", sam_id(db), uiaflag ).id;
+      asset_id_type samcoin_id = create_user_issued_asset( "SAMCOIN", sam_id(db), uiaflag ).get_id();
 
       // Testing asset_update_operation
       asset_update_operation auop;
@@ -411,15 +411,15 @@ BOOST_AUTO_TEST_CASE( bsrm_asset_permissions_flags_extensions_test )
 
       // create a PM with a zero market_fee_percent
       const asset_object& pm = create_prediction_market( "TESTPM", sam_id, 0, charge_market_fee );
-      asset_id_type pm_id = pm.id;
+      asset_id_type pm_id = pm.get_id();
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       // create a UIA with a zero market_fee_percent
       const asset_object& uia = create_user_issued_asset( "TESTUIA", sam_id(db), charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       // Prepare for asset update
       asset_update_operation auop;
@@ -572,7 +572,7 @@ BOOST_AUTO_TEST_CASE( bsrm_asset_owner_permissions_update_bsrm )
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa_id(db).can_owner_update_bsrm() );
 
@@ -719,7 +719,7 @@ BOOST_AUTO_TEST_CASE( close_debt_position_when_no_feed )
       // Create asset
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -738,7 +738,7 @@ BOOST_AUTO_TEST_CASE( close_debt_position_when_no_feed )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // update price feed publisher list so that there is no valid feed
       update_feed_producers( mpa_id, { sam_id } );
@@ -796,7 +796,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       // Create asset
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       using bsrm_type = bitasset_options::black_swan_response_type;
 
@@ -821,7 +821,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       ilog( "Publish a new feed to trigger GS" );
@@ -940,7 +940,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_fund );
@@ -964,10 +964,10 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       ilog( "Publish a new feed to trigger settlement" );
@@ -1090,7 +1090,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::individual_settlement_to_order );
@@ -1114,10 +1114,10 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       ilog( "Publish a new feed to trigger settlement" );
@@ -1248,7 +1248,7 @@ BOOST_AUTO_TEST_CASE( undercollateralized_and_update_bsrm_from_no_settlement )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                    == bsrm_type::no_settlement );
@@ -1272,10 +1272,10 @@ BOOST_AUTO_TEST_CASE( undercollateralized_and_update_bsrm_from_no_settlement )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       ilog( "Publish a new feed so that the least collateralized short is undercollateralized" );
@@ -1394,7 +1394,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       trx.operations.push_back( acop );
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(i) );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
@@ -1417,10 +1417,10 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       // borrow some
       const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id = call_ptr->get_id();
       const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
       BOOST_REQUIRE( call2_ptr );
-      call_order_id_type call2_id = call2_ptr->id;
+      call_order_id_type call2_id = call2_ptr->get_id();
 
       // publish a new feed so that borrower's debt position is undercollateralized
       ilog( "Publish a new feed so that the least collateralized short is undercollateralized" );

@@ -391,7 +391,9 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    FC_ASSERT( _taker_market_fee <= _pool_pays, "Market fee should not be greater than the amount to receive" );
    _account_receives = _pool_pays - _taker_market_fee;
 
-   FC_ASSERT( _account_receives.amount >= op.min_to_receive.amount, "Unable to exchange at expected price" );
+   GRAPHENE_ASSERT( _account_receives.amount >= op.min_to_receive.amount,
+                    liquidity_pool_exchange_unfillable_price,
+                    "Unable to exchange at expected price" );
 
    _pool_taker_fee = asset( static_cast<int64_t>( pool_taker_fee ), op.min_to_receive.asset_id );
 

@@ -22,17 +22,11 @@
  * THE SOFTWARE.
  */
 #include <graphene/app/application.hpp>
-#include <graphene/app/plugin.hpp>
 #include <graphene/app/config_util.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
-
-#include <graphene/account_history/account_history_plugin.hpp>
-#include <graphene/market_history/market_history_plugin.hpp>
-#include <graphene/witness/witness.hpp>
-#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/log/appender.hpp>
@@ -212,23 +206,19 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_legacy_config_ini_options)
 }
 
 /////////////
-/// @brief create a 2 node network
+/// @brief create a 3 node network
 /////////////
-BOOST_AUTO_TEST_CASE( two_node_network )
+BOOST_AUTO_TEST_CASE( three_node_network )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
    try {
       // Configure logging
-      fc::logging_config logging_config;
-      logging_config.appenders.push_back( fc::appender_config( "stderr", "console",
-            fc::variant( fc::console_appender::config(), GRAPHENE_MAX_NESTED_OBJECTS ) ) );
+      fc::logging_config logging_config = fc::logging_config::default_config();
 
-      fc::logger_config logger_config("p2p");
-      logger_config.level = fc::log_level::debug;
-      logger_config.appenders.push_back("stderr");
-
-      logging_config.loggers.push_back(logger_config);
+      auto logger = logging_config.loggers.back(); // get a copy of the default logger
+      logger.name = "p2p";                         // update the name to p2p
+      logging_config.loggers.push_back( logger );  // add it to logging_config
 
       fc::configure_logging(logging_config);
 
@@ -238,15 +228,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       auto port = fc::network::get_available_port();
       auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
       auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
+      auto app3_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
       auto genesis_file = create_genesis_file(app_dir);
 
       graphene::app::application app1;
-      app1.register_plugin< graphene::account_history::account_history_plugin>();
-      app1.register_plugin< graphene::market_history::market_history_plugin >();
-      app1.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
       auto& cfg = *sharable_cfg;
       fc::set_option( cfg, "p2p-endpoint", app1_p2p_endpoint_str );
@@ -268,10 +255,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
       graphene::app::application app2;
-      app2.register_plugin<account_history::account_history_plugin>();
-      app2.register_plugin< graphene::market_history::market_history_plugin >();
-      app2.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg2 = std::make_shared<boost::program_options::variables_map>();
       auto& cfg2 = *sharable_cfg2;
       fc::set_option( cfg2, "genesis-json", genesis_file );
@@ -309,7 +292,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Creating transfer tx" );
       graphene::chain::precomputable_transaction trx;
       {
-         account_id_type nathan_id = db2->get_index_type<account_index>().indices().get<by_name>().find( "nathan" )->id;
+         account_id_type nathan_id = db2->get_index_type<account_index>().indices().get<by_name>().find( "nathan" )
+                                        ->get_id();
          fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
          balance_claim_operation claim_op;
@@ -384,6 +368,69 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Checking GRAPHENE_NULL_ACCOUNT has balance" );
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
+
+      // Start app3
+      BOOST_TEST_MESSAGE( "Creating and initializing app3" );
+
+      fc::temp_directory app3_dir( graphene::utilities::temp_directory_path() );
+      graphene::app::application app3;
+      auto sharable_cfg3 = std::make_shared<boost::program_options::variables_map>();
+      auto& cfg3 = *sharable_cfg3;
+      fc::set_option( cfg3, "genesis-json", genesis_file );
+      fc::set_option( cfg3, "seed-nodes", app3_seed_nodes_str );
+      fc::set_option( cfg3, "p2p-accept-incoming-connections", false );
+      app3.initialize(app3_dir.path(), sharable_cfg3);
+
+      BOOST_TEST_MESSAGE( "Starting app3 and waiting for connection" );
+      app3.startup();
+
+      fc::wait_for( node_startup_wait_time, [&app1] () {
+         if( app1.p2p_node()->get_connection_count() < 2 )
+            return false;
+         auto peers = app1.p2p_node()->get_connected_peers();
+         if( peers.size() < 2 )
+            return false;
+         for( const auto& peer : peers )
+         {
+            auto itr = peer.info.find( "peer_needs_sync_items_from_us" );
+            if( itr == peer.info.end() )
+               return false;
+            if( itr->value().as<bool>(1) )
+               return false;
+         }
+         return true;
+      });
+
+      BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 2u);
+      BOOST_TEST_MESSAGE( "app1 and app3 successfully connected" );
+
+      BOOST_TEST_MESSAGE( "Verifying app3 is synced" );
+      BOOST_CHECK_EQUAL( app3.chain_database()->head_block_num(), 1u);
+      BOOST_CHECK_EQUAL( app3.chain_database()->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value,
+                         1000000 );
+
+      auto new_peer_wait_time = fc::seconds(45);
+
+      BOOST_TEST_MESSAGE( "Waiting for app2 and app3 to connect to each other" );
+      fc::wait_for( new_peer_wait_time, [&app2] () {
+         if( app2.p2p_node()->get_connection_count() < 2 )
+            return false;
+         auto peers = app2.p2p_node()->get_connected_peers();
+         if( peers.size() < 2 )
+            return false;
+         for( const auto& peer : peers )
+         {
+            auto itr = peer.info.find( "peer_needs_sync_items_from_us" );
+            if( itr == peer.info.end() )
+               return false;
+            if( itr->value().as<bool>(1) )
+               return false;
+         }
+         return true;
+      });
+
+      BOOST_REQUIRE_EQUAL(app3.p2p_node()->get_connection_count(), 2u);
+      BOOST_TEST_MESSAGE( "app2 and app3 successfully connected" );
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));

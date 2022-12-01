@@ -79,7 +79,7 @@ struct swan_fixture : database_fixture {
            bitusd_ptr = &db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
         }
         const auto& bitusd = *bitusd_ptr;
-        _swan = bitusd.id;
+        _swan = bitusd.get_id();
         _back = asset_id_type();
         update_feed_producers(swan(), {_feedproducer});
     }
@@ -99,7 +99,7 @@ struct swan_fixture : database_fixture {
 
         set_feed( 1, 2 );
         // this sell order is designed to trigger a black swan
-        limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->id;
+        limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->get_id();
 
         FC_ASSERT( get_balance(borrower(),  swan()) == amount1 );
         FC_ASSERT( get_balance(borrower2(), swan()) == amount2 - 1 );
@@ -228,16 +228,16 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          {
             int64_t bal = get_balance( *actor, core );
             if( bal < init_balance )
-               transfer( committee_account, actor->id, asset(init_balance - bal) );
+               transfer( committee_account, actor->get_id(), asset(init_balance - bal) );
             else if( bal > init_balance )
-               transfer( actor->id, committee_account, asset(bal - init_balance) );
+               transfer( actor->get_id(), committee_account, asset(bal - init_balance) );
          }
       };
 
       auto setup_asset = [&]() -> const asset_object&
       {
          const asset_object& bitusd = create_bitasset("USDBIT"+fc::to_string(trial)+"X", feeder_id);
-         update_feed_producers( bitusd, {feeder.id} );
+         update_feed_producers( bitusd, {feeder.get_id()} );
          BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
          trial++;
          return bitusd;
@@ -306,17 +306,17 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          borrow( borrower, bitusd.amount(100), asset(5000) );    // 2x collat
          transfer( borrower, seller, bitusd.amount(100) );
          // this order is at $0.019, we should not be able to match against it
-         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;
+         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->get_id();
          // this order is at $0.020, we should be able to match against it
-         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;
+         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->get_id();
          set_price( bitusd, bitusd.amount(21) / core.amount(1000) ); // $0.021
          //
          // We attempt to match against $0.019 order and black swan,
          // and this is intended behavior.  See discussion in ticket.
          //
          BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
-         BOOST_CHECK( db.find_object( oid_019 ) != nullptr );
-         BOOST_CHECK( db.find_object( oid_020 ) == nullptr );
+         BOOST_CHECK( db.find( oid_019 ) != nullptr );
+         BOOST_CHECK( db.find( oid_020 ) == nullptr );
       }
 
    } catch( const fc::exception& e) {
@@ -562,7 +562,7 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       update_feed_producers(bitcny, {_feedproducer});
       price_feed feed;
       feed.settlement_price = bitcny.amount(1) / asset(1);
-      publish_feed( bitcny.id, _feedproducer, feed );
+      publish_feed( bitcny.get_id(), _feedproducer, feed );
       borrow( borrower2(), bitcny.amount(100), asset(1000) );
 
       // can't bid wrong collateral type
@@ -828,7 +828,7 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 
       set_feed( 1, 2 );
       // this sell order is designed to trigger a black swan
-      limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->id;
+      limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->get_id();
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       cancel_limit_order( oid(db) );
@@ -1016,15 +1016,15 @@ BOOST_AUTO_TEST_CASE( hf2281_asset_permissions_flags_test )
 
       // create a PM with a zero market_fee_percent
       const asset_object& pm = create_prediction_market( "TESTPM", sam_id, 0, charge_market_fee );
-      asset_id_type pm_id = pm.id;
+      asset_id_type pm_id = pm.get_id();
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       // create a UIA with a zero market_fee_percent
       const asset_object& uia = create_user_issued_asset( "TESTUIA", sam_id(db), charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       // Prepare for asset update
       asset_update_operation auop;
@@ -1168,7 +1168,7 @@ BOOST_AUTO_TEST_CASE( hf2281_asset_owner_permission_test )
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa_id(db).can_bid_collateral() );
 
@@ -1300,7 +1300,7 @@ BOOST_AUTO_TEST_CASE( disable_collateral_bidding_test )
    // Disable collateral bidding
    asset_update_operation auop;
    auop.issuer = swan().issuer;
-   auop.asset_to_update = swan().id;
+   auop.asset_to_update = swan().get_id();
    auop.new_options = swan().options;
    auop.new_options.flags |= disable_collateral_bidding;
    trx.operations.clear();
@@ -1428,7 +1428,7 @@ BOOST_AUTO_TEST_CASE( update_bitasset_after_gs )
 
    // unable to update backing asset
 
-   asset_id_type uia_id = create_user_issued_asset( "MYUIA" ).id;
+   asset_id_type uia_id = create_user_issued_asset( "MYUIA" ).get_id();
 
    aubop.new_options.short_backing_asset = uia_id;
 

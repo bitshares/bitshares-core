@@ -70,7 +70,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       vector< object_id_type > query_ids;
       for( const worker_id_type& wid : merged )
-         query_ids.push_back( wid );
+         query_ids.push_back( object_id_type(wid) );
 
       flat_set<vote_id_type> new_votes( acct.options.votes );
 
@@ -78,15 +78,16 @@ namespace graphene { namespace wallet { namespace detail {
       for( const variant& obj : objects )
       {
          worker_object wo;
+         worker_id_type wo_id { wo.id };
          from_variant( obj, wo, GRAPHENE_MAX_NESTED_OBJECTS );
          new_votes.erase( wo.vote_for );
          new_votes.erase( wo.vote_against );
-         if( delta.vote_for.find( wo.id ) != delta.vote_for.end() )
+         if( delta.vote_for.find( wo_id ) != delta.vote_for.end() )
             new_votes.insert( wo.vote_for );
-         else if( delta.vote_against.find( wo.id ) != delta.vote_against.end() )
+         else if( delta.vote_against.find( wo_id ) != delta.vote_against.end() )
             new_votes.insert( wo.vote_against );
          else
-            assert( delta.vote_abstain.find( wo.id ) != delta.vote_abstain.end() );
+            assert( delta.vote_abstain.find( wo_id ) != delta.vote_abstain.end() );
       }
 
       account_update_operation update_op;
@@ -139,7 +140,7 @@ namespace graphene { namespace wallet { namespace detail {
             // then maybe it's the owner account
             try
             {
-               std::string owner_account_id = account_id_to_string(get_account_id(owner_account));
+               auto owner_account_id = std::string(get_account_id(owner_account));
                fc::optional<witness_object> witness = _remote_db->get_witness_by_account(owner_account_id);
                if (witness)
                   return *witness;
@@ -207,7 +208,7 @@ namespace graphene { namespace wallet { namespace detail {
       witness_create_op.block_signing_key = witness_public_key;
       witness_create_op.url = url;
 
-      if (_remote_db->get_witness_by_account(account_id_to_string(witness_create_op.witness_account)))
+      if (_remote_db->get_witness_by_account(std::string(witness_create_op.witness_account)))
          FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
 
       signed_transaction tx;

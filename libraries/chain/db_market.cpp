@@ -497,7 +497,7 @@ void database::cancel_settle_order( const force_settlement_object& order )
 {
    adjust_balance(order.owner, order.balance);
 
-   push_applied_operation( asset_settle_cancel_operation( order.id, order.owner, order.balance ) );
+   push_applied_operation( asset_settle_cancel_operation( order.get_id(), order.owner, order.balance ) );
 
    remove(order);
 }

@@ -28,16 +28,14 @@
 
 namespace graphene { namespace db {
 
-   using std::unordered_map;
-   using fc::flat_set;
    class object_database;
 
    struct undo_state
    {
-      unordered_map<object_id_type, unique_ptr<object> > old_values;
-      unordered_map<object_id_type, object_id_type>      old_index_next_ids;
-      std::unordered_set<object_id_type>                 new_ids;
-      unordered_map<object_id_type, unique_ptr<object> > removed;
+      std::unordered_map<object_id_type, std::unique_ptr<object> > old_values;
+      std::unordered_map<object_id_type, object_id_type>           old_index_next_ids;
+      std::unordered_set<object_id_type>                           new_ids;
+      std::unordered_map<object_id_type, std::unique_ptr<object> > removed;
    };
 
 
@@ -49,7 +47,7 @@ namespace graphene { namespace db {
    class undo_database
    {
       public:
-         undo_database( object_database& db ):_db(db){}
+         explicit undo_database( object_database& db ):_db(db){}
 
          class session
          {
@@ -75,7 +73,10 @@ namespace graphene { namespace db {
 
             private:
                friend class undo_database;
-               session(undo_database& db, bool disable_on_exit = false): _db(db),_disable_on_exit(disable_on_exit) {}
+
+               explicit session(undo_database& db, bool disable_on_exit = false)
+               : _db(db),_disable_on_exit(disable_on_exit) {}
+
                undo_database& _db;
                bool _apply_undo = true;
                bool _disable_on_exit = false;

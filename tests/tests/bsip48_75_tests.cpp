@@ -120,7 +120,7 @@ BOOST_AUTO_TEST_CASE( bsip48_75_hardfork_protection_test )
       // Able to create asset without new data
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& samcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type samcoin_id = samcoin.id;
+      asset_id_type samcoin_id = samcoin.get_id();
 
       BOOST_CHECK_EQUAL( samcoin.options.market_fee_percent, 100 );
       BOOST_CHECK_EQUAL( samcoin.bitasset_data(db).options.minimum_feeds, 3 );
@@ -304,7 +304,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_global_settle_permission )
 
       // create a prediction market
       const asset_object& pm = create_prediction_market( "PDM", sam_id );
-      asset_id_type pm_id = pm.id;
+      asset_id_type pm_id = pm.get_id();
 
       BOOST_CHECK( pm_id(db).can_global_settle() );
 
@@ -376,7 +376,7 @@ BOOST_AUTO_TEST_CASE( update_max_supply )
 
       // create a UIA
       const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       // issue some to Sam
       issue_uia( sam_id, uia.amount( GRAPHENE_MAX_SHARE_SUPPLY - 100 ) );
@@ -702,7 +702,7 @@ BOOST_AUTO_TEST_CASE( disable_new_supply_uia )
 
       // create a UIA
       const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       BOOST_CHECK( uia_id(db).can_create_new_supply() );
       BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 0 );
@@ -811,7 +811,7 @@ BOOST_AUTO_TEST_CASE( disable_new_supply_pm )
 
       // create a PM
       const asset_object& pm = create_prediction_market( "PDM", sam_id );
-      asset_id_type pm_id = pm.id;
+      asset_id_type pm_id = pm.get_id();
 
       BOOST_CHECK( pm_id(db).can_create_new_supply() );
       BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 0 );
@@ -918,7 +918,7 @@ BOOST_AUTO_TEST_CASE( skip_core_exchange_rate )
 
       // create a UIA
       const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       BOOST_CHECK( uia_id(db).options.core_exchange_rate == price(asset(1, uia_id), asset(1)) );
 
@@ -1014,7 +1014,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const asset_object& samcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type samcoin_id = samcoin.id;
+      asset_id_type samcoin_id = samcoin.get_id();
 
       // There are invalid bits in flags
       BOOST_CHECK( samcoin_id(db).options.flags & ~UIA_VALID_FLAGS_MASK );
@@ -1031,7 +1031,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
       ptx = PUSH_TX(db, trx, ~0);
       const asset_object& sambit = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type sambit_id = sambit.id;
+      asset_id_type sambit_id = sambit.get_id();
 
       // There are invalid bits in flags
       BOOST_CHECK( sambit_id(db).options.flags & ~VALID_FLAGS_MASK );
@@ -1155,7 +1155,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       trx.operations.push_back( acop );
       ptx = PUSH_TX(db, trx, ~0);
       const asset_object& newsamcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type newsamcoin_id = newsamcoin.id;
+      asset_id_type newsamcoin_id = newsamcoin.get_id();
 
       BOOST_CHECK_EQUAL( newsamcoin_id(db).options.flags, UIA_VALID_FLAGS_MASK );
 
@@ -1186,7 +1186,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       trx.operations.push_back( acop2 );
       ptx = PUSH_TX(db, trx, ~0);
       const asset_object& newsambit = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
-      asset_id_type newsambit_id = newsambit.id;
+      asset_id_type newsambit_id = newsambit.get_id();
 
       BOOST_CHECK_EQUAL( newsambit_id(db).options.flags, valid_bitflag );
 
@@ -1235,7 +1235,7 @@ BOOST_AUTO_TEST_CASE( update_asset_precision )
 
       // create a prediction market
       const asset_object& pm = create_prediction_market( "PDM", sam_id );
-      asset_id_type pm_id = pm.id;
+      asset_id_type pm_id = pm.get_id();
 
       BOOST_CHECK_EQUAL( pm_id(db).precision, 5 );
 
@@ -1258,7 +1258,7 @@ BOOST_AUTO_TEST_CASE( update_asset_precision )
 
       // create a UIA
       const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
-      asset_id_type uia_id = uia.id;
+      asset_id_type uia_id = uia.get_id();
 
       BOOST_CHECK_EQUAL( uia_id(db).precision, 2 );
 
@@ -1321,7 +1321,7 @@ BOOST_AUTO_TEST_CASE( update_asset_precision )
 
       // create a MPA which is backed by the UIA
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 10, charge_market_fee, 3, uia_id );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa_id(db).bitasset_data(db).options.short_backing_asset == uia_id );
 
@@ -1357,7 +1357,7 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_icr_mcr_mssr )
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
 
       BOOST_CHECK( mpa_id(db).can_owner_update_icr() );
       BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
@@ -1747,7 +1747,7 @@ BOOST_AUTO_TEST_CASE( asset_owner_update_mcr_mssr )
 
       // create a MPA with a zero market_fee_percent
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
-      asset_id_type mpa_id = mpa.id;
+      asset_id_type mpa_id = mpa.get_id();
       asset_id_type core_id = asset_id_type();
 
       // add a price feed publisher and publish a feed
@@ -1773,7 +1773,7 @@ BOOST_AUTO_TEST_CASE( asset_owner_update_mcr_mssr )
       // borrower borrows some and sends to seller
       const call_order_object* call_ptr = borrow( borrower_id, asset(1000, mpa_id), asset(2000) );
       BOOST_REQUIRE( call_ptr );
-      call_order_id_type call_id = call_ptr->id;
+      call_order_id_type call_id { call_ptr->id };
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
 
@@ -1792,13 +1792,13 @@ BOOST_AUTO_TEST_CASE( asset_owner_update_mcr_mssr )
       // seller places orders
       const limit_order_object* order1_ptr = create_sell_order( seller, asset(100, mpa_id), asset(105) );
       BOOST_REQUIRE( order1_ptr );
-      limit_order_id_type order1_id = order1_ptr->id;
+      limit_order_id_type order1_id = order1_ptr->get_id();
       BOOST_CHECK_EQUAL( order1_id(db).for_sale.value, 100 );
       BOOST_CHECK_EQUAL( order1_id(db).amount_to_receive().amount.value, 105 );
 
       const limit_order_object* order2_ptr = create_sell_order( seller, asset(100, mpa_id), asset(115) );
       BOOST_REQUIRE( order2_ptr );
-      limit_order_id_type order2_id = order2_ptr->id;
+      limit_order_id_type order2_id = order2_ptr->get_id();
       BOOST_CHECK_EQUAL( order2_id(db).for_sale.value, 100 );
       BOOST_CHECK_EQUAL( order2_id(db).amount_to_receive().amount.value, 115 );
 

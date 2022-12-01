@@ -40,14 +40,19 @@ namespace graphene { namespace protocol {
     */
    struct pts_address
    {
+       static constexpr uint8_t default_version = 56;
+
        pts_address(); ///< constructs empty / null address
-       pts_address( const std::string& base58str );   ///< converts to binary, validates checksum
-       pts_address( const fc::ecc::public_key& pub, bool compressed = true, uint8_t version=56 ); ///< converts to binary
+       explicit pts_address( const std::string& base58str );   ///< converts to binary, validates checksum
+       /// Constructs from a public key
+       explicit pts_address( const fc::ecc::public_key& pub,
+                             bool compressed = true,
+                             uint8_t version = default_version );
 
        uint8_t version()const { return addr.at(0); }
        bool is_valid()const;
 
-       operator std::string()const; ///< converts to base58 + checksum
+       explicit operator std::string()const; ///< converts to base58 + checksum
 
        std::array<char,25> addr{}; ///< binary representation of address, 0-initialized
    };
@@ -61,10 +66,10 @@ namespace graphene { namespace protocol {
 namespace std
 {
    template<>
-   struct hash<graphene::protocol::pts_address> 
+   struct hash<graphene::protocol::pts_address>
    {
        public:
-         size_t operator()(const graphene::protocol::pts_address &a) const 
+         size_t operator()(const graphene::protocol::pts_address &a) const
          {
             size_t s;
             std::memcpy( (char*)&s, a.addr.data() + a.addr.size() - sizeof(s), sizeof(s) );
@@ -76,8 +81,8 @@ namespace std
 #include <fc/reflect/reflect.hpp>
 FC_REFLECT( graphene::protocol::pts_address, (addr) )
 
-namespace fc 
-{ 
+namespace fc
+{
    void to_variant( const graphene::protocol::pts_address& var,  fc::variant& vo, uint32_t max_depth = 1 );
    void from_variant( const fc::variant& var,  graphene::protocol::pts_address& vo, uint32_t max_depth = 1 );
 

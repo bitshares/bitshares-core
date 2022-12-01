@@ -43,21 +43,6 @@
 
 namespace graphene { namespace net
   {
-    struct firewall_check_state_data
-    {
-      node_id_t        expected_node_id;
-      fc::ip::endpoint endpoint_to_test;
-
-      // if we're coordinating a firewall check for another node, these are the helper
-      // nodes we've already had do the test (if this structure is still relevant, that
-      // that means they have all had indeterminate results
-      std::set<node_id_t> nodes_already_tested;
-
-      // If we're a just a helper node, this is the node we report back to
-      // when we have a result
-      node_id_t        requesting_peer;
-    };
-
     class peer_connection;
     class peer_connection_delegate
     {
@@ -77,16 +62,18 @@ namespace graphene { namespace net
       enum class our_connection_state
       {
         disconnected,
-        just_connected, // if in this state, we have sent a hello_message
-        connection_accepted, // remote side has sent us a connection_accepted, we're operating normally with them
-        connection_rejected // remote side has sent us a connection_rejected, we may be exchanging address with them or may just be waiting for them to close
+        just_connected, ///< If in this state, we have sent a hello_message
+        connection_accepted, ///< Remote side has sent us a connection_accepted, we're operating normally with them
+        /// Remote side has sent us a connection_rejected, we may be exchanging address with them or may just
+        /// be waiting for them to close
+        connection_rejected
       };
       enum class their_connection_state
       {
         disconnected,
-        just_connected, // we have not yet received a hello_message
-        connection_accepted, // we have sent them a connection_accepted
-        connection_rejected // we have sent them a connection_rejected
+        just_connected, ///< We have not yet received a hello_message
+        connection_accepted, ///< We have sent them a connection_accepted
+        connection_rejected ///< We have sent them a connection_rejected
       };
       enum class connection_negotiation_status
       {
@@ -171,7 +158,6 @@ namespace graphene { namespace net
       fc::time_point connection_closed_time;
       fc::time_point connection_terminated_time;
       peer_connection_direction direction = peer_connection_direction::unknown;
-      //connection_state state;
       firewalled_state is_firewalled = firewalled_state::unknown;
       fc::microseconds clock_offset;
       fc::microseconds round_trip_delay;
@@ -205,27 +191,42 @@ namespace graphene { namespace net
       fc::optional<std::string> platform;
       fc::optional<uint32_t> bitness;
 
-      // for inbound connections, these fields record what the peer sent us in
-      // its hello message.  For outbound, they record what we sent the peer
-      // in our hello message
+      // Initially, these fields record info about our local socket,
+      // they are useless (except the remote_inbound_endpoint field for outbound connections).
+      // After we receive a hello message, they are replaced with the info in the hello message.
       fc::ip::address inbound_address;
       uint16_t inbound_port = 0;
       uint16_t outbound_port = 0;
+      /// The inbound endpoint of the remote peer (our best guess)
+      fc::optional<fc::ip::endpoint> remote_inbound_endpoint;
+      /// Some nodes may be listening on multiple endpoints
+      fc::flat_set<fc::ip::endpoint> additional_inbound_endpoints;
+      /// Potential inbound endpoints of the peer
+      fc::flat_map<fc::ip::endpoint, firewalled_state> potential_inbound_endpoints;
       /// @}
 
-      typedef std::unordered_map<item_id, fc::time_point> item_to_time_map_type;
+      using item_to_time_map_type = std::unordered_map<item_id, fc::time_point>;
 
-      /// blockchain synchronization state data
+      /// Blockchain synchronization state data
       /// @{
-      boost::container::deque<item_hash_t> ids_of_items_to_get; /// id of items in the blockchain that this peer has told us about
-      std::set<item_hash_t> ids_of_items_being_processed; /// list of all items this peer has offered use that we've already handed to the client but the client hasn't finished processing
-      uint32_t number_of_unfetched_item_ids = 0; /// number of items in the blockchain that follow ids_of_items_to_get but the peer hasn't yet told us their ids
+      /// ID of items in the blockchain that this peer has told us about
+      boost::container::deque<item_hash_t> ids_of_items_to_get;
+      /// List of all items this peer has offered use that we've already handed to the client but the client
+      /// hasn't finished processing
+      std::set<item_hash_t> ids_of_items_being_processed;
+      /// Number of items in the blockchain that follow ids_of_items_to_get but the peer hasn't yet told us their IDs
+      uint32_t number_of_unfetched_item_ids = 0;
       bool peer_needs_sync_items_from_us = false;
       bool we_need_sync_items_from_peer = false;
-      fc::optional<boost::tuple<std::vector<item_hash_t>, fc::time_point> > item_ids_requested_from_peer; /// we check this to detect a timed-out request and in busy()
-      fc::time_point last_sync_item_received_time; /// the time we received the last sync item or the time we sent the last batch of sync item requests to this peer
-      std::set<item_hash_t> sync_items_requested_from_peer; /// ids of blocks we've requested from this peer during sync.  fetch from another peer if this peer disconnects
-      item_hash_t last_block_delegate_has_seen; /// the hash of the last block  this peer has told us about that the peer knows
+      /// We check this to detect a timed-out request and in busy()
+      fc::optional<boost::tuple<std::vector<item_hash_t>, fc::time_point> > item_ids_requested_from_peer;
+      /// The time we received the last sync item or the time we sent the last batch of sync item requests
+      /// to this peer
+      fc::time_point last_sync_item_received_time;
+      /// IDs of blocks we've requested from this peer during sync. Fetch from another peer if this peer disconnects
+      std::set<item_hash_t> sync_items_requested_from_peer;
+      /// The hash of the last block  this peer has told us about that the peer knows
+      item_hash_t last_block_delegate_has_seen;
       fc::time_point_sec last_block_time_delegate_has_seen;
       bool inhibit_fetching_sync_blocks = false;
       /// @}
@@ -242,15 +243,24 @@ namespace graphene { namespace net
         {}
       };
       struct timestamp_index{};
-      typedef boost::multi_index_container<timestamped_item_id,
-                                           boost::multi_index::indexed_by<boost::multi_index::hashed_unique<boost::multi_index::member<timestamped_item_id, item_id, &timestamped_item_id::item>,
-                                                                                                            std::hash<item_id> >,
-                                                                          boost::multi_index::ordered_non_unique<boost::multi_index::tag<timestamp_index>,
-                                                                                                                 boost::multi_index::member<timestamped_item_id, fc::time_point_sec, &timestamped_item_id::timestamp> > > > timestamped_items_set_type;
+      using timestamped_items_set_type = boost::multi_index_container< timestamped_item_id,
+         boost::multi_index::indexed_by<
+            boost::multi_index::hashed_unique<
+               boost::multi_index::member<timestamped_item_id, item_id, &timestamped_item_id::item>,
+               std::hash<item_id>
+            >,
+            boost::multi_index::ordered_non_unique<
+               boost::multi_index::tag<timestamp_index>,
+               boost::multi_index::member<timestamped_item_id, fc::time_point_sec, &timestamped_item_id::timestamp>
+            >
+         >
+      >;
       timestamped_items_set_type inventory_peer_advertised_to_us;
       timestamped_items_set_type inventory_advertised_to_peer;
 
-      item_to_time_map_type items_requested_from_peer;  /// items we've requested from this peer during normal operation.  fetch from another peer if this peer disconnects
+      /// Items we've requested from this peer during normal operation.
+      /// Fetch from another peer if this peer disconnects
+      item_to_time_map_type items_requested_from_peer;
       /// @}
 
       // if they're flooding us with transactions, we set this to avoid fetching for a few seconds to let the
@@ -261,28 +271,35 @@ namespace graphene { namespace net
 
       fc::future<void> accept_or_connect_task_done;
 
-      firewall_check_state_data *firewall_check_state = nullptr;
+      /// Whether we're waiting for an address message
+      bool expecting_address_message = false;
+
     private:
 #ifndef NDEBUG
       fc::thread* _thread = nullptr;
       unsigned _send_message_queue_tasks_running = 0; // temporary debugging
 #endif
-      bool _currently_handling_message = false; // true while we're in the middle of handling a message from the remote system
+      /// true while we're in the middle of handling a message from the remote system
+      bool _currently_handling_message = false;
+    protected:
       peer_connection(peer_connection_delegate* delegate);
+    private:
       void destroy();
     public:
-      static peer_connection_ptr make_shared(peer_connection_delegate* delegate); // use this instead of the constructor
+      /// Use this instead of the constructor
+      static peer_connection_ptr make_shared(peer_connection_delegate* delegate);
       virtual ~peer_connection();
 
       fc::tcp_socket& get_socket();
       void accept_connection();
-      void connect_to(const fc::ip::endpoint& remote_endpoint, fc::optional<fc::ip::endpoint> local_endpoint = fc::optional<fc::ip::endpoint>());
+      void connect_to(const fc::ip::endpoint& remote_endpoint,
+                      const fc::optional<fc::ip::endpoint>& local_endpoint = fc::optional<fc::ip::endpoint>());
 
       void on_message(message_oriented_connection* originating_connection, const message& received_message) override;
       void on_connection_closed(message_oriented_connection* originating_connection) override;
 
       void send_queueable_message(std::unique_ptr<queued_message>&& message_to_send);
-      void send_message(const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1);
+      virtual void send_message( const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1 );
       void send_item(const item_id& item_to_send);
       void close_connection();
       void destroy_connection();
@@ -306,7 +323,6 @@ namespace graphene { namespace net
       void clear_old_inventory();
       bool is_inventory_advertised_to_us_list_full_for_transactions() const;
       bool is_inventory_advertised_to_us_list_full() const;
-      bool performing_firewall_check() const;
       fc::optional<fc::ip::endpoint> get_endpoint_for_connecting() const;
     private:
       void send_queued_messages_task();

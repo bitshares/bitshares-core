@@ -25,7 +25,7 @@
 #include <graphene/protocol/base.hpp>
 #include <graphene/protocol/asset.hpp>
 
-namespace graphene { namespace protocol { 
+namespace graphene { namespace protocol {
 
    /**
     *  @class limit_order_create_operation
@@ -115,7 +115,8 @@ namespace graphene { namespace protocol {
        */
       struct options_type
       {
-         optional<uint16_t> target_collateral_ratio; ///< maximum CR to maintain when selling collateral on margin call
+         /// Maximum CR to maintain when selling collateral on margin call
+         optional<uint16_t> target_collateral_ratio;
       };
 
       /** this is slightly more expensive than limit orders, this pricing impacts prediction markets */
@@ -154,7 +155,7 @@ namespace graphene { namespace protocol {
       asset               receives;
       asset               fee; // paid by receiving account
       price               fill_price;
-      bool                is_maker;
+      bool                is_maker = true;
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -226,12 +227,18 @@ FC_REFLECT( graphene::protocol::execute_bid_operation::fee_parameters_type,  ) /
 
 FC_REFLECT( graphene::protocol::call_order_update_operation::options_type, (target_collateral_ratio) )
 
-FC_REFLECT( graphene::protocol::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
-FC_REFLECT( graphene::protocol::limit_order_cancel_operation,(fee)(fee_paying_account)(order)(extensions) )
-FC_REFLECT( graphene::protocol::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(extensions) )
-FC_REFLECT( graphene::protocol::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives)(fill_price)(is_maker) )
-FC_REFLECT( graphene::protocol::bid_collateral_operation, (fee)(bidder)(additional_collateral)(debt_covered)(extensions) )
-FC_REFLECT( graphene::protocol::execute_bid_operation, (fee)(bidder)(debt)(collateral) )
+FC_REFLECT( graphene::protocol::limit_order_create_operation,
+            (fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
+FC_REFLECT( graphene::protocol::limit_order_cancel_operation,
+            (fee)(fee_paying_account)(order)(extensions) )
+FC_REFLECT( graphene::protocol::call_order_update_operation,
+            (fee)(funding_account)(delta_collateral)(delta_debt)(extensions) )
+FC_REFLECT( graphene::protocol::fill_order_operation,
+            (fee)(order_id)(account_id)(pays)(receives)(fill_price)(is_maker) )
+FC_REFLECT( graphene::protocol::bid_collateral_operation,
+            (fee)(bidder)(additional_collateral)(debt_covered)(extensions) )
+FC_REFLECT( graphene::protocol::execute_bid_operation,
+            (fee)(bidder)(debt)(collateral) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_parameters_type )

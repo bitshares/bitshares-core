@@ -364,7 +364,7 @@ std::string operation_result_printer::operator()(const void_result& x) const
    return "";
 }
 
-std::string operation_result_printer::operator()(const object_id_type& oid) const
+std::string operation_result_printer::operator()(const graphene::protocol::object_id_type& oid) const
 {
    return std::string(oid);
 }
