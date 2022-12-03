@@ -86,6 +86,7 @@ class elasticsearch_plugin_impl
       std::unique_ptr<graphene::utilities::es_client> es;
 
       vector <string> bulk_lines; //  vector of op lines
+      size_t approximate_bulk_size = 0;
 
       bulk_struct bulk_line_struct;
 
@@ -95,7 +96,7 @@ class elasticsearch_plugin_impl
 
       void add_elasticsearch( const account_id_type& account_id, const optional<operation_history_object>& oho,
                               uint32_t block_number );
-      void send_bulk();
+      void send_bulk( uint32_t block_num );
 
       void doOperationHistory(const optional <operation_history_object>& oho, operation_history_struct& os) const;
       void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const;
@@ -214,12 +215,14 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
    // we send bulk at end of block when we are in sync for better real time client experience
    if( is_sync && !bulk_lines.empty() )
-      send_bulk();
+      send_bulk( b.block_num() );
 
 }
 
-void elasticsearch_plugin_impl::send_bulk()
+void elasticsearch_plugin_impl::send_bulk( uint32_t block_num )
 {
+   ilog( "Sending ${n} lines of bulk data to ElasticSearch at block ${b}, approximate size ${s}",
+         ("n",bulk_lines.size())("b",block_num)("s",approximate_bulk_size) );
    if( !es->send_bulk( bulk_lines ) )
    {
       elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:",
@@ -233,6 +236,7 @@ void elasticsearch_plugin_impl::send_bulk()
             "Error populating ES database, we are going to keep trying." );
    }
    bulk_lines.clear();
+   approximate_bulk_size = 0;
    bulk_lines.reserve(limit_documents);
 }
 
@@ -435,8 +439,11 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
       auto prepare = graphene::utilities::createBulk(bulk_header, std::move(bulk_line));
       std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk_lines));
 
-      if( bulk_lines.size() >= limit_documents )
-         send_bulk();
+      approximate_bulk_size += bulk_lines.back().size();
+
+      if( bulk_lines.size() >= limit_documents
+            || approximate_bulk_size >= graphene::utilities::es_client::request_size_threshold )
+         send_bulk( block_number );
    }
    cleanObjects(ath, account_id);
 }

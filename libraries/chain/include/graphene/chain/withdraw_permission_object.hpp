@@ -54,31 +54,37 @@ namespace graphene { namespace chain {
         asset              withdrawal_limit;
         /// The duration of a withdrawal period in seconds
         uint32_t           withdrawal_period_sec = 0;
-       /***
-        * The beginning of the next withdrawal period
-        * WARNING: Due to caching, this value does not always represent the start of the next or current period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        */
+        /**
+         * The beginning of the next withdrawal period.
+         * WARNING: Due to caching, this value does not always represent the start of the next or current period,
+         *   because it is only updated after a withdrawal operation such as claim.
+         * For the latest current period, use current_period().
+         */
         time_point_sec     period_start_time;
         /// The time at which this withdraw permission expires
         time_point_sec     expiration;
 
-       /***
-        * Tracks the total amount
-        * WARNING: Due to caching, this value does not always represent the total amount claimed during the current period; it may represent what was claimed during the last claimed period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        */
+        /**
+         * Tracks the total amount
+         * WARNING: Due to caching, this value does not always represent the total amount claimed during the
+         *   current period, it may represent what was claimed during the last claimed period, because it is only
+         *   updated after a withdrawal operation such as claim.
+         * For the latest current period, use current_period().
+         */
         share_type         claimed_this_period;
 
-       /***
-        * Determine how much is still available to be claimed during the period that contains a time of interest.  This object and function is mainly intended to be used with the "current" time as a parameter.  The current time can be obtained from the time of the current head of the blockchain.
-        */
+        /***
+         * Determine how much is still available to be claimed during the period that contains a time of interest.
+         * This object and function is mainly intended to be used with the "current" time as a parameter.
+         * The current time can be obtained from the time of the current head of the blockchain.
+         */
         asset              available_this_period( fc::time_point_sec current_time )const
         {
            if( current_time >= period_start_time + withdrawal_period_sec )
               return withdrawal_limit;
-           return asset(
-              ( withdrawal_limit.amount > claimed_this_period )
-              ? withdrawal_limit.amount - claimed_this_period
-              : 0, withdrawal_limit.asset_id );
+           return asset( ( withdrawal_limit.amount > claimed_this_period ) ?
+                            ( withdrawal_limit.amount - claimed_this_period ) : 0,
+                         withdrawal_limit.asset_id );
         }
    };
 
@@ -86,32 +92,33 @@ namespace graphene { namespace chain {
    struct by_authorized;
    struct by_expiration;
 
-   typedef multi_index_container<
+   using withdraw_permission_obj_mlt_idx = multi_index_container<
       withdraw_permission_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_from>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::withdraw_from_account>,
+               member< withdraw_permission_object, account_id_type,
+                       &withdraw_permission_object::withdraw_from_account >,
                member< object, object_id_type, &object::id >
             >
          >,
          ordered_unique< tag<by_authorized>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account>,
+               member< withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account >,
                member< object, object_id_type, &object::id >
             >
          >,
          ordered_unique< tag<by_expiration>,
             composite_key< withdraw_permission_object,
-               member<withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration>,
+               member< withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration >,
                member< object, object_id_type, &object::id >
             >
          >
       >
-   > withdraw_permission_object_multi_index_type;
+   >;
 
-   typedef generic_index<withdraw_permission_object, withdraw_permission_object_multi_index_type> withdraw_permission_index;
+   using withdraw_permission_index = generic_index<withdraw_permission_object, withdraw_permission_obj_mlt_idx>;
 
 
 } } // graphene::chain

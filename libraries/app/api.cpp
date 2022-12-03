@@ -59,21 +59,19 @@ namespace graphene { namespace app {
           return uint32_t(1); // Note: hard code it here for backward compatibility
 
        FC_ASSERT( o_user.valid() && o_password.valid(), "Must provide both user and password" );
-       string user = *o_user;
 
-       optional< api_access_info > acc = _app.get_api_access_info( user );
-       if( !acc.valid() )
+       optional< api_access_info > acc = _app.get_api_access_info( *o_user );
+       if( !acc )
           return logout();
        if( acc->password_hash_b64 != "*" )
        {
-          std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
           std::string acc_password_hash = fc::base64_decode( acc->password_hash_b64 );
-
-          string password = *o_password;
-          fc::sha256 hash_obj = fc::sha256::hash( password + password_salt );
-          if( hash_obj.data_size() != acc_password_hash.length() )
+          if( fc::sha256::data_size() != acc_password_hash.length() )
              return logout();
-          if( memcmp( hash_obj.data(), acc_password_hash.c_str(), hash_obj.data_size() ) != 0 )
+
+          std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
+          fc::sha256 hash_obj = fc::sha256::hash( *o_password + password_salt );
+          if( memcmp( hash_obj.data(), acc_password_hash.data(), fc::sha256::data_size() ) != 0 )
              return logout();
        }
 
@@ -102,8 +100,8 @@ namespace graphene { namespace app {
 
     application_options login_api::get_config() const
     {
-       bool allowed = !_allowed_apis.empty();
-       FC_ASSERT( allowed, "Access denied, please login" );
+       bool is_allowed = !_allowed_apis.empty();
+       FC_ASSERT( is_allowed, "Access denied, please login" );
        return _app.get_options();
     }
 
@@ -114,8 +112,8 @@ namespace graphene { namespace app {
 
     bool login_api::is_database_api_allowed() const
     {
-       bool allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
-       return allowed;
+       bool is_allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
+       return is_allowed;
     }
 
     // block_api
@@ -244,8 +242,8 @@ namespace graphene { namespace app {
 
     fc::api<network_broadcast_api> login_api::network_broadcast()
     {
-       bool allowed = ( _allowed_apis.find("network_broadcast_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("network_broadcast_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_network_broadcast_api )
        {
           _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
@@ -255,8 +253,8 @@ namespace graphene { namespace app {
 
     fc::api<block_api> login_api::block()
     {
-       bool allowed = ( _allowed_apis.find("block_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("block_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_block_api )
        {
           _block_api = std::make_shared< block_api >( std::ref( *_app.chain_database() ) );
@@ -266,8 +264,8 @@ namespace graphene { namespace app {
 
     fc::api<network_node_api> login_api::network_node()
     {
-       bool allowed = ( _allowed_apis.find("network_node_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("network_node_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_network_node_api )
        {
           _network_node_api = std::make_shared< network_node_api >( std::ref(_app) );
@@ -277,8 +275,8 @@ namespace graphene { namespace app {
 
     fc::api<database_api> login_api::database()
     {
-       bool allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_database_api )
        {
           _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ),
@@ -289,8 +287,8 @@ namespace graphene { namespace app {
 
     fc::api<history_api> login_api::history()
     {
-       bool allowed = ( _allowed_apis.find("history_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("history_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_history_api )
        {
           _history_api = std::make_shared< history_api >( _app );
@@ -300,8 +298,8 @@ namespace graphene { namespace app {
 
     fc::api<crypto_api> login_api::crypto()
     {
-       bool allowed = ( _allowed_apis.find("crypto_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("crypto_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_crypto_api )
        {
           _crypto_api = std::make_shared< crypto_api >();
@@ -311,8 +309,8 @@ namespace graphene { namespace app {
 
     fc::api<asset_api> login_api::asset()
     {
-       bool allowed = ( _allowed_apis.find("asset_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("asset_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_asset_api )
        {
           _asset_api = std::make_shared< asset_api >( _app );
@@ -322,8 +320,8 @@ namespace graphene { namespace app {
 
     fc::api<orders_api> login_api::orders()
     {
-       bool allowed = ( _allowed_apis.find("orders_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("orders_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        if( !_orders_api )
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
@@ -333,8 +331,8 @@ namespace graphene { namespace app {
 
     fc::api<graphene::debug_witness::debug_api> login_api::debug()
     {
-       bool allowed = ( _allowed_apis.find("debug_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("debug_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        // can only use this API set if the plugin was loaded
        bool plugin_enabled = !!_app.get_plugin( "debug_witness" );
        FC_ASSERT( plugin_enabled, "The debug_witness plugin is not enabled" );
@@ -347,8 +345,8 @@ namespace graphene { namespace app {
 
     fc::api<custom_operations_api> login_api::custom_operations()
     {
-       bool allowed = ( _allowed_apis.find("custom_operations_api") != _allowed_apis.end() );
-       FC_ASSERT( allowed, "Access denied" );
+       bool is_allowed = ( _allowed_apis.find("custom_operations_api") != _allowed_apis.end() );
+       FC_ASSERT( is_allowed, "Access denied" );
        // can only use this API set if the plugin was loaded
        bool plugin_enabled = !!_app.get_plugin( "custom_operations" );
        FC_ASSERT( plugin_enabled, "The custom_operations plugin is not enabled" );

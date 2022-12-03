@@ -289,6 +289,7 @@ fc::variant es_data_adaptor::adapt( const fc::variant_object& op, uint16_t max_d
       { "active_special_authority", data_type::static_variant_type },
       { "owner_special_authority",  data_type::static_variant_type },
       { "htlc_preimage_hash",       data_type::static_variant_type },
+      { "argument",                 data_type::static_variant_type }, // for custom authority, restriction.argument
       { "feeds",                    data_type::map_type }, // asset_bitasset_data_object.feeds
       { "acceptable_collateral",    data_type::map_type },
       { "acceptable_borrowers",     data_type::map_type }
@@ -408,8 +409,9 @@ void es_data_adaptor::extract_data_from_variant(
       mv[prefix + "_string"] = v.get_string();
    else
       mv[prefix + "_string"] = fc::json::to_string( v );
-   // Note: we don't use double or array here, and we convert null and blob to string,
-   //       and static_variants (i.e. in custom authorities) and maps (if any) are converted to strings too.
+   // Note: we don't use double here, and we convert nulls and blobs to strings,
+   //       arrays and pairs (i.e. in custom authorities) are converted to strings,
+   //       static_variants and maps (if any) are converted to strings too.
 }
 
 fc::variant es_data_adaptor::adapt_map_item( const fc::variants& v, uint16_t max_depth )

@@ -1,4 +1,3 @@
-"seed01.liondani.com:1776",          // liondani       (Germany)
 "bts-seed1.abit-more.com:62015",     // abit           (Germany)
 "seed.roelandp.nl:1776",             // roelandp       (Canada)
 "seed1.xbts.io:1776",                // xbts.io        (Germany)
