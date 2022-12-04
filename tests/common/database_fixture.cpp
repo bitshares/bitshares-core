@@ -31,6 +31,7 @@
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
+#include <graphene/debug_witness/debug_witness.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -48,6 +49,7 @@
 #include <iomanip>
 
 #include "database_fixture.hpp"
+#include "elasticsearch.hpp"
 
 using namespace graphene::chain::test;
 
@@ -193,117 +195,192 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fc::set_option( options, "enable-p2p-network", false );
    else if( rand() % 100 >= 50 ) // Disable P2P network randomly for test cases
       fc::set_option( options, "enable-p2p-network", false );
-   else if( rand() % 100 >= 50 ) // this should lead to no change
-      fc::set_option( options, "enable-p2p-network", true );
+   else
+   {
+      if( rand() % 100 >= 50 ) // this should lead to no change
+      {
+         fc::set_option( options, "enable-p2p-network", true );
+      }
+      fc::ip::endpoint ep;
+      ep.set_port( rand() % 20000 + 5000 );
+      idump( (ep)(std::string(ep)) );
+      fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+   }
 
+   if (fixture.current_test_name == "min_blocks_to_keep_test")
+   {
+      fc::set_option( options, "partial-operations", true );
+      fc::set_option( options, "max-ops-per-account", (uint64_t)2 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)3 );
+      fc::set_option( options, "max-ops-per-acc-by-min-blocks", (uint64_t)5 );
+   }
    if (fixture.current_test_name == "get_account_history_operations")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)75 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
    }
    if (fixture.current_test_name == "api_limit_get_account_history_operations")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-account-history-operations", (uint64_t)300 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
+      fc::set_option( options, "api-limit-get-account-history-operations", (uint32_t)300 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-account-history", (uint64_t)250 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
+      fc::set_option( options, "api-limit-get-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_grouped_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-grouped-limit-orders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-grouped-limit-orders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_relative_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
+      fc::set_option( options, "min-blocks-to-keep", (uint32_t)0 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history_by_operations")
    {
-      fc::set_option( options, "api-limit-get-account-history-by-operations", (uint64_t)250 );
-      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-account-history-by-operations", (uint32_t)250 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_asset_holders")
    {
-      fc::set_option( options, "api-limit-get-asset-holders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-asset-holders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_key_references")
    {
-      fc::set_option( options, "api-limit-get-key-references", (uint64_t)200 );
+      fc::set_option( options, "api-limit-get-key-references", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-limit-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-limit-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders_by_account")
    {
-      fc::set_option( options, "api-limit-get-limit-orders-by-account", (uint64_t)150 );
+      fc::set_option( options, "api-limit-get-limit-orders-by-account", (uint32_t)150 );
    }
    if(fixture.current_test_name =="api_limit_get_call_orders")
    {
-      fc::set_option( options, "api-limit-get-call-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-call-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_settle_orders")
    {
-      fc::set_option( options, "api-limit-get-settle-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-settle-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_order_book")
    {
-      fc::set_option( options, "api-limit-get-order-book", (uint64_t)80 );
+      fc::set_option( options, "api-limit-get-order-book", (uint32_t)80 );
    }
    if(fixture.current_test_name =="api_limit_lookup_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_witness_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-witness-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-witness-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_vote_ids")
    {
-      fc::set_option( options, "api-limit-lookup-vote-ids", (uint64_t)2 );
+      fc::set_option( options, "api-limit-lookup-vote-ids", (uint32_t)2 );
    }
    if(fixture.current_test_name =="api_limit_get_account_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-account-limit-orders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-account-limit-orders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_collateral_bids")
    {
-      fc::set_option( options, "api-limit-get-collateral-bids", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-collateral-bids", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_top_markets")
    {
-      fc::set_option( options, "api-limit-get-top-markets", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-top-markets", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history")
    {
-      fc::set_option( options, "api-limit-get-trade-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-trade-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history_by_sequence")
    {
-      fc::set_option( options, "api-limit-get-trade-history-by-sequence", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-trade-history-by-sequence", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_giver")
    {
-      fc::set_option( options, "api-limit-get-withdraw-permissions-by-giver", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-giver", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_recipient")
    {
-      fc::set_option( options, "api-limit-get-withdraw-permissions-by-recipient", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-recipient", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_full_accounts2")
    {
-      fc::set_option( options, "api-limit-get-full-accounts", (uint64_t)200 );
-      fc::set_option( options, "api-limit-get-full-accounts-lists", (uint64_t)120 );
+      fc::set_option( options, "api-limit-get-full-accounts", (uint32_t)200 );
+      fc::set_option( options, "api-limit-get-full-accounts-lists", (uint32_t)120 );
+   }
+
+   if( fixture.current_suite_name == "login_api_tests" )
+   {
+      if( fixture.current_test_name =="get_config_test" )
+      {
+         fc::set_option( options, "api-node-info", string("Test API node") );
+         fc::set_option( options, "api-limit-get-full-accounts-subscribe", (uint32_t)120 );
+      }
+      if( fixture.current_test_name =="login_test" )
+      {
+         // bytemaster/supersecret, user2/superpassword2
+         string api_access_config = R"(
+         {
+            "permission_map" :
+            [
+               [
+                  "bytemaster",
+                  {
+                     "password_hash_b64" : "9e9GF7ooXVb9k4BoSfNIPTelXeGOZ5DrgOYMj94elaY=",
+                     "password_salt_b64" : "INDdM6iCi/8=",
+                     "allowed_apis" : ["database_api", "network_broadcast_api", "history_api", "network_node_api",
+                                       "asset_api", "crypto_api", "block_api", "orders_api", "custom_operations_api"
+                                       "debug_api"]
+                  }
+               ],
+               [
+                  "user2",
+                  {
+                     "password_hash_b64" : "myadjRISnFOWn2TTd91zqbY50q0w2j/oJGlcdQkUB0Y=",
+                     "password_salt_b64" : "Zb8JrQDKNIQ=",
+                     "allowed_apis" : ["history_api"]
+                  }
+               ],
+               [
+                  "*",
+                  {
+                     "password_hash_b64" : "*",
+                     "password_salt_b64" : "*",
+                     "allowed_apis" : ["database_api", "network_broadcast_api", "history_api"]
+                  }
+               ]
+            ]
+         }
+         )";
+
+         fc::json::save_to_file( fc::json::from_string( api_access_config ),
+                                 fixture.data_dir.path() / "api-access.json" );
+         fc::set_option( options, "api-access",
+                         boost::filesystem::path(fixture.data_dir.path() / "api-access.json") );
+
+         fixture.app.register_plugin<graphene::debug_witness_plugin::debug_witness_plugin>(true);
+         fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
+         fc::set_option( options, "custom-operations-start-block", uint32_t(1) );
+      }
    }
 
    // add account tracking for ahplugin for special test case with track-account enabled
@@ -356,8 +433,8 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
       fc::set_option( options, "es-objects-elasticsearch-url", GRAPHENE_TESTING_ES_URL );
-      fc::set_option( options, "es-objects-bulk-replay", uint32_t(2) );
-      fc::set_option( options, "es-objects-bulk-sync", uint32_t(2) );
+      fc::set_option( options, "es-objects-bulk-replay", uint32_t(1) );
+      fc::set_option( options, "es-objects-bulk-sync", uint32_t(1) );
       fc::set_option( options, "es-objects-proposals", true );
       fc::set_option( options, "es-objects-accounts", true );
       fc::set_option( options, "es-objects-assets", true );
@@ -383,6 +460,9 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fixture.current_test_name == "custom_operations_account_storage_list_test") {
       fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
       fc::set_option( options, "custom-operations-start-block", uint32_t(1) );
+      if( fixture.current_test_name == "custom_operations_account_storage_map_test" )
+         // Set a small limit
+         fc::set_option( options, "api-limit-get-storage-info", uint32_t(6) );
    }
 
    fc::set_option( options, "bucket-size", string("[15]") );
@@ -515,7 +595,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
       const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
-      total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
+      total_balances[asset_obj.get_id()] += dasset_obj.accumulated_fees;
       total_balances[asset_id_type()] += dasset_obj.fee_pool;
       if( asset_obj.is_market_issued() )
       {
@@ -526,7 +606,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
          if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
             total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
-      total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
+      total_balances[asset_obj.get_id()] += dasset_obj.confidential_supply.value;
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
@@ -606,7 +686,8 @@ void database_fixture_base::verify_asset_supplies( const database& db )
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
+      BOOST_CHECK_EQUAL( total_balances[asset_obj.get_id()].value,
+                         asset_obj.dynamic_asset_data_id(db).current_supply.value );
    }
 
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
@@ -1280,7 +1361,7 @@ const call_order_object* database_fixture_base::borrow( const account_object& wh
    verify_asset_supplies(db);
 
    auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
-   auto itr = call_idx.find( boost::make_tuple(who.id, what.asset_id) );
+   auto itr = call_idx.find( boost::make_tuple(who.get_id(), what.asset_id) );
    const call_order_object* call_obj = nullptr;
 
    if( itr != call_idx.end() )
@@ -2046,14 +2127,14 @@ vector< operation_history_object > database_fixture_base::get_operation_history(
 {
    vector< operation_history_object > result;
    const auto& stats = account_id(db).statistics(db);
-   if(stats.most_recent_op == account_transaction_history_id_type())
+   if(stats.most_recent_op == account_history_id_type())
       return result;
 
-   const account_transaction_history_object* node = &stats.most_recent_op(db);
+   const account_history_object* node = &stats.most_recent_op(db);
    while( true )
    {
       result.push_back( node->operation_id(db) );
-      if(node->next == account_transaction_history_id_type())
+      if(node->next == account_history_id_type())
          break;
       node = db.find(node->next);
    }
@@ -2145,7 +2226,7 @@ void database_fixture_base::set_htlc_committee_parameters()
    trx.operations.push_back(cop);
    graphene::chain::processed_transaction proc_trx = db.push_transaction(trx);
    trx.clear();
-   proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
+   proposal_id_type good_proposal_id { proc_trx.operation_results[0].get<object_id_type>() };
 
    proposal_update_operation puo;
    puo.proposal = good_proposal_id;

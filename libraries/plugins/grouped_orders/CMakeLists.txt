@@ -4,7 +4,7 @@ add_library( graphene_grouped_orders
              grouped_orders_plugin.cpp
            )
 
-target_link_libraries( graphene_grouped_orders graphene_chain graphene_app )
+target_link_libraries( graphene_grouped_orders graphene_app graphene_chain )
 target_include_directories( graphene_grouped_orders
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

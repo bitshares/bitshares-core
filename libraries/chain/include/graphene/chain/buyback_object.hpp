@@ -40,12 +40,10 @@ namespace graphene { namespace chain {
  * This class is an implementation detail.
  */
 
-class buyback_object : public graphene::db::abstract_object< buyback_object >
+class buyback_object : public graphene::db::abstract_object< buyback_object,
+                                 implementation_ids, impl_buyback_object_type >
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_buyback_object_type;
-
       asset_id_type asset_to_buy;
 };
 

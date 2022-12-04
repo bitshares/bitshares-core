@@ -63,12 +63,10 @@ struct budget_record
    share_type current_supply;
 };
 
-class budget_record_object : public graphene::db::abstract_object<budget_record_object>
+class budget_record_object : public graphene::db::abstract_object<budget_record_object,
+                                       implementation_ids, impl_budget_record_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_budget_record_object_type;
-
       fc::time_point_sec time;
       budget_record record;
 };

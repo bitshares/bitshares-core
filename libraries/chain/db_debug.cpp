@@ -90,7 +90,7 @@ void database::debug_dump()
    }
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
+      total_balances[asset_obj.get_id()] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
 //      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
    }
@@ -116,12 +116,11 @@ void database::debug_dump()
 
 void debug_apply_update( database& db, const fc::variant_object& vo )
 {
-   static const uint8_t
-      db_action_nil = 0,
-      db_action_create = 1,
-      db_action_write = 2,
-      db_action_update = 3,
-      db_action_delete = 4;
+   constexpr uint8_t db_action_nil = 0;
+   constexpr uint8_t db_action_create = 1;
+   constexpr uint8_t db_action_write = 2;
+   constexpr uint8_t db_action_update = 3;
+   constexpr uint8_t db_action_delete = 4;
 
    // "_action" : "create"   object must not exist, unspecified fields take defaults
    // "_action" : "write"    object may exist, is replaced entirely, unspecified fields take defaults

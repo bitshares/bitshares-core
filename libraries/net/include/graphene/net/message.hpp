@@ -28,9 +28,7 @@
 
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
-#include <fc/io/raw_fwd.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace net {
 
@@ -54,7 +52,7 @@ namespace graphene { namespace net {
   using message_hash_type = fc::ripemd160;
 
   /**
-   *  Abstracts the process of packing/unpacking a message for a 
+   *  Abstracts the process of packing/unpacking a message for a
    *  particular channel.
    */
   struct message : public message_header
@@ -73,7 +71,7 @@ namespace graphene { namespace net {
       *  Assumes that T::type specifies the message type
       */
      template<typename T>
-     message( const T& m ) 
+     message( const T& m )
      {
         msg_type = T::type;
         data     = fc::raw::pack(m);
@@ -90,7 +88,7 @@ namespace graphene { namespace net {
       *  opposite process from the constructor.
       */
      template<typename T>
-     T as()const 
+     T as()const
      {
          try {
           FC_ASSERT( msg_type.value() == T::type );
@@ -107,8 +105,8 @@ namespace graphene { namespace net {
              fc::raw::unpack( ds, tmp );
           }
           return tmp;
-         } FC_RETHROW_EXCEPTIONS( warn, 
-              "error unpacking network message as a '${type}'  ${x} !=? ${msg_type}", 
+         } FC_RETHROW_EXCEPTIONS( warn,
+              "error unpacking network message as a '${type}'  ${x} !=? ${msg_type}",
               ("type", fc::get_typename<T>::name() )
               ("x", T::type)
               ("msg_type", msg_type.value())

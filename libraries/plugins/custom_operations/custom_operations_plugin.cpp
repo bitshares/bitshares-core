@@ -24,9 +24,7 @@
 
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 
-#include <fc/crypto/hex.hpp>
-#include <iostream>
-#include <graphene/app/database_api.hpp>
+#include <graphene/chain/operation_history_object.hpp>
 
 namespace graphene { namespace custom_operations {
 
@@ -138,7 +136,8 @@ void custom_operations_plugin::plugin_initialize(const boost::program_options::v
       my->_start_block = options["custom-operations-start-block"].as<uint32_t>();
    }
 
-   database().applied_block.connect( [this]( const signed_block& b) {
+   // connect with group 0 to process before some special steps (e.g. snapshot or next_object_id)
+   database().applied_block.connect( 0, [this]( const signed_block& b) {
       if( b.block_num() >= my->_start_block )
          my->onBlock();
    } );

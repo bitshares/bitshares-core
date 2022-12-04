@@ -88,6 +88,11 @@ namespace graphene { namespace protocol {
        return p1.key_data != p2.key_data;
     }
     
+    bool operator < ( const public_key_type& p1, const public_key_type& p2)
+    {
+       return address(p1) < address(p2);
+    }
+
 } } // graphene::protocol
 
 namespace fc

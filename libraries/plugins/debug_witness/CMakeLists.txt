@@ -5,7 +5,7 @@ add_library( graphene_debug_witness
              debug_witness.cpp
            )
 
-target_link_libraries( graphene_debug_witness graphene_chain graphene_app )
+target_link_libraries( graphene_debug_witness graphene_app graphene_chain )
 target_include_directories( graphene_debug_witness
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

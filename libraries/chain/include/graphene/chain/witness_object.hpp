@@ -29,23 +29,18 @@
 namespace graphene { namespace chain {
    using namespace graphene::db;
 
-   class witness_object : public abstract_object<witness_object>
+   class witness_object : public abstract_object<witness_object, protocol_ids, witness_object_type>
    {
       public:
-         static constexpr uint8_t space_id = protocol_ids;
-         static constexpr uint8_t type_id = witness_object_type;
-
          account_id_type  witness_account;
          uint64_t         last_aslot = 0;
          public_key_type  signing_key;
          optional< vesting_balance_id_type > pay_vb;
-         vote_id_type     vote_id;
+         vote_id_type     vote_id { vote_id_type::witness };
          uint64_t         total_votes = 0;
          string           url;
          int64_t          total_missed = 0;
          uint32_t         last_confirmed_block_num = 0;
-
-         witness_object() : vote_id(vote_id_type::witness) {}
    };
 
    struct by_account;

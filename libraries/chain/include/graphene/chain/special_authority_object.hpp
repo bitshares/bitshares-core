@@ -39,26 +39,25 @@ namespace graphene { namespace chain {
  * This class is an implementation detail.
  */
 
-class special_authority_object : public graphene::db::abstract_object<special_authority_object>
+class special_authority_object : public graphene::db::abstract_object<special_authority_object,
+                                           implementation_ids, impl_special_authority_object_type>
 {
    public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_special_authority_object_type;
-
       account_id_type account;
 };
 
 struct by_account;
 
-typedef multi_index_container<
+using special_authority_multi_idx_typ = multi_index_container<
    special_authority_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_unique< tag<by_account>, member< special_authority_object, account_id_type, &special_authority_object::account> >
+      ordered_unique< tag<by_account>,
+         member< special_authority_object, account_id_type, &special_authority_object::account> >
    >
-> special_authority_multi_index_type;
+>;
 
-typedef generic_index< special_authority_object, special_authority_multi_index_type > special_authority_index;
+using special_authority_index = generic_index< special_authority_object, special_authority_multi_idx_typ >;
 
 } } // graphene::chain
 

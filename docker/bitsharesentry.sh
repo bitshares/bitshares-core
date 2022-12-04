@@ -84,10 +84,17 @@ fi
 ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
 ln -f -s /etc/bitshares/logging.ini /var/lib/bitshares
 
+chown -R bitshares:bitshares /var/lib/bitshares
+
+# Get the latest security updates
+apt-get update && apt-get upgrade -y -o Dpkg::Options::="--force-confold"
+
 # Plugins need to be provided in a space-separated list, which
 # makes it necessary to write it like this
 if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
-   exec "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
+   exec /usr/bin/setpriv --reuid=bitshares --regid=bitshares --clear-groups \
+     "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
 else
-   exec "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS}
+   exec /usr/bin/setpriv --reuid=bitshares --regid=bitshares --clear-groups \
+     "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS}
 fi

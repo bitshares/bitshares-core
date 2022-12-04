@@ -120,7 +120,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
 { try {
    ilog("witness plugin:  plugin_initialize() begin");
    _options = &options;
-   LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
+   LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type);
 
    if( options.count("private-key") > 0 )
    {

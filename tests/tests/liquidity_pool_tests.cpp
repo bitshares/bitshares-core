@@ -57,7 +57,8 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_hardfork_time_test )
 
       // Before the hard fork, unable to create a liquidity pool or transact against a liquidity pool,
       // or do any of them with proposals
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
 
       liquidity_pool_id_type tmp_lp_id;
       BOOST_CHECK_THROW( delete_liquidity_pool( sam_id, tmp_lp_id ), fc::exception );
@@ -69,7 +70,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_hardfork_time_test )
                          fc::exception );
 
       liquidity_pool_create_operation cop =
-                         make_liquidity_pool_create_op( sam_id, core.id, usd.id, lpa.id, 0, 0 );
+                         make_liquidity_pool_create_op( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 0, 0 );
       BOOST_CHECK_THROW( propose( cop ), fc::exception );
 
       liquidity_pool_delete_operation delop = make_liquidity_pool_delete_op( sam_id, tmp_lp_id );
@@ -131,7 +132,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
       // Able to propose
       {
          liquidity_pool_create_operation cop =
-                         make_liquidity_pool_create_op( sam_id, core.id, usd.id, lpa.id, 0, 0 );
+                         make_liquidity_pool_create_op( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 0, 0 );
          propose( cop );
 
          liquidity_pool_id_type tmp_lp_id;
@@ -153,7 +154,8 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
       }
 
       // Able to create liquidity pools with valid data
-      const liquidity_pool_object& lpo1 = create_liquidity_pool( sam_id, core.id, usd.id, lpa1.id, 0, 0 );
+      const liquidity_pool_object& lpo1 = create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa1.get_id(),
+                                                                 0, 0 );
       BOOST_CHECK( lpo1.asset_a == core.id );
       BOOST_CHECK( lpo1.asset_b == usd.id );
       BOOST_CHECK( lpo1.balance_a == 0 );
@@ -163,11 +165,12 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
       BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
       BOOST_CHECK( lpo1.virtual_value == 0 );
 
-      liquidity_pool_id_type lp_id1 = lpo1.id;
+      liquidity_pool_id_type lp_id1 = lpo1.get_id();
       BOOST_CHECK( lpa1.is_liquidity_pool_share_asset() );
       BOOST_CHECK( *lpa1.for_liquidity_pool == lp_id1 );
 
-      const liquidity_pool_object& lpo2 = create_liquidity_pool( sam_id, core.id, usd.id, lpa2.id, 200, 300 );
+      const liquidity_pool_object& lpo2 = create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa2.get_id(),
+                                                                 200, 300 );
       BOOST_CHECK( lpo2.asset_a == core.id );
       BOOST_CHECK( lpo2.asset_b == usd.id );
       BOOST_CHECK( lpo2.balance_a == 0 );
@@ -177,11 +180,12 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
       BOOST_CHECK( lpo2.withdrawal_fee_percent == 300 );
       BOOST_CHECK( lpo2.virtual_value == 0 );
 
-      liquidity_pool_id_type lp_id2 = lpo2.id;
+      liquidity_pool_id_type lp_id2 = lpo2.get_id();
       BOOST_CHECK( lpa2.is_liquidity_pool_share_asset() );
       BOOST_CHECK( *lpa2.for_liquidity_pool == lp_id2 );
 
-      const liquidity_pool_object& lpo3 = create_liquidity_pool( sam_id, usd.id, mpa.id, lpa3.id, 50, 50 );
+      const liquidity_pool_object& lpo3 = create_liquidity_pool( sam_id, usd.get_id(), mpa.get_id(), lpa3.get_id(),
+                                                                 50, 50 );
 
       BOOST_CHECK( lpo3.asset_a == usd.id );
       BOOST_CHECK( lpo3.asset_b == mpa.id );
@@ -192,42 +196,58 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
       BOOST_CHECK( lpo3.withdrawal_fee_percent == 50 );
       BOOST_CHECK( lpo3.virtual_value == 0 );
 
-      liquidity_pool_id_type lp_id3 = lpo3.id;
+      liquidity_pool_id_type lp_id3 = lpo3.get_id();
       BOOST_CHECK( lpa3.is_liquidity_pool_share_asset() );
       BOOST_CHECK( *lpa3.for_liquidity_pool == lp_id3 );
 
       // Unable to create a liquidity pool with invalid data
       // the same assets in pool
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, core.id, lpa.id, 0, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.id, usd.id, lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), core.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.get_id(), usd.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
       // ID of the first asset is greater
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.id, core.id, lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.get_id(), core.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
       // the share asset is one of the assets in pool
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.id, lpa.id, lpa.id, 0, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, lpa.id, pm.id, lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, usd.get_id(), lpa.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, lpa.get_id(), pm.get_id(), lpa.get_id(), 0, 0 ),
+                         fc::exception );
       // percentage too big
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, lpa.id, 10001, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, lpa.id, 0, 10001 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, lpa.id, 10001, 10001 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 10001, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 0, 10001 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa.get_id(), 10001, 10001 ),
+                         fc::exception );
       // asset does not exist
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, no_asset_id1, 0, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, no_asset_id1, lpa.id, 0, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, no_asset_id1, no_asset_id2, lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), no_asset_id1, 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), no_asset_id1, lpa.get_id(), 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, no_asset_id1, no_asset_id2, lpa.get_id(), 0, 0 ),
+                         fc::exception );
       // the account does not own the share asset
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, ted_lpa.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), ted_lpa.get_id(), 0, 0 ),
+                         fc::exception );
       // the share asset is a MPA or a PM
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, mpa.id, 0, 0 ), fc::exception );
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, pm.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), mpa.get_id(), 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), pm.get_id(), 0, 0 ),
+                         fc::exception );
       // the share asset is already bound to a liquidity pool
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, usd.id, lpa1.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa1.get_id(), 0, 0 ),
+                         fc::exception );
       // current supply of the share asset is not zero
-      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, lpa.id, usd.id, 0, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.get_id(), lpa.get_id(), usd.get_id(), 0, 0 ),
+                         fc::exception );
 
       // Unable to issue a liquidity pool share asset
       BOOST_CHECK_THROW( issue_uia( sam, lpa1.amount(1) ), fc::exception );
 
       // Sam is able to delete an empty pool owned by him
-      generic_operation_result result = delete_liquidity_pool( sam_id, lpo1.id );
+      generic_operation_result result = delete_liquidity_pool( sam_id, lpo1.get_id() );
       BOOST_CHECK( !db.find( lp_id1 ) );
       BOOST_CHECK( !lpa1.is_liquidity_pool_share_asset() );
       BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
@@ -278,9 +298,9 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_deposit_withdrawal_test )
       const asset_object& lpa = create_user_issued_asset( "LPATEST", sam, charge_market_fee );
 
       asset_id_type core_id = asset_id_type();
-      asset_id_type eur_id = eur.id;
-      asset_id_type usd_id = usd.id;
-      asset_id_type lpa_id = lpa.id;
+      asset_id_type eur_id = eur.get_id();
+      asset_id_type usd_id = usd.get_id();
+      asset_id_type lpa_id = lpa.get_id();
 
       int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
@@ -313,8 +333,9 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_deposit_withdrawal_test )
       int64_t expected_lp_supply = 0;
 
       // create a liquidity pool
-      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, eur.id, usd.id, lpa.id, 200, 300 );
-      liquidity_pool_id_type lp_id = lpo.id;
+      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, eur.get_id(), usd.get_id(), lpa.get_id(),
+                                                                200, 300 );
+      liquidity_pool_id_type lp_id = lpo.get_id();
 
       BOOST_CHECK( lpo.asset_a == eur_id );
       BOOST_CHECK( lpo.asset_b == usd_id );
@@ -672,7 +693,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_deposit_withdrawal_test )
       generate_block();
 
       graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
-      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      const auto& ticker = db.get( ticker_id );
       BOOST_CHECK_EQUAL( ticker._24h_deposit_count, 7u );
       BOOST_CHECK_EQUAL( ticker.total_deposit_count, 7u );
       BOOST_CHECK_EQUAL( ticker._24h_withdrawal_count, 2u );
@@ -713,9 +734,9 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       const asset_object& lpa = create_user_issued_asset( "LPATEST", sam, charge_market_fee );
 
       asset_id_type core_id = asset_id_type();
-      asset_id_type eur_id = eur.id;
-      asset_id_type usd_id = usd.id;
-      asset_id_type lpa_id = lpa.id;
+      asset_id_type eur_id = eur.get_id();
+      asset_id_type usd_id = usd.get_id();
+      asset_id_type lpa_id = lpa.get_id();
 
       int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
@@ -751,8 +772,9 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       int64_t expected_lp_supply = 0;
 
       // create a liquidity pool
-      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, eur.id, usd.id, lpa.id, 200, 300 );
-      liquidity_pool_id_type lp_id = lpo.id;
+      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, eur.get_id(), usd.get_id(), lpa.get_id(),
+                                                                200, 300 );
+      liquidity_pool_id_type lp_id = lpo.get_id();
 
       BOOST_CHECK( lpo.asset_a == eur_id );
       BOOST_CHECK( lpo.asset_b == usd_id );
@@ -974,7 +996,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       BOOST_CHECK_EQUAL( eur_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
 
       graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
-      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      const auto& ticker = db.get( ticker_id );
       BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 1u );
       BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
       BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 1u );
@@ -1368,17 +1390,16 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
       const asset_object ted_lp3 = create_user_issued_asset( "TEDLP3", ted, charge_market_fee );
 
       // create liquidity pools
-      const liquidity_pool_object sam_lpo1 = create_liquidity_pool( sam_id, sam_eur.id, sam_usd.id,
-                                                                     sam_lp1.id, 100, 310 );
-      const liquidity_pool_object sam_lpo2 = create_liquidity_pool( sam_id, sam_usd.id, ted_usd.id,
-                                                                     sam_lp2.id, 200, 320 );
-      const liquidity_pool_object ted_lpo1 = create_liquidity_pool( ted_id, sam_usd.id, ted_usd.id,
-                                                                     ted_lp1.id, 300, 330 );
-      const liquidity_pool_object ted_lpo2 = create_liquidity_pool( ted_id, sam_usd.id, ted_eur.id,
-                                                                     ted_lp2.id, 400, 340 );
-      const liquidity_pool_object ted_lpo3 = create_liquidity_pool( ted_id, ted_eur.id, ted_usd.id,
-                                                                     ted_lp3.id, 500, 350 );
-
+      const liquidity_pool_object sam_lpo1 = create_liquidity_pool( sam_id, sam_eur.get_id(), sam_usd.get_id(),
+                                                                     sam_lp1.get_id(), 100, 310 );
+      const liquidity_pool_object sam_lpo2 = create_liquidity_pool( sam_id, sam_usd.get_id(), ted_usd.get_id(),
+                                                                     sam_lp2.get_id(), 200, 320 );
+      const liquidity_pool_object ted_lpo1 = create_liquidity_pool( ted_id, sam_usd.get_id(), ted_usd.get_id(),
+                                                                     ted_lp1.get_id(), 300, 330 );
+      const liquidity_pool_object ted_lpo2 = create_liquidity_pool( ted_id, sam_usd.get_id(), ted_eur.get_id(),
+                                                                     ted_lp2.get_id(), 400, 340 );
+      const liquidity_pool_object ted_lpo3 = create_liquidity_pool( ted_id, ted_eur.get_id(), ted_usd.get_id(),
+                                                                     ted_lp3.get_id(), 500, 350 );
       generate_block();
 
       // Check database API
@@ -1388,73 +1409,73 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
       auto pools = db_api.list_liquidity_pools();
       BOOST_REQUIRE_EQUAL( pools.size(), 5u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo1.id );
-      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+      BOOST_CHECK( pools.front().id == sam_lpo1.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
       // pagination
-      pools = db_api.list_liquidity_pools( 5, sam_lpo2.id );
+      pools = db_api.list_liquidity_pools( 5, sam_lpo2.get_id() );
       BOOST_REQUIRE_EQUAL( pools.size(), 4u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
       // with statistics
-      pools = db_api.list_liquidity_pools( 2, sam_lpo2.id, true );
+      pools = db_api.list_liquidity_pools( 2, sam_lpo2.get_id(), true );
       BOOST_REQUIRE_EQUAL( pools.size(), 2u );
       BOOST_CHECK( pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo1.get_id() );
 
       // get_liquidity_pools_by_asset_a
       pools = db_api.get_liquidity_pools_by_asset_a( "SAMUSD" );
       BOOST_REQUIRE_EQUAL( pools.size(), 3u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo2.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo2.get_id() );
 
       // pagination and with statistics
-      pools = db_api.get_liquidity_pools_by_asset_a( "SAMUSD", 2, ted_lpo2.id, true );
+      pools = db_api.get_liquidity_pools_by_asset_a( "SAMUSD", 2, ted_lpo2.get_id(), true );
       BOOST_REQUIRE_EQUAL( pools.size(), 1u );
       BOOST_CHECK( pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == ted_lpo2.id );
+      BOOST_CHECK( pools.front().id == ted_lpo2.get_id() );
 
       // get_liquidity_pools_by_asset_b
       pools = db_api.get_liquidity_pools_by_asset_b( "TEDUSD" );
       BOOST_REQUIRE_EQUAL( pools.size(), 3u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
       // pagination and with statistics
-      pools = db_api.get_liquidity_pools_by_asset_b( "TEDUSD", 2, sam_lpo1.id, true );
+      pools = db_api.get_liquidity_pools_by_asset_b( "TEDUSD", 2, sam_lpo1.get_id(), true );
       BOOST_REQUIRE_EQUAL( pools.size(), 2u );
       BOOST_CHECK( pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo1.get_id() );
 
       // get_liquidity_pools_by_one_asset
       pools = db_api.get_liquidity_pools_by_one_asset( "SAMUSD" );
       BOOST_REQUIRE_EQUAL( pools.size(), 4u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo1.id );
-      BOOST_CHECK( pools.back().id == ted_lpo2.id );
+      BOOST_CHECK( pools.front().id == sam_lpo1.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo2.get_id() );
 
       // pagination and with statistics
       pools = db_api.get_liquidity_pools_by_one_asset( "SAMUSD", 3, liquidity_pool_id_type(), true );
       BOOST_REQUIRE_EQUAL( pools.size(), 3u );
       BOOST_CHECK( pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo1.id );
-      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+      BOOST_CHECK( pools.front().id == sam_lpo1.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo1.get_id() );
 
       // get_liquidity_pools_by_both_asset
       pools = db_api.get_liquidity_pools_by_both_assets( "SAMUSD", "TEDUSD" );
       BOOST_REQUIRE_EQUAL( pools.size(), 2u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo2.id );
-      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+      BOOST_CHECK( pools.front().id == sam_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo1.get_id() );
 
       // pagination and with statistics
-      pools = db_api.get_liquidity_pools_by_both_assets( "SAMUSD", "TEDUSD", 3, ted_lpo2.id, true );
+      pools = db_api.get_liquidity_pools_by_both_assets( "SAMUSD", "TEDUSD", 3, ted_lpo2.get_id(), true );
       BOOST_REQUIRE_EQUAL( pools.size(), 0u );
 
       // get_liquidity_pools_by_share_asset
@@ -1462,27 +1483,23 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
       BOOST_REQUIRE_EQUAL( opools.size(), 2u );
       BOOST_CHECK( opools.front().valid() );
       BOOST_CHECK( opools.front()->statistics.valid() );
-      BOOST_CHECK( opools.front()->id == sam_lpo1.id );
+      BOOST_CHECK( opools.front()->id == sam_lpo1.get_id() );
       BOOST_CHECK( !opools.back().valid() );
 
       // get_liquidity_pools_by_owner
       pools = db_api.get_liquidity_pools_by_owner( "sam" );
       BOOST_REQUIRE_EQUAL( pools.size(), 2u );
       BOOST_CHECK( !pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == sam_lpo1.id );
-      BOOST_CHECK( pools.back().id == sam_lpo2.id );
+      BOOST_CHECK( pools.front().id == sam_lpo1.get_id() );
+      BOOST_CHECK( pools.back().id == sam_lpo2.get_id() );
 
       // pagination and with statistics
-      pools = db_api.get_liquidity_pools_by_owner( "ted", 5, sam_lpo1.id, true );
-      BOOST_REQUIRE_EQUAL( pools.size(), 3u );
+      pools = db_api.get_liquidity_pools_by_owner( "ted", 5, ted_lp2.get_id(), true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 2u );
       BOOST_CHECK( pools.front().statistics.valid() );
-      BOOST_CHECK( pools.front().id == ted_lpo1.id );
-      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+      BOOST_CHECK( pools.front().id == ted_lpo2.get_id() );
+      BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_SUITE_END()

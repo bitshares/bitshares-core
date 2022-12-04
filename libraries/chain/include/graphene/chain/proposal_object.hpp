@@ -33,16 +33,13 @@ namespace graphene { namespace chain {
    class database;
 
 /**
- *  @brief tracks the approval of a partially approved transaction 
+ *  @brief tracks the approval of a partially approved transaction
  *  @ingroup object
  *  @ingroup protocol
  */
-class proposal_object : public abstract_object<proposal_object>
+class proposal_object : public abstract_object<proposal_object, protocol_ids, proposal_object_type>
 {
    public:
-      static constexpr uint8_t space_id = protocol_ids;
-      static constexpr uint8_t type_id = proposal_object_type;
-
       time_point_sec                expiration_time;
       optional<time_point_sec>      review_period_time;
       transaction                   proposed_transaction;
@@ -59,7 +56,7 @@ class proposal_object : public abstract_object<proposal_object>
 
 /**
  *  @brief tracks all of the proposal objects that requrie approval of
- *  an individual account.   
+ *  an individual account.
  *
  *  @ingroup object
  *  @ingroup protocol
@@ -91,7 +88,6 @@ typedef boost::multi_index_container<
    proposal_object,
    indexed_by<
       ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
-      //ordered_non_unique< tag< by_expiration >, member< proposal_object, time_point_sec, &proposal_object::expiration_time > >
       ordered_unique<tag<by_expiration>,
          composite_key<proposal_object,
             member<proposal_object, time_point_sec, &proposal_object::expiration_time>,

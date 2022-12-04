@@ -117,20 +117,20 @@ BOOST_AUTO_TEST_CASE(put_my_witnesses)
       upgrade_to_lifetime_member(witness13_id);
 
       // Create all the witnesses
-      const witness_id_type witness0_witness_id = create_witness(witness0_id, witness0_private_key).id;
-      const witness_id_type witness1_witness_id = create_witness(witness1_id, witness1_private_key).id;
-      const witness_id_type witness2_witness_id = create_witness(witness2_id, witness2_private_key).id;
-      const witness_id_type witness3_witness_id = create_witness(witness3_id, witness3_private_key).id;
-      const witness_id_type witness4_witness_id = create_witness(witness4_id, witness4_private_key).id;
-      const witness_id_type witness5_witness_id = create_witness(witness5_id, witness5_private_key).id;
-      const witness_id_type witness6_witness_id = create_witness(witness6_id, witness6_private_key).id;
-      const witness_id_type witness7_witness_id = create_witness(witness7_id, witness7_private_key).id;
-      const witness_id_type witness8_witness_id = create_witness(witness8_id, witness8_private_key).id;
-      const witness_id_type witness9_witness_id = create_witness(witness9_id, witness9_private_key).id;
-      const witness_id_type witness10_witness_id = create_witness(witness10_id, witness10_private_key).id;
-      const witness_id_type witness11_witness_id = create_witness(witness11_id, witness11_private_key).id;
-      const witness_id_type witness12_witness_id = create_witness(witness12_id, witness12_private_key).id;
-      const witness_id_type witness13_witness_id = create_witness(witness13_id, witness13_private_key).id;
+      const witness_id_type witness0_witness_id = create_witness(witness0_id, witness0_private_key).get_id();
+      const witness_id_type witness1_witness_id = create_witness(witness1_id, witness1_private_key).get_id();
+      const witness_id_type witness2_witness_id = create_witness(witness2_id, witness2_private_key).get_id();
+      const witness_id_type witness3_witness_id = create_witness(witness3_id, witness3_private_key).get_id();
+      const witness_id_type witness4_witness_id = create_witness(witness4_id, witness4_private_key).get_id();
+      const witness_id_type witness5_witness_id = create_witness(witness5_id, witness5_private_key).get_id();
+      const witness_id_type witness6_witness_id = create_witness(witness6_id, witness6_private_key).get_id();
+      const witness_id_type witness7_witness_id = create_witness(witness7_id, witness7_private_key).get_id();
+      const witness_id_type witness8_witness_id = create_witness(witness8_id, witness8_private_key).get_id();
+      const witness_id_type witness9_witness_id = create_witness(witness9_id, witness9_private_key).get_id();
+      const witness_id_type witness10_witness_id = create_witness(witness10_id, witness10_private_key).get_id();
+      const witness_id_type witness11_witness_id = create_witness(witness11_id, witness11_private_key).get_id();
+      const witness_id_type witness12_witness_id = create_witness(witness12_id, witness12_private_key).get_id();
+      const witness_id_type witness13_witness_id = create_witness(witness13_id, witness13_private_key).get_id();
 
       // Create a vector with private key of all witnesses, will be used to activate 9 witnesses at a time
       const vector <fc::ecc::private_key> private_keys = {
@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE(track_votes_witnesses_enabled)
 
       INVOKE(put_my_witnesses);
 
-      const account_id_type witness1_id= get_account("witness1").id;
+      const account_id_type witness1_id= get_account("witness1").get_id();
       auto witness1_object = db_api1.get_witness_by_account(witness1_id(db).name);
       BOOST_CHECK_EQUAL(witness1_object->total_votes, 111u);
 
@@ -246,7 +246,7 @@ BOOST_AUTO_TEST_CASE(track_votes_witnesses_disabled)
 
       INVOKE(put_my_witnesses);
 
-      const account_id_type witness1_id= get_account("witness1").id;
+      const account_id_type witness1_id= get_account("witness1").get_id();
       auto witness1_object = db_api1.get_witness_by_account(witness1_id(db).name);
       BOOST_CHECK_EQUAL(witness1_object->total_votes, 0u);
 
@@ -289,20 +289,20 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
       upgrade_to_lifetime_member(committee13_id);
 
       // Create all the committee
-      const committee_member_id_type committee0_committee_id = create_committee_member(committee0_id(db)).id;
-      const committee_member_id_type committee1_committee_id = create_committee_member(committee1_id(db)).id;
-      const committee_member_id_type committee2_committee_id = create_committee_member(committee2_id(db)).id;
-      const committee_member_id_type committee3_committee_id = create_committee_member(committee3_id(db)).id;
-      const committee_member_id_type committee4_committee_id = create_committee_member(committee4_id(db)).id;
-      const committee_member_id_type committee5_committee_id = create_committee_member(committee5_id(db)).id;
-      const committee_member_id_type committee6_committee_id = create_committee_member(committee6_id(db)).id;
-      const committee_member_id_type committee7_committee_id = create_committee_member(committee7_id(db)).id;
-      const committee_member_id_type committee8_committee_id = create_committee_member(committee8_id(db)).id;
-      const committee_member_id_type committee9_committee_id = create_committee_member(committee9_id(db)).id;
-      const committee_member_id_type committee10_committee_id = create_committee_member(committee10_id(db)).id;
-      const committee_member_id_type committee11_committee_id = create_committee_member(committee11_id(db)).id;
-      const committee_member_id_type committee12_committee_id = create_committee_member(committee12_id(db)).id;
-      const committee_member_id_type committee13_committee_id = create_committee_member(committee13_id(db)).id;
+      const committee_member_id_type committee0_committee_id = create_committee_member(committee0_id(db)).get_id();
+      const committee_member_id_type committee1_committee_id = create_committee_member(committee1_id(db)).get_id();
+      const committee_member_id_type committee2_committee_id = create_committee_member(committee2_id(db)).get_id();
+      const committee_member_id_type committee3_committee_id = create_committee_member(committee3_id(db)).get_id();
+      const committee_member_id_type committee4_committee_id = create_committee_member(committee4_id(db)).get_id();
+      const committee_member_id_type committee5_committee_id = create_committee_member(committee5_id(db)).get_id();
+      const committee_member_id_type committee6_committee_id = create_committee_member(committee6_id(db)).get_id();
+      const committee_member_id_type committee7_committee_id = create_committee_member(committee7_id(db)).get_id();
+      const committee_member_id_type committee8_committee_id = create_committee_member(committee8_id(db)).get_id();
+      const committee_member_id_type committee9_committee_id = create_committee_member(committee9_id(db)).get_id();
+      const committee_member_id_type committee10_committee_id = create_committee_member(committee10_id(db)).get_id();
+      const committee_member_id_type committee11_committee_id = create_committee_member(committee11_id(db)).get_id();
+      const committee_member_id_type committee12_committee_id = create_committee_member(committee12_id(db)).get_id();
+      const committee_member_id_type committee13_committee_id = create_committee_member(committee13_id(db)).get_id();
 
       // Create a vector with private key of all committee members, will be used to activate 9 members at a time
       const vector <fc::ecc::private_key> private_keys = {
@@ -410,7 +410,7 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_enabled)
 
       INVOKE(put_my_committee_members);
 
-      const account_id_type committee1_id= get_account("committee1").id;
+      const account_id_type committee1_id= get_account("committee1").get_id();
       auto committee1_object = db_api1.get_committee_member_by_account(committee1_id(db).name);
       BOOST_CHECK_EQUAL(committee1_object->total_votes, 111u);
 
@@ -425,7 +425,7 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_disabled)
 
       INVOKE(put_my_committee_members);
 
-      const account_id_type committee1_id= get_account("committee1").id;
+      const account_id_type committee1_id= get_account("committee1").get_id();
       auto committee1_object = db_api1.get_committee_member_by_account(committee1_id(db).name);
       BOOST_CHECK_EQUAL(committee1_object->total_votes, 0u);
 
@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE( witness_votes_calculation )
       {
          auto wit_object = db_api1.get_witness_by_account( wit_account_ids[i](db).name );
          BOOST_REQUIRE( wit_object.valid() );
-         wit_ids.push_back( wit_object->id );
+         wit_ids.push_back( wit_object->get_id() );
       }
 
       generate_blocks( HARDFORK_CORE_2103_TIME - 750 * 86400 );
@@ -878,7 +878,7 @@ BOOST_AUTO_TEST_CASE( committee_votes_calculation )
       {
          auto com_object = db_api1.get_committee_member_by_account( com_account_ids[i](db).name );
          BOOST_REQUIRE( com_object.valid() );
-         com_ids.push_back( com_object->id );
+         com_ids.push_back( com_object->get_id() );
       }
 
       generate_blocks( HARDFORK_CORE_2103_TIME - 750 * 86400 );

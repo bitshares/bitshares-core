@@ -497,7 +497,7 @@ void database::cancel_settle_order( const force_settlement_object& order )
 {
    adjust_balance(order.owner, order.balance);
 
-   push_applied_operation( asset_settle_cancel_operation( order.id, order.owner, order.balance ) );
+   push_applied_operation( asset_settle_cancel_operation( order.get_id(), order.owner, order.balance ) );
 
    remove(order);
 }
@@ -907,6 +907,9 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
 
+   auto head_time = head_block_time();
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
    auto new_obj_id = new_settlement.id;
 
    // Price at which margin calls sit on the books.
@@ -940,8 +943,10 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
             || call_itr->collateralization() > bitasset.current_maintenance_collateralization )
          break;
       // TCR applies here
+      auto settle_price = after_core_hardfork_2582 ? bitasset.median_feed.settlement_price
+                                                   : bitasset.current_feed.settlement_price;
       asset max_debt_to_cover( call_itr->get_max_debt_to_cover( call_pays_price,
-                                                       bitasset.current_feed.settlement_price,
+                                                       settle_price,
                                                        bitasset.current_feed.maintenance_collateral_ratio,
                                                        bitasset.current_maintenance_collateralization ),
                                new_settlement.balance.asset_id );
@@ -1155,7 +1160,11 @@ database::match_result_type database::match( const limit_order_object& bid, cons
    bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
    bool after_core_hardfork_2481 = HARDFORK_CORE_2481_PASSED( maint_time ); // Match settle orders with margin calls
 
-   const auto& feed_price = bitasset.current_feed.settlement_price;
+   auto head_time = head_block_time();
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
+   const auto& feed_price = after_core_hardfork_2582 ? bitasset.median_feed.settlement_price
+                                                     : bitasset.current_feed.settlement_price;
    const auto& maintenance_collateral_ratio = bitasset.current_feed.maintenance_collateral_ratio;
    optional<price> maintenance_collateralization;
    if( !before_core_hardfork_1270 )
@@ -1828,6 +1837,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
+    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
     auto has_call_order = [ before_core_hardfork_1270,
                             &call_collateral_itr,&call_collateral_end,
                             &call_price_itr,&call_price_end ]()
@@ -1906,8 +1917,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
          if( !before_core_hardfork_1270 )
          {
+            auto settle_price = after_core_hardfork_2582 ? bitasset.median_feed.settlement_price
+                                                         : bitasset.current_feed.settlement_price;
             usd_to_buy.amount = call_order.get_max_debt_to_cover( call_pays_price,
-                                                                bitasset.current_feed.settlement_price,
+                                                                settle_price,
                                                                 bitasset.current_feed.maintenance_collateral_ratio,
                                                                 bitasset.current_maintenance_collateralization );
          }
@@ -2084,6 +2097,9 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
 
+   auto head_time = head_block_time();
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
    const auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
    auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
    auto settle_end = settlement_index.upper_bound( bitasset.asset_id );
@@ -2114,8 +2130,10 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
          return false;
 
       // TCR applies here
+      auto settle_price = after_core_hardfork_2582 ? bitasset.median_feed.settlement_price
+                                                   : bitasset.current_feed.settlement_price;
       asset max_debt_to_cover( call_order.get_max_debt_to_cover( call_pays_price,
-                                                       bitasset.current_feed.settlement_price,
+                                                       settle_price,
                                                        bitasset.current_feed.maintenance_collateral_ratio,
                                                        bitasset.current_maintenance_collateralization ),
                                bitasset.asset_id );

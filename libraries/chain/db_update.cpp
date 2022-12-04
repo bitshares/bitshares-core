@@ -477,6 +477,7 @@ void database::update_expired_feeds()
 {
    const auto head_time = head_block_time();
    bool after_hardfork_615 = ( head_time >= HARDFORK_615_TIME );
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
 
    const auto& idx = get_index_type<asset_bitasset_data_index>().indices().get<by_feed_expiration>();
    auto itr = idx.begin();
@@ -489,13 +490,19 @@ void database::update_expired_feeds()
       if( !( after_hardfork_615 || b.feed_is_expired_before_hf_615( head_time ) ) )
          continue;
 
-      auto old_median_feed = b.current_feed;
+      auto old_current_feed = b.current_feed;
+      auto old_median_feed = b.median_feed;
       const asset_object& asset_obj = b.asset_id( *this );
       update_bitasset_current_feed( b );
       // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
 
       if( !b.current_feed.settlement_price.is_null()
-            && !b.current_feed.margin_call_params_equal( old_median_feed ) )
+            && !b.current_feed.margin_call_params_equal( old_current_feed ) )
+      {
+         check_call_orders( asset_obj, true, false, &b, true );
+      }
+      else if( after_core_hardfork_2582 && !b.median_feed.settlement_price.is_null()
+            && !b.median_feed.margin_call_params_equal( old_median_feed ) )
       {
          check_call_orders( asset_obj, true, false, &b, true );
       }
@@ -581,7 +588,7 @@ void database::clear_expired_htlcs()
       const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
       adjust_balance( obj.transfer.from, amount );
       // notify related parties
-      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+      htlc_refund_operation vop( obj.get_id(), obj.transfer.from, obj.transfer.to, amount,
          obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       push_applied_operation( vop );
       remove( obj );
@@ -743,7 +750,7 @@ void database::update_credit_offers_and_deals()
 
       // Notify related parties
       push_applied_operation( credit_deal_expired_operation (
-                                    deal.id, deal.offer_id, deal.offer_owner, deal.borrower,
+                                    deal.get_id(), deal.offer_id, deal.offer_owner, deal.borrower,
                                     asset( deal.debt_amount, deal.debt_asset ),
                                     asset( deal.collateral_amount, deal.collateral_asset ),
                                     deal.fee_rate ) );

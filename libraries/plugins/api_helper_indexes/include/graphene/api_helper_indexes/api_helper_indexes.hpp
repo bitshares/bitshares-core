@@ -71,6 +71,21 @@ class asset_in_liquidity_pools_index: public secondary_index
       flat_map<asset_id_type, flat_set<liquidity_pool_id_type>> asset_in_pools_map;
 };
 
+/**
+ *  @brief This secondary index tracks the next ID of all object types.
+ *  @note This is implemented with \c flat_map considering there aren't too many object types in the system thus
+ *        the performance would be acceptable.
+ */
+class next_object_ids_index : public secondary_index
+{
+   public:
+      object_id_type get_next_id( uint8_t space_id, uint8_t type_id ) const;
+
+   private:
+      friend class api_helper_indexes;
+      flat_map< std::pair<uint8_t,uint8_t>, object_id_type > _next_ids;
+};
+
 namespace detail
 {
     class api_helper_indexes_impl;
@@ -96,6 +111,10 @@ class api_helper_indexes : public graphene::app::plugin
       std::unique_ptr<detail::api_helper_indexes_impl> my;
       amount_in_collateral_index* amount_in_collateral_idx = nullptr;
       asset_in_liquidity_pools_index* asset_in_liquidity_pools_idx = nullptr;
+      next_object_ids_index* next_object_ids_idx = nullptr;
+
+      bool _next_ids_map_initialized = false;
+      void refresh_next_ids();
 };
 
 } } //graphene::template

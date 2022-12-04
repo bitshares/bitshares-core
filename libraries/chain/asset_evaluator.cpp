@@ -220,9 +220,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
-      d.get_object(id);
+      d.get(id);
    for( auto id : op.common_options.blacklist_authorities )
-      d.get_object(id);
+      d.get(id);
 
    auto& asset_indx = d.get_index_type<asset_index>().indices().get<by_symbol>();
    auto asset_symbol_itr = asset_indx.find( op.symbol );
@@ -310,7 +310,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          }).id;
 
    const asset_object& new_asset =
-     d.create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id]( asset_object& a ) {
+     d.create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id,&d]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
          a.precision = op.precision;
@@ -322,6 +322,8 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          a.dynamic_asset_data_id = dyn_asset.id;
          if( op.bitasset_opts.valid() )
             a.bitasset_data_id = bit_asset_id;
+         a.creation_block_num = d._current_block_num;
+         a.creation_time      = d._current_block_time;
       });
    FC_ASSERT( new_asset.id == next_asset_id, "Unexpected object database error, object id mismatch" );
 
@@ -426,7 +428,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
 
 static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
 { try {
-   FC_ASSERT(d.find_object(new_issuer));
+   FC_ASSERT(d.find(new_issuer), "New issuer account does not exist");
    if( a.is_market_issued() && new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
    {
       const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
@@ -585,10 +587,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    FC_ASSERT( o.new_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.whitelist_authorities )
-      d.get_object(id);
+      d.get(id);
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
-      d.get_object(id);
+      d.get(id);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -911,6 +913,9 @@ static bool update_bitasset_object_options(
    const fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
 
+   const auto& head_time = db.head_block_time();
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
    if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
@@ -996,12 +1001,19 @@ static bool update_bitasset_object_options(
    if( should_update_feeds || update_feeds_due_to_bsrm_change )
    {
       const auto old_feed = bdo.current_feed;
+      const auto old_median_feed = bdo.median_feed;
       // skip recalculating median feed if it is not needed
       db.update_bitasset_current_feed( bdo, !should_update_feeds );
       // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
 
+      // TODO potential optimization: check only when should_update_feeds == true
+
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
+
+      if( !feed_actually_changed && after_core_hardfork_2582
+            && !old_median_feed.margin_call_params_equal( bdo.median_feed ) )
+         feed_actually_changed = true;
    }
 
    // Conditions under which a call to check_call_orders is needed in response to the updates applied here:
@@ -1052,7 +1064,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 
    // Make sure all producers exist. Check these after asset because account lookup is more expensive
    for( auto id : o.new_feed_producers )
-      d.get_object(id);
+      d.get(id);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -1194,7 +1206,7 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
 
    asset settled_amount = ( op.amount.amount == mia_dyn.current_supply )
                           ? asset( bitasset.settlement_fund, bitasset.options.short_backing_asset )
-                          : op.amount * bitasset.settlement_price; // round down, favors global settlement fund
+                          : ( op.amount * bitasset.settlement_price ); // round down, favors global settlement fund
    if( op.amount.amount != mia_dyn.current_supply )
    {
       // should be strictly < except for PM with zero outcome since in that case bitasset.settlement_fund is zero
@@ -1331,6 +1343,11 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& head_time = d.head_block_time();
    const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    d.adjust_balance( op.account, -to_settle );
+
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+   if( after_core_hardfork_2582 && 0 == to_settle.amount )
+      return result;
+
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
       s.owner = op.account;
@@ -1422,6 +1439,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    const asset_bitasset_data_object& bad = *bitasset_ptr;
 
    auto old_feed = bad.current_feed;
+   auto old_median_feed = bad.median_feed;
    // Store medians for this asset
    d.modify( bad , [&o,&head_time](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
@@ -1429,7 +1447,11 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    });
    d.update_bitasset_current_feed( bad );
 
-   if( old_feed.margin_call_params_equal(bad.current_feed) )
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
+   if( !after_core_hardfork_2582 && old_feed.margin_call_params_equal(bad.current_feed) )
+      return void_result();
+   if( after_core_hardfork_2582 && old_median_feed.margin_call_params_equal(bad.median_feed) )
       return void_result();
 
    // Feed changed, check whether need to revive the asset and proceed if need
