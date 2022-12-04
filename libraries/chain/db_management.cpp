@@ -65,7 +65,7 @@ void database::reindex( fc::path data_dir )
    ilog( "reindexing blockchain" );
    auto start = fc::time_point::now();
    const auto last_block_num = last_block->block_num();
-   uint32_t undo_point = last_block_num < GRAPHENE_MAX_UNDO_HISTORY ? 0 : last_block_num - GRAPHENE_MAX_UNDO_HISTORY;
+   uint32_t undo_point = last_block_num < GRAPHENE_MAX_UNDO_HISTORY ? 0 : (last_block_num - GRAPHENE_MAX_UNDO_HISTORY);
 
    ilog( "Replaying blocks, starting at ${next}...", ("next",head_block_num() + 1) );
    if( head_block_num() >= undo_point )
@@ -88,10 +88,11 @@ void database::reindex( fc::path data_dir )
       if( next_block_num <= last_block_num && blocks.size() < 20 )
       {
          const size_t processed_block_size = _block_id_to_block.blocks_current_position();
-         fc::optional< signed_block > block = _block_id_to_block.fetch_by_number( next_block_num++ );
+         fc::optional< signed_block > block = _block_id_to_block.fetch_by_number( next_block_num );
+         ++next_block_num;
          if( block.valid() )
          {
-            if( block->timestamp >= last_block->timestamp - gpo.parameters.maximum_time_until_expiration )
+            if( block->timestamp >= (last_block->timestamp - gpo.parameters.maximum_time_until_expiration) )
                skip &= (uint32_t)(~skip_transaction_dupe_check);
             blocks.emplace( processed_block_size, std::move(*block), fc::future<void>() );
             std::get<2>(blocks.back()) = precompute_parallel( std::get<1>(blocks.back()), skip );
@@ -104,13 +105,12 @@ void database::reindex( fc::path data_dir )
             {
                fc::optional< block_id_type > last_id = _block_id_to_block.last_id();
                // this can trigger if we attempt to e.g. read a file that has block #2 but no block #1
-               if( !last_id.valid() )
-                  break;
+               // OR
                // we've caught up to the gap
-               if( block_header::num_from_id( *last_id ) <= i )
+               if( !last_id.valid() || block_header::num_from_id( *last_id ) <= i )
                   break;
                _block_id_to_block.remove( *last_id );
-               dropped_count++;
+               ++dropped_count;
             }
             wlog( "Dropped ${n} blocks from after the gap", ("n", dropped_count) );
             next_block_num = last_block_num + 1; // don't load more blocks
@@ -128,8 +128,8 @@ void database::reindex( fc::path data_dir )
             size_t current_pos = std::get<0>(blocks.front());
             if( current_pos > total_block_size )
                total_block_size = current_pos;
-            bysize << std::fixed << std::setprecision(5) << double(current_pos) / total_block_size * 100;
-            bynum << std::fixed << std::setprecision(5) << double(i)*100/last_block_num;
+            bysize << std::fixed << std::setprecision(5) << (100 * double(current_pos) / total_block_size);
+            bynum << std::fixed << std::setprecision(5) << (100 * double(i) / last_block_num);
             ilog(
                "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
                ("size", bysize.str())
@@ -154,7 +154,7 @@ void database::reindex( fc::path data_dir )
             push_block( block, skip );
          }
          blocks.pop();
-         i++;
+         ++i;
       }
    }
    _undo_db.enable();
@@ -227,17 +227,16 @@ void database::open(
    FC_CAPTURE_LOG_AND_RETHROW( (data_dir) )
 }
 
-void database::close(bool rewind)
+void database::close(bool rewinding)
 {
    if (!_opened)
       return;
-      
    // TODO:  Save pending tx's on close()
    clear_pending();
 
    // pop all of the blocks that we can given our undo history, this should
    // throw when there is no more undo history to pop
-   if( rewind )
+   if( rewinding )
    {
       try
       {
