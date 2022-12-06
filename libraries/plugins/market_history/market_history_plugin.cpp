@@ -744,12 +744,14 @@ void market_history_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("bucket-size", boost::program_options::value<string>()->default_value("[60,300,900,1800,3600,14400,86400]"),
+         ("bucket-size",
+           // 1m, 5m, 15m, 1h, 4h, 1d, 1w
+           boost::program_options::value<string>()->default_value("[60,300,900,3600,14400,86400,604800]"),
            "Track market history by grouping orders into buckets of equal size measured "
            "in seconds specified as a JSON array of numbers")
-         ("history-per-size", boost::program_options::value<uint32_t>()->default_value(1000),
+         ("history-per-size", boost::program_options::value<uint32_t>()->default_value(1500),
            "How far back in time to track history for each bucket size, "
-           "measured in the number of buckets (default: 1000)")
+           "measured in the number of buckets (default: 1500)")
          ("max-order-his-records-per-market", boost::program_options::value<uint32_t>()->default_value(1000),
            "Will only store this amount of matched orders for each market in order history for querying, "
            "or those meet the other option, which has more data (default: 1000). "
