@@ -11,9 +11,15 @@ jobs:
         os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
-      elasticsearch:
-        image: docker://elasticsearch:7.17.7
-        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
+      elasticsearch8:
+        image: elastic/elasticsearch:8.5.3
+        options: >-
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
     steps:
     - name: Download and install latest SonarScanner CLI tool
       run: |
@@ -167,9 +173,6 @@ jobs:
         df -h
         echo "Cleanup"
         rm -rf /tmp/graphene*
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
-          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        echo
         _build/tests/es_test -l test_suite
         df -h
         echo "Cleanup"
