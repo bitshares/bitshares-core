@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             return (total == "5");
          });
 
-         es.endpoint = es.index_prefix + "*/_doc/_search";
+         es.endpoint = es.index_prefix + "*/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
 
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -255,14 +255,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "2");
          });
 
-         es.endpoint = es.index_prefix + "asset/_doc/_search";
+         es.endpoint = es.index_prefix + "asset/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_source"]["symbol"].as_string();
          BOOST_CHECK_EQUAL(first_id, "USD");
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
-         es.endpoint = es.index_prefix + "bitasset/_doc/_search";
+         es.endpoint = es.index_prefix + "bitasset/_search";
          es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""
                   + bitasset_data_id + "\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
@@ -275,7 +275,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
                             db.get_dynamic_global_properties().next_maintenance_time );
          generate_block();
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
          generate_block();
 
-         es.endpoint = es.index_prefix + "budget/_doc/_count";
+         es.endpoint = es.index_prefix + "budget/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -307,7 +307,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "1"); // new record inserted at the first maintenance block
          });
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
