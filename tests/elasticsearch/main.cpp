@@ -329,39 +329,6 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
    }
 }
 
-BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
-   try {
-
-      CURL *curl; // curl handler
-      curl = curl_easy_init();
-      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es.index_prefix = es_index_prefix;
-      auto delete_account_history = graphene::utilities::deleteAll(es);
-      BOOST_REQUIRE(delete_account_history); // require successful deletion
-
-      graphene::utilities::ES es_obj;
-      es_obj.curl = curl;
-      es_obj.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es_obj.index_prefix = es_obj_index_prefix;
-      auto delete_objects = graphene::utilities::deleteAll(es_obj);
-      BOOST_REQUIRE(delete_objects); // require successful deletion
-
-      if(delete_account_history && delete_objects) { // all records deleted
-
-
-      }
-      // Note: this test case ends too quickly, sometimes causing an memory access violation on cleanup
-   }
-   catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
    try {
       CURL *curl; // curl handler
