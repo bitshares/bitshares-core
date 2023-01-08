@@ -357,8 +357,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          generate_block();
 
+         // Test history APIs
          graphene::app::history_api hist_api(app);
-         app.enable_plugin("elasticsearch");
 
          // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
          auto histories = hist_api.get_account_history(
@@ -652,6 +652,16 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[4].id.instance(), 0u);
+
+         // Ugly test to cover elasticsearch_plugin::get_operation_by_id()
+         if( !app.elasticsearch_thread )
+            app.elasticsearch_thread = std::make_shared<fc::thread>("elasticsearch");
+         auto es_plugin = app.get_plugin< graphene::elasticsearch::elasticsearch_plugin >("elasticsearch");
+         auto his_obj7 = app.elasticsearch_thread->async([&es_plugin]() {
+            return es_plugin->get_operation_by_id( operation_history_id_type(7) );
+         }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+         BOOST_REQUIRE( his_obj7.op.is_type<account_create_operation>() );
+         BOOST_CHECK_EQUAL( his_obj7.op.get<account_create_operation>().name, "alice" );
       }
    }
    catch (fc::exception &e) {
