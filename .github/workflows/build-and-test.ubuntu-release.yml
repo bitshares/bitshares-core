@@ -57,6 +57,14 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
+        df -h
+        free
+        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        df -h
+        free
         mkdir -p _build
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
