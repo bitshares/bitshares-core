@@ -407,7 +407,6 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    }
    // load ES or AH, but not both
    if(fixture.current_test_name == "elasticsearch_account_history" ||
-         fixture.current_test_name == "elasticsearch_suite" ||
          fixture.current_test_name == "elasticsearch_history_api") {
       fixture.app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
 
@@ -429,7 +428,7 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fixture.app.register_plugin<graphene::account_history::account_history_plugin>(true);
    }
 
-   if(fixture.current_test_name == "elasticsearch_objects" || fixture.current_test_name == "elasticsearch_suite") {
+   if( fixture.current_test_name == "elasticsearch_objects" ) {
       fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
       fc::set_option( options, "es-objects-elasticsearch-url", GRAPHENE_TESTING_ES_URL );

@@ -211,13 +211,14 @@ std::string es_client::get_version() const
 
    fc::variant content = fc::json::from_string( response.content );
    return content["version"]["number"].as_string();
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_LOG_AND_RETHROW( (base_url) ) }
 
 void es_client::check_version_7_or_above( bool& result ) const noexcept
 {
    static const int64_t version_7 = 7;
    try {
       const auto es_version = get_version();
+      ilog( "ES version detected: ${v}", ("v", es_version) );
       auto dot_pos = es_version.find('.');
       result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
    }

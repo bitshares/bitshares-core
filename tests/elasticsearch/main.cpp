@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             return (total == "5");
          });
 
-         es.endpoint = es.index_prefix + "*/_doc/_search";
+         es.endpoint = es.index_prefix + "*/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
 
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -255,14 +255,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "2");
          });
 
-         es.endpoint = es.index_prefix + "asset/_doc/_search";
+         es.endpoint = es.index_prefix + "asset/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_source"]["symbol"].as_string();
          BOOST_CHECK_EQUAL(first_id, "USD");
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
-         es.endpoint = es.index_prefix + "bitasset/_doc/_search";
+         es.endpoint = es.index_prefix + "bitasset/_search";
          es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""
                   + bitasset_data_id + "\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
@@ -275,7 +275,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
                             db.get_dynamic_global_properties().next_maintenance_time );
          generate_block();
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
          generate_block();
 
-         es.endpoint = es.index_prefix + "budget/_doc/_count";
+         es.endpoint = es.index_prefix + "budget/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -307,7 +307,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "1"); // new record inserted at the first maintenance block
          });
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -322,39 +322,6 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          });
 
       }
-   }
-   catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
-   try {
-
-      CURL *curl; // curl handler
-      curl = curl_easy_init();
-      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es.index_prefix = es_index_prefix;
-      auto delete_account_history = graphene::utilities::deleteAll(es);
-      BOOST_REQUIRE(delete_account_history); // require successful deletion
-
-      graphene::utilities::ES es_obj;
-      es_obj.curl = curl;
-      es_obj.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es_obj.index_prefix = es_obj_index_prefix;
-      auto delete_objects = graphene::utilities::deleteAll(es_obj);
-      BOOST_REQUIRE(delete_objects); // require successful deletion
-
-      if(delete_account_history && delete_objects) { // all records deleted
-
-
-      }
-      // Note: this test case ends too quickly, sometimes causing an memory access violation on cleanup
    }
    catch (fc::exception &e) {
       edump((e.to_detail_string()));
@@ -390,8 +357,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          generate_block();
 
+         // Test history APIs
          graphene::app::history_api hist_api(app);
-         app.enable_plugin("elasticsearch");
 
          // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
          auto histories = hist_api.get_account_history(
@@ -685,6 +652,16 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[4].id.instance(), 0u);
+
+         // Ugly test to cover elasticsearch_plugin::get_operation_by_id()
+         if( !app.elasticsearch_thread )
+            app.elasticsearch_thread = std::make_shared<fc::thread>("elasticsearch");
+         auto es_plugin = app.get_plugin< graphene::elasticsearch::elasticsearch_plugin >("elasticsearch");
+         auto his_obj7 = app.elasticsearch_thread->async([&es_plugin]() {
+            return es_plugin->get_operation_by_id( operation_history_id_type(7) );
+         }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+         BOOST_REQUIRE( his_obj7.op.is_type<account_create_operation>() );
+         BOOST_CHECK_EQUAL( his_obj7.op.get<account_create_operation>().name, "alice" );
       }
    }
    catch (fc::exception &e) {
