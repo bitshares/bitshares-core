@@ -68,6 +68,7 @@ void checkESVersion7OrAbove(ES& es, bool& result) noexcept
    static const int64_t version_7 = 7;
    try {
       const auto es_version = graphene::utilities::getESVersion(es);
+      ilog( "ES version detected: ${v}", ("v", es_version) );
       auto dot_pos = es_version.find('.');
       result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
    }
