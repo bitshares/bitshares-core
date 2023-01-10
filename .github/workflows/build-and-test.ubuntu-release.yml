@@ -14,6 +14,7 @@ jobs:
       elasticsearch8:
         image: elastic/elasticsearch:8.5.3
         options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
           --env xpack.security.enabled=false
           --env xpack.security.http.ssl.enabled=false
@@ -23,6 +24,7 @@ jobs:
       elasticsearch7:
         image: elastic/elasticsearch:7.17.8
         options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
           --env cluster.routing.allocation.disk.threshold_enabled=false
           --publish 9201:9200
@@ -57,12 +59,6 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
-        df -h
-        free
-        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
         df -h
         free
         mkdir -p _build
