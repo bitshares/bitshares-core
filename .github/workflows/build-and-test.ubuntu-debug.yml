@@ -64,6 +64,7 @@ jobs:
       run: |
         pwd
         df -h .
+        df -h
         free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /_build/tests /mnt/_build
