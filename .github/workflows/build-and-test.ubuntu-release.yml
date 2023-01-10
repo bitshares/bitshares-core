@@ -84,7 +84,7 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 1 -C _build
+        make -j 2 -C _build
         df -h
     - name: Unit-Tests
       run: |
