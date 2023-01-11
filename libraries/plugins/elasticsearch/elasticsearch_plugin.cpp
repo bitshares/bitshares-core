@@ -630,7 +630,8 @@ operation_history_object elasticsearch_plugin::get_operation_by_id( const operat
    }
    )";
 
-   const auto response = my->es->query( my->_options.index_prefix + "*/_doc/_search", query );
+   const auto uri = my->_options.index_prefix + ( my->is_es_version_7_or_above ? "*/_search" : "*/_doc/_search" );
+   const auto response = my->es->query( uri, query );
    variant variant_response = fc::json::from_string(response);
    const auto source = variant_response["hits"]["hits"][size_t(0)]["_source"];
    return fromEStoOperation(source);
@@ -677,7 +678,8 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
    if( !my->es->check_status() )
       return result;
 
-   const auto response = my->es->query( my->_options.index_prefix + "*/_doc/_search", query );
+   const auto uri = my->_options.index_prefix + ( my->is_es_version_7_or_above ? "*/_search" : "*/_doc/_search" );
+   const auto response = my->es->query( uri, query );
 
    variant variant_response = fc::json::from_string(response);
 
