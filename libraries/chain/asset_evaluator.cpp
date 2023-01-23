@@ -1341,13 +1341,16 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    // Process the rest
    const auto& head_time = d.head_block_time();
-   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
-   d.adjust_balance( op.account, -to_settle );
 
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
    if( after_core_hardfork_2582 && 0 == to_settle.amount )
       return result;
 
+   bool after_core_hardfork_2587 = HARDFORK_CORE_2587_PASSED( head_time );
+   if( after_core_hardfork_2587 && bitasset.current_feed.settlement_price.is_null() )
+      return result;
+
+   d.adjust_balance( op.account, -to_settle );
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
       s.owner = op.account;
@@ -1357,6 +1360,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    result.value.new_objects = flat_set<object_id_type>({ settle.id });
 
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    if( HARDFORK_CORE_2481_PASSED( maint_time ) )
    {
       d.apply_force_settlement( settle, bitasset, *asset_to_settle );
