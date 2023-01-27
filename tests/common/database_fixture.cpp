@@ -1533,6 +1533,35 @@ generic_operation_result database_fixture_base::delete_liquidity_pool( account_i
    return op_result.get<generic_operation_result>();
 }
 
+liquidity_pool_update_operation database_fixture_base::make_liquidity_pool_update_op( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )const
+{
+   liquidity_pool_update_operation op;
+   op.account = account;
+   op.pool = pool;
+   op.taker_fee_percent = taker_fee_percent;
+   op.withdrawal_fee_percent = withdrawal_fee_percent;
+   return op;
+}
+
+void database_fixture_base::update_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )
+{
+   liquidity_pool_update_operation op = make_liquidity_pool_update_op( account, pool, taker_fee_percent,
+                                                                       withdrawal_fee_percent );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+}
+
 liquidity_pool_deposit_operation database_fixture_base::make_liquidity_pool_deposit_op( account_id_type account,
                                                   liquidity_pool_id_type pool, const asset& amount_a,
                                                   const asset& amount_b )const
