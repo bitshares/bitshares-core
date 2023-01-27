@@ -22,6 +22,7 @@ public:
   bool _done = false;
   graphene::net::peer_connection_ptr _connection = graphene::net::peer_connection::make_shared(this);
   fc::promise<void>::ptr _probe_complete_promise = fc::promise<void>::create("probe_complete");
+  fc::future<void> _timeout_handler;
 
   fc::ip::endpoint _remote;
   graphene::net::node_id_t _node_id;
@@ -49,6 +50,15 @@ public:
                                   signature,
                                   chain_id,
                                   fc::variant_object());
+
+    constexpr uint16_t timeout = 180; // seconds
+    _timeout_handler = fc::schedule( [this]() {
+        wlog( "Communication with peer ${remote} took too long, closing connection", ("remote", _remote) );
+        wdump( (_peers)(_peers.size()) );
+        _timeout_handler = fc::future<void>();
+        _we_closed_connection = true;
+        _connection->close_connection();
+      }, fc::time_point::now() + fc::seconds(timeout), "timeout_handler" );
 
     _connection->send_message(hello);
   } catch( const fc::exception& e ) {
@@ -156,8 +166,9 @@ public:
   {
     // Note: In rare cases, the peer may neither send us an address_message nor close the connection,
     //       causing us to wait forever.
-    //       We tolerate it, because this program (network_mapper) is not critical.
+    //       In this case the timeout handler will close the connection.
     _done = true;
+    _timeout_handler.cancel();
     _probe_complete_promise->set_value();
   }
 
@@ -230,7 +241,7 @@ int main(int argc, char** argv)
   const auto& update_info_by_address_info = [ &address_info_by_node_id, &my_node_id, &nodes_already_visited,
                  &nodes_to_visit_set, &nodes_to_visit ] ( const graphene::net::address_info& info )
   {
-             if (info.node_id == my_node_id) // We should not be in the list, just be defensive here
+             if( info.node_id == graphene::net::node_id_t(my_node_id) ) // We should not be in the list, be defensive
                 return;
              if (nodes_already_visited.find(info.remote_endpoint) == nodes_already_visited.end() &&
                  nodes_to_visit_set.find(info.remote_endpoint) == nodes_to_visit_set.end())
@@ -361,7 +372,8 @@ int main(int argc, char** argv)
   constexpr uint16_t pair_depth = 2;
   for (auto& node_and_connections : connections_by_node_id)
     for (const graphene::net::address_info& this_connection : node_and_connections.second)
-      if( this_connection.node_id != my_node_id ) // We should not be in the list, just be defensive here
+      if( this_connection.node_id != graphene::net::node_id_t(my_node_id) ) // We should not be in the list,
+                                                                            // just be defensive here
         dot_stream << "  \"" << fc::variant( node_and_connections.first, pair_depth ).as_string()
                    << "\" -- \"" << fc::variant( this_connection.node_id, 1 ).as_string() << "\";\n";
 
