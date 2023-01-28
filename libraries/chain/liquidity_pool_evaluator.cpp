@@ -119,7 +119,7 @@ void_result liquidity_pool_update_evaluator::do_evaluate(const liquidity_pool_up
    const database& d = db();
    const auto block_time = d.head_block_time();
 
-   FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the LP hardfork" );
+   FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
 
    _pool = &op.pool(d);
 
