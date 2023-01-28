@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who owns the liquidity pool
