@@ -205,6 +205,10 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_expired_operation>(),
                    "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
       }
+      if (!HARDFORK_CORE_2604_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_update_operation>(),
+                   "Unable to define fees for liquidity pool update operation prior to the core-2604 hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -245,6 +249,9 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::liquidity_pool_delete_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
    }
    void operator()(const graphene::chain::liquidity_pool_deposit_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );

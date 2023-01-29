@@ -511,6 +511,11 @@ struct get_liquidity_pool_id_visitor
       return o.pool;
    }
 
+   result_type operator()( const liquidity_pool_update_operation& o )const
+   {
+      return o.pool;
+   }
+
    result_type operator()( const liquidity_pool_deposit_operation& o )const
    {
       return o.pool;

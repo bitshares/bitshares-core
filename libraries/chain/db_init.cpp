@@ -133,6 +133,7 @@ void database::initialize_evaluators()
    register_evaluator<ticket_update_evaluator>();
    register_evaluator<liquidity_pool_create_evaluator>();
    register_evaluator<liquidity_pool_delete_evaluator>();
+   register_evaluator<liquidity_pool_update_evaluator>();
    register_evaluator<liquidity_pool_deposit_evaluator>();
    register_evaluator<liquidity_pool_withdraw_evaluator>();
    register_evaluator<liquidity_pool_exchange_evaluator>();
