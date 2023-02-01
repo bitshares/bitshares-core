@@ -46,14 +46,14 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Push to DockerHub (for branches)
       if: env.DOCKER_PUSH_TAG != '' && env.DOCKER_PUSH_TAG_SHORT == ''
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v4
       with:
         context: .
         push: true
         tags: ${{ secrets.DOCKERHUB_REPO_PATH }}:${{ env.DOCKER_PUSH_TAG }}
     - name: Push to DockerHub (for tags)
       if: env.DOCKER_PUSH_TAG != '' && env.DOCKER_PUSH_TAG_SHORT != ''
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v4
       with:
         context: .
         push: true
