@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch8:
-        image: elastic/elasticsearch:8.5.3
+        image: elastic/elasticsearch:8.6.1
         options: >-
           --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
@@ -22,7 +22,7 @@ jobs:
           --env cluster.routing.allocation.disk.threshold_enabled=false
           --publish 9200:9200
       elasticsearch7:
-        image: elastic/elasticsearch:7.17.8
+        image: elastic/elasticsearch:7.17.9
         options: >-
           --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
