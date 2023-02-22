@@ -368,9 +368,11 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
       if( limit_ptr )
       {
          modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
-            obj.for_sale += fund_receives.amount;
-            obj.sell_price.base.amount = obj.for_sale;
-            obj.sell_price.quote.amount += order.debt;
+            obj.settled_debt_amount += order.debt;
+            obj.settled_collateral_amount += fund_receives.amount;
+            obj.for_sale = obj.settled_collateral_amount;
+            obj.sell_price.base.amount = obj.settled_collateral_amount;
+            obj.sell_price.quote.amount = obj.settled_debt_amount;
          } );
       }
       else
@@ -381,6 +383,8 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
             obj.for_sale = fund_receives.amount;
             obj.sell_price = fund_receives / order_debt;
             obj.is_settled_debt = true;
+            obj.settled_debt_amount = order_debt.amount;
+            obj.settled_collateral_amount = fund_receives.amount;
          } );
       }
       // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
@@ -1135,9 +1139,11 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    else
    {
       modify( maker, [&order_receives,&call_receives]( limit_order_object& obj ) {
-         obj.for_sale -= order_receives.amount;
-         obj.sell_price.base.amount = obj.for_sale;
-         obj.sell_price.quote.amount -= call_receives.amount;
+         obj.settled_debt_amount -= call_receives.amount;
+         obj.settled_collateral_amount -= order_receives.amount;
+         obj.for_sale = obj.settled_collateral_amount;
+         obj.sell_price.base.amount = obj.settled_collateral_amount;
+         obj.sell_price.quote.amount = obj.settled_debt_amount;
       });
    }
 

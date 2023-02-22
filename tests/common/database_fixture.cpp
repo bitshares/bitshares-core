@@ -582,6 +582,8 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       {
          total_debts[o.receive_asset_id()] += o.sell_price.quote.amount;
          BOOST_CHECK_EQUAL( o.sell_price.base.amount.value, for_sale.amount.value );
+         BOOST_CHECK_EQUAL( o.settled_collateral_amount.value, for_sale.amount.value );
+         BOOST_CHECK_EQUAL( o.sell_price.quote.amount.value, o.settled_debt_amount.value );
       }
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
