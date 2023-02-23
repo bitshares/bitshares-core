@@ -1091,7 +1091,7 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    bool maker_filled = false;
 
    auto usd_for_sale = taker.amount_for_sale();
-   auto usd_to_buy = maker.sell_price.quote;
+   auto usd_to_buy = asset( maker.settled_debt_amount, maker.receive_asset_id() );
 
    asset call_receives;
    asset order_receives;
@@ -1121,16 +1121,36 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    // seller, pays, receives, ...
    bool taker_filled = fill_limit_order( taker, call_receives, order_receives, cull_taker, match_price, false );
 
-   // Reduce current supply
+   const auto& head_time = head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+
+   asset call_pays = order_receives;
+   if( maker_filled ) // Regardless of hf core-2591
+      call_pays.amount = maker.settled_collateral_amount;
+   else if( maker.for_sale != maker.settled_collateral_amount ) // implies hf core-2591
+   {
+      price settle_price = asset( maker.settled_collateral_amount, maker.sell_asset_id() )
+                         / asset( maker.settled_debt_amount, maker.receive_asset_id() );
+      call_pays = call_receives * settle_price; // round down here, in favor of call order
+   }
+   if( call_pays < order_receives ) // be defensive, maybe unnecessary
+   {
+      wlog( "Unexpected scene: call_pays < order_receives" );
+      call_pays = order_receives;
+   }
+   asset collateral_fee = call_pays - order_receives;
+
+   // Reduce current supply, and accumulate collateral fees
    const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
-   modify( mia_ddo, [&call_receives]( asset_dynamic_data_object& ao ){
+   modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
       ao.current_supply -= call_receives.amount;
+      ao.accumulated_collateral_fees += collateral_fee.amount;
    });
 
    // Push fill_order vitual operation
    // id, seller, pays, receives, ...
-   push_applied_operation( fill_order_operation( maker.id, maker.seller, order_receives, call_receives,
-                                                 asset(0, call_receives.asset_id), match_price, true ) );
+   push_applied_operation( fill_order_operation( maker.id, maker.seller, call_pays, call_receives,
+                                                 collateral_fee, match_price, true ) );
 
    // Update the maker order
    // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
@@ -1138,13 +1158,32 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
       remove( maker );
    else
    {
-      modify( maker, [&order_receives,&call_receives]( limit_order_object& obj ) {
+      modify( maker, [after_core_hardfork_2591,&call_pays,&call_receives]( limit_order_object& obj ) {
          obj.settled_debt_amount -= call_receives.amount;
-         obj.settled_collateral_amount -= order_receives.amount;
-         obj.for_sale = obj.settled_collateral_amount;
-         obj.sell_price.base.amount = obj.settled_collateral_amount;
-         obj.sell_price.quote.amount = obj.settled_debt_amount;
+         obj.settled_collateral_amount -= call_pays.amount;
+         if( after_core_hardfork_2591 )
+         {
+            // Note: for simplicity, only update price when necessary
+            asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+            obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
+            if( obj.for_sale > obj.settled_collateral_amount ) // be defensive, maybe unnecessary
+            {
+               wlog( "Unexpected scene: obj.for_sale > obj.settled_collateral_amount" );
+               obj.for_sale = obj.settled_collateral_amount;
+               obj.sell_price.base.amount = obj.settled_collateral_amount;
+               obj.sell_price.quote.amount = obj.settled_debt_amount;
+            }
+         }
+         else
+         {
+            obj.for_sale = obj.settled_collateral_amount;
+            obj.sell_price.base.amount = obj.settled_collateral_amount;
+            obj.sell_price.quote.amount = obj.settled_debt_amount;
+         }
       });
+      // Note:
+      // After the price is updated, it is possible that the order can be matched with another order on the order
+      // book, which may then be matched with more other orders. For simplicity, we don't do more matching here.
    }
 
    match_result_type result = get_match_result( taker_filled, maker_filled );
