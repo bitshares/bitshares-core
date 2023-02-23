@@ -364,15 +364,39 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
    }
    else // settle to order
    {
+      const auto& head_time = head_block_time();
+      bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+
       const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
       if( limit_ptr )
       {
-         modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
+         modify( *limit_ptr, [&order,&fund_receives,after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
             obj.settled_debt_amount += order.debt;
             obj.settled_collateral_amount += fund_receives.amount;
-            obj.for_sale = obj.settled_collateral_amount;
-            obj.sell_price.base.amount = obj.settled_collateral_amount;
-            obj.sell_price.quote.amount = obj.settled_debt_amount;
+            // TODO fix duplicate code
+            bool sell_all = true;
+            if( after_core_hardfork_2591 )
+            {
+               obj.sell_price = ~bitasset.get_margin_call_order_price();
+               asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+               try
+               {
+                  obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount; // may overflow
+                  if( obj.for_sale <= obj.settled_collateral_amount ) // "=" for consistency of order matching logic
+                     sell_all = false;
+               }
+               catch( fc::exception& e ) // catch the overflow
+               {
+                  // do nothing
+                  dlog( e.to_detail_string() );
+               }
+            }
+            if( sell_all )
+            {
+               obj.for_sale = obj.settled_collateral_amount;
+               obj.sell_price.base.amount = obj.settled_collateral_amount;
+               obj.sell_price.quote.amount = obj.settled_debt_amount;
+            }
          } );
       }
       else
