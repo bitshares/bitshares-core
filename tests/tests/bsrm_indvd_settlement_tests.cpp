@@ -1855,15 +1855,32 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
 
 } FC_LOG_AND_RETHROW() }
 
-/// Tests individual settlement to order : settles when price drops, and how orders are being matched after settled
-BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
-{
-   try {
+/// Tests individual settlement to order : settles when price drops, and the settled-debt order is matched as maker
+/// * Before hf core-2591, the settled-debt order is filled at its own price (collateral amount / debt amount)
+/// * After hf core-2591, the settled-debt order is filled at margin call order price (MCOP)
+BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test )
+{ try {
 
-      // Advance to core-2467 hard fork
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_2467_TIME - mi);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   // Advance to core-2467 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   // multiple passes,
+   // i == 0 : before hf core-2591
+   // i == 1 : after hf core-2591
+   for( int i = 0; i < 2; ++i )
+   {
+      idump( (i) );
+
+      if( 1 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
+         generate_block();
+      }
+
       set_expiration( db, trx );
 
       ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(borrower4)(seller));
@@ -1977,8 +1994,12 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
 
       // call: margin call fee deducted = round_down(2000*11/1250) = 17,
       // fund receives 2000 - 17 = 1983
+      BOOST_CHECK( settled_debt->is_settled_debt );
       BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 1983 );
       BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 100000 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 100000 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 1983 );
+      BOOST_CHECK( settled_debt->sell_price == asset(1983)/asset(100000,mpa_id) );
       // order match price = 100000 / 1983 = 50.428643469
 
       BOOST_CHECK( !db.find( call_id ) );
@@ -1988,6 +2009,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 2200 );
       BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
       BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
+
+      BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 17 );
 
       // seller sells some
       const limit_order_object* limit_ptr = create_sell_order( seller, asset(10000,mpa_id), asset(100) );
@@ -2007,11 +2030,20 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
       BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
 
+      // no change to the settled-debt order
+      settled_debt = db.find_settled_debt_order(mpa_id);
+      BOOST_REQUIRE( settled_debt );
+      BOOST_CHECK( settled_debt->is_settled_debt );
       BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 1983 );
       BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 100000 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 100000 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 1983 );
+      BOOST_CHECK( settled_debt->sell_price == asset(1983)/asset(100000,mpa_id) );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 390021 ); // 400000 - 9979
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 204 );
+
+      BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 18 ); // 17 + 1
 
       // publish a new feed so that 2 other debt positions are undercollateralized
       f.settlement_price = price( asset(100000,mpa_id), asset(1800) );
@@ -2034,9 +2066,17 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       // fund receives 1895 - 16 = 1879
       // call3: margin call fee deducted = round_down(2200*11/1250) = 19,
       // fund receives 2200 - 19 = 2181
+      settled_debt = db.find_settled_debt_order(mpa_id);
+      BOOST_REQUIRE( settled_debt );
+      BOOST_CHECK( settled_debt->is_settled_debt );
       BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 ); // 1983 + 1879 + 2181
       BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 ); // 100000 + 90021 + 100000
+      BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+      BOOST_CHECK( settled_debt->sell_price == asset(6043)/asset(290021,mpa_id) );
       // order match price = 290021 / 6043 = 47.992884329
+
+      BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 53 ); // 17 + 1 + 16 + 19
 
       // borrower buys at higher price
       const limit_order_object* buy_high = create_sell_order( borrower, asset(10), asset(100,mpa_id) );
@@ -2054,102 +2094,290 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
       BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
       BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
 
-      BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 ); // no change
-      BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 ); // no change
+      // no change to the settled-debt order
+      settled_debt = db.find_settled_debt_order(mpa_id);
+      BOOST_REQUIRE( settled_debt );
+      BOOST_CHECK( settled_debt->is_settled_debt );
+      BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 );
+      BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+      BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+      BOOST_CHECK( settled_debt->sell_price == asset(6043)/asset(290021,mpa_id) );
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389921 ); // 400000 - 9979 - 100
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 214 ); // 204 + 10
 
-      // publish a new feed so that the settled debt order is in the front of the order book
+      // publish a new feed so that
+      // * before hf core-2591, the settled debt order is in the front of the order book
+      // * after hf core-2591, the settled debt order is updated to be behind the margin call orders
       f.settlement_price = price( asset(100000,mpa_id), asset(1600) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1600 * 1000:1250 = 100000:2000 = 50
       // call match price = 100000:1600 * 1000:1239 = 100000:1982.4 = 50.443906376
+
+      if( 0 == i )
+      {
+         // no change to the settled-debt order
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 );
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+         BOOST_CHECK( settled_debt->sell_price == asset(6043)/asset(290021,mpa_id) );
+      }
+      else if( 1 == i )
+      {
+         // the settled-debt order is updated
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 5750 ); // round_up(290021 * 19824 / 1000000)
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290052 ); //round_down(5750*1000000/19824)
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+         BOOST_CHECK( settled_debt->sell_price == asset(19824)/asset(1000000,mpa_id) );
+      }
 
       // borrower buys at higher price
       buy_high = create_sell_order( borrower, asset(10), asset(100,mpa_id) );
       BOOST_CHECK( buy_high );
       buy_high_id = buy_high->get_id();
 
-      // seller sells some, this will match buy_high,
-      // and when it matches the settled debt, it will be cancelled since it is too small
+      // seller sells some, this will match buy_high, then
+      // * before hf core-2591, when it matches the settled debt, it will be cancelled since it is too small
+      // * after hf core-2591, when it matches a call order, it will be cancelled since it is too small
       limit_ptr = create_sell_order( seller, asset(120,mpa_id), asset(1) );
       // the limit order is filled
       BOOST_CHECK( !limit_ptr );
       // buy_high is filled
       BOOST_CHECK( !db.find( buy_high_id ) );
 
-      BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 ); // no change
-      BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 ); // no change
+      if( 0 == i )
+      {
+         // no change to the settled-debt order
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 6043 );
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+         BOOST_CHECK( settled_debt->sell_price == asset(6043)/asset(290021,mpa_id) );
+      }
+      else if( 1 == i )
+      {
+         // no change to the settled-debt order
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 5750 );
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290052 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+         BOOST_CHECK( settled_debt->sell_price == asset(19824)/asset(1000000,mpa_id) );
+      }
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389821 ); // 400000 - 9979 - 100 - 100
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 224 ); // 204 + 10 + 10
+
+      BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 53 ); // 17 + 1 + 16 + 19
 
       // seller sells some
       limit_ptr = create_sell_order( seller, asset(10000,mpa_id), asset(100) );
       // the limit order is filled
       BOOST_CHECK( !limit_ptr );
-      // the settled debt is partially filled
-      // limit order receives = round_down(10000*6043/290021) = 208
-      // settled debt receives = round_up(208*290021/6043) = 9983
 
-      BOOST_CHECK( !db.find( call_id ) );
-      BOOST_CHECK( !db.find( call2_id ) );
-      BOOST_CHECK( !db.find( call3_id ) );
-      BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
-      BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
+      if( 0 == i )
+      {
+         // the settled debt is partially filled
+         // limit order receives = round_down(10000*6043/290021) = 208
+         // settled debt receives = round_up(208*290021/6043) = 9983
 
-      BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 5835 ); // 6043 - 208
-      BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 280038 ); // 290021 - 9983
+         BOOST_CHECK( !db.find( call_id ) );
+         BOOST_CHECK( !db.find( call2_id ) );
+         BOOST_CHECK( !db.find( call3_id ) );
+         BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
+         BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
 
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 379838 ); // 400000 - 9979 - 100 - 100 - 9983
-      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 432 ); // 204 + 10 + 10 + 208
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 5835 ); // 6043 - 208
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 280038 ); // 290021 - 9983
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 280038 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 5835 );
+         BOOST_CHECK( settled_debt->sell_price == asset(5835)/asset(280038,mpa_id) );
+
+         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 379838 ); // 400000 - 9979 - 100 - 100 - 9983
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 432 ); // 204 + 10 + 10 + 208
+
+         BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 53 ); // no change
+      }
+      else if( 1 == i )
+      {
+         // call4 is partially filled
+         // limit order gets round_down(10000*(1600/100000)*(1239/1000)) = 198
+         // limit order pays round_up(198*(100000/1600)*(1000/1239)) = 9988
+         // call4 gets 9988
+         // call4 pays round_down(9988*(1600/100000)*(1250/1000)) = 199, margin call fee = 1
+
+         BOOST_CHECK( !db.find( call_id ) );
+         BOOST_CHECK( !db.find( call2_id ) );
+         BOOST_CHECK( !db.find( call3_id ) );
+         BOOST_CHECK_EQUAL( call4_id(db).debt.value, 90012 ); // 100000 - 9988
+         BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2301 ); // 2500 - 199
+
+         // no change to the settled-debt order
+         settled_debt = db.find_settled_debt_order(mpa_id);
+         BOOST_REQUIRE( settled_debt );
+         BOOST_CHECK( settled_debt->is_settled_debt );
+         BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 5750 );
+         BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 290052 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 290021 );
+         BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 6043 );
+         BOOST_CHECK( settled_debt->sell_price == asset(19824)/asset(1000000,mpa_id) );
+
+         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 379833 ); // 400000 - 9979 - 100 - 100 - 9988
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 422 ); // 204 + 10 + 10 + 198
+
+         BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 54 ); // 53 + 1
+      }
 
       // seller sells some
       limit_ptr = create_sell_order( seller, asset(300000,mpa_id), asset(3000) );
       // the limit order is filled
       BOOST_CHECK( !limit_ptr );
 
-      auto final_check = [&]
+      auto check_result = [&]
       {
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
 
-         // the settled debt is fully filled
-         BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
-         // limit order reminder = 300000 - 280038 = 19962
-         // call4 is partially filled
-         // limit order gets round_down(19962*(1600/100000)*(1239/1000)) = 395
-         // limit order pays round_up(395*(100000/1600)*(1000/1239)) = 19926
-         // call4 gets 19926
-         // call4 pays round_down(19926*(1600/100000)*(1250/1000)) = 398, margin call fee = 3
+         if( 0 == i )
+         {
+            // the settled debt is fully filled
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+            // limit order reminder = 300000 - 280038 = 19962
+            // call4 is partially filled
+            // limit order gets round_down(19962*(1600/100000)*(1239/1000)) = 395
+            // limit order pays round_up(395*(100000/1600)*(1000/1239)) = 19926
+            // call4 gets 19926
+            // call4 pays round_down(19926*(1600/100000)*(1250/1000)) = 398, margin call fee = 3
 
-         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 79874 ); // 400000 - 9979 - 100 - 100 - 9983
-                                                                       // - 280038 - 19926
-         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 6662 ); // 204 + 10 + 10 + 208 + 5835 + 395
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 79874 ); // 400000 - 9979 - 100 - 100 - 9983
+                                                                          // - 280038 - 19926
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 6662 ); // 204 + 10 + 10 + 208 + 5835 + 395
 
-         BOOST_CHECK( !db.find( call_id ) );
-         BOOST_CHECK( !db.find( call2_id ) );
-         BOOST_CHECK( !db.find( call3_id ) );
-         BOOST_CHECK_EQUAL( call4_id(db).debt.value, 80074 ); // 100000 - 19926
-         BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2102 ); // 2500 - 398
+            BOOST_CHECK( !db.find( call_id ) );
+            BOOST_CHECK( !db.find( call2_id ) );
+            BOOST_CHECK( !db.find( call3_id ) );
+            BOOST_CHECK_EQUAL( call4_id(db).debt.value, 80074 ); // 100000 - 19926
+            BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2102 ); // 2500 - 398
+
+            BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 56 ); // 53 + 3
+         }
+         else if( 1 == i )
+         {
+            // call4 is fully filled
+            BOOST_CHECK( !db.find( call_id ) );
+            BOOST_CHECK( !db.find( call2_id ) );
+            BOOST_CHECK( !db.find( call3_id ) );
+            BOOST_CHECK( !db.find( call4_id ) );
+            // call4 gets 90012
+            // limit order gets round_up(90012*(1600/100000)*(1239/1000)) = 1785
+            // call4 pays round_up(90012*(1600/100000)*(1250/1000)) = 1801, margin call fee = 1801 - 1785 = 16
+
+            // limit order reminder = 300000 - 90012 = 209988
+            // the settled debt is partially filled
+            // limit order receives = round_down(209988*19824/1000000) = 4162
+            // settled debt receives = round_up(4162*1000000/19824) = 209948
+            // settled debt pays = round_down(209948*6043/290021) = 4374, collateral fee = 4374 - 4162 = 212
+
+            settled_debt = db.find_settled_debt_order(mpa_id);
+            BOOST_REQUIRE( settled_debt );
+            BOOST_CHECK( settled_debt->is_settled_debt );
+            BOOST_CHECK_EQUAL( settled_debt->for_sale.value, 1588 ); // round_up( 80073 * 19824 / 1000000 )
+            BOOST_CHECK_EQUAL( settled_debt->amount_to_receive().amount.value, 80104 ); //rnd_down(1588*1000000/19824)
+            BOOST_CHECK_EQUAL( settled_debt->settled_debt_amount.value, 80073 ); // 290021 - 209948
+            BOOST_CHECK_EQUAL( settled_debt->settled_collateral_amount.value, 1669 ); // 6043 - 4374
+            BOOST_CHECK( settled_debt->sell_price == asset(19824)/asset(1000000,mpa_id) );
+
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 79873 ); // 400000 - 9979 - 100 - 100 - 9988
+                                                                          // - 90012 - 209948
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 6369 ); // 204 + 10 + 10 + 198 + 1785 + 4162
+
+            BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 282 ); // 54 + 16 + 212
+         }
 
       };
 
-      final_check();
+      check_result();
 
       BOOST_TEST_MESSAGE( "Generate a block" );
       generate_block();
 
-      final_check();
+      check_result();
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+      if( 1 == i )
+      {
+
+         // undercollateralization price = 100000:5000 * 1250:1000 = 100000:4000
+         const call_order_object* call5_ptr = borrow( borrower4_id(db), asset(100000, mpa_id), asset(5000) );
+         BOOST_REQUIRE( call5_ptr );
+         call_order_id_type call5_id = call5_ptr->get_id();
+
+         BOOST_CHECK_EQUAL( call5_id(db).debt.value, 100000 );
+         BOOST_CHECK_EQUAL( call5_id(db).collateral.value, 5000 );
+
+         transfer( borrower4_id(db), seller_id(db), asset(100000,mpa_id) );
+
+         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 179873 ); // 79873 + 100000
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 6369 ); // no change
+
+         // seller sells some
+         limit_ptr = create_sell_order( seller_id(db), asset(100000,mpa_id), asset(1000) );
+         // the limit order is partially filled
+         BOOST_REQUIRE( limit_ptr );
+         limit_order_id_type limit_id = limit_ptr->get_id();
+
+         auto check_result_1 = [&]
+         {
+            // the settled-debt order is fully filled
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+
+            // settled debt receives = 80073
+            // limit order receives = round_up(80073*19824/1000000) = 1588
+            // settled debt pays = 1669, collateral fee = 1669 - 1588 = 81
+
+            BOOST_CHECK_EQUAL( limit_id(db).for_sale.value, 19927 ); // 100000 - 80073
+
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 79873 ); // 179873 - 100000
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 7957 ); // 6369 + 1588
+
+            BOOST_CHECK_EQUAL( mpa_id(db).dynamic_data(db).accumulated_collateral_fees.value, 363 ); // 282 + 81
+         };
+
+         check_result_1();
+
+         BOOST_TEST_MESSAGE( "Generate a new block" );
+         generate_block();
+
+         check_result_1();
+
+         // reset
+         db.pop_block();
+      }
+
+      // reset
+      db.pop_block();
+
+   } // for i
+
+} FC_LOG_AND_RETHROW() }
 
 /// Tests a scenario that force settlements get cancelled on expiration when there is no debt position
 /// due to individual settlement to order
