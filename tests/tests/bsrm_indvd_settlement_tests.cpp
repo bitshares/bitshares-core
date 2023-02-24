@@ -2382,8 +2382,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
 /// Tests a scenario that force settlements get cancelled on expiration when there is no debt position
 /// due to individual settlement to order
 BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
-{
-   try {
+{ try {
 
       // Advance to core-2467 hard fork
       auto mi = db.get_global_properties().parameters.maintenance_interval;
@@ -2553,10 +2552,6 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa2_id ), 88900 ); // 100000 - 11100
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
