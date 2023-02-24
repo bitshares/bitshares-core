@@ -1014,12 +1014,7 @@ static database::match_result_type get_match_result( bool taker_filled, bool mak
 /**
  *  Matches the two orders, the first parameter is taker, the second is maker.
  *
- *  @return a bit field indicating which orders were filled (and thus removed)
- *
- *  0 - no orders were matched
- *  1 - taker was filled
- *  2 - maker was filled
- *  3 - both were filled
+ *  @return which orders were filled (and thus removed)
  */
 database::match_result_type database::match( const limit_order_object& taker, const limit_order_object& maker,
                                              const price& match_price )
@@ -1032,10 +1027,12 @@ database::match_result_type database::match( const limit_order_object& taker, co
                                 : match_limit_normal_limit( taker, maker, match_price );
 }
 
+/// Match a normal limit order with another normal limit order
 database::match_result_type database::match_limit_normal_limit( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
    FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
+   FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
 
    auto taker_for_sale = taker.amount_for_sale();
    auto maker_for_sale = maker.amount_for_sale();
@@ -1105,11 +1102,12 @@ database::match_result_type database::match_limit_normal_limit( const limit_orde
    return result;
 }
 
-// When matching a limit order against settled debt, the maker actually behaviors like a call order
+/// When matching a limit order against settled debt, the maker actually behaviors like a call order
 database::match_result_type database::match_limit_settled_debt( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
    FC_ASSERT( maker.is_settled_debt, "Internal error: maker is not settled debt" );
+   FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
 
    bool cull_taker = false;
    bool maker_filled = false;
@@ -1213,6 +1211,95 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    match_result_type result = get_match_result( taker_filled, maker_filled );
    return result;
 }
+
+/// When matching a settled debt order against a limit order, the taker actually behaviors like a call order
+// TODO fix duplicate code
+database::match_result_type database::match_settled_debt_limit( const limit_order_object& taker,
+                               const limit_order_object& maker, const price& match_price )
+{
+   FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
+   FC_ASSERT( taker.is_settled_debt, "Internal error: taker is not settled debt" );
+
+   bool taker_filled = false;
+
+   auto usd_for_sale = maker.amount_for_sale();
+   auto usd_to_buy = asset( taker.settled_debt_amount, taker.receive_asset_id() );
+
+   asset call_receives;
+   asset order_receives;
+   if( usd_to_buy > usd_for_sale )
+   {  // fill maker limit order
+      order_receives = usd_for_sale * match_price; // round down here, in favor of call order
+
+      // Be here, the limit order won't be paying something for nothing, since if it would, it would have
+      //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing).
+
+      call_receives = order_receives.multiply_and_round_up( match_price );
+   }
+   else
+   {  // fill taker "call order"
+      call_receives = usd_to_buy;
+      order_receives = call_receives.multiply_and_round_up( match_price ); // round up here, in favor of limit order
+      taker_filled = true;
+   }
+
+   asset call_pays = order_receives;
+   if( taker_filled )
+      call_pays.amount = taker.settled_collateral_amount;
+   else if( taker.for_sale != taker.settled_collateral_amount )
+   {
+      price settle_price = asset( taker.settled_collateral_amount, taker.sell_asset_id() )
+                         / asset( taker.settled_debt_amount, taker.receive_asset_id() );
+      call_pays = call_receives * settle_price; // round down here, in favor of call order
+   }
+   if( call_pays < order_receives ) // be defensive, maybe unnecessary
+   {
+      wlog( "Unexpected scene: call_pays < order_receives" );
+      call_pays = order_receives;
+   }
+   asset collateral_fee = call_pays - order_receives;
+
+   // Reduce current supply, and accumulate collateral fees
+   const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
+   modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
+      ao.current_supply -= call_receives.amount;
+      ao.accumulated_collateral_fees += collateral_fee.amount;
+   });
+
+   // Push fill_order vitual operation
+   // id, seller, pays, receives, ...
+   push_applied_operation( fill_order_operation( taker.id, taker.seller, call_pays, call_receives,
+                                                 collateral_fee, match_price, false ) );
+
+   // Update the taker order
+   // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
+   if( taker_filled )
+      remove( taker );
+   else
+   {
+      modify( taker, [&call_pays,&call_receives]( limit_order_object& obj ) {
+         obj.settled_debt_amount -= call_receives.amount;
+         obj.settled_collateral_amount -= call_pays.amount;
+         // Note: for simplicity, only update price when necessary
+         asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+         obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
+         if( obj.for_sale > obj.settled_collateral_amount ) // be defensive, maybe unnecessary
+         {
+            wlog( "Unexpected scene: obj.for_sale > obj.settled_collateral_amount" );
+            obj.for_sale = obj.settled_collateral_amount;
+            obj.sell_price.base.amount = obj.settled_collateral_amount;
+            obj.sell_price.quote.amount = obj.settled_debt_amount;
+         }
+      });
+   }
+
+   // seller, pays, receives, ...
+   bool maker_filled = fill_limit_order( maker, call_receives, order_receives, true, match_price, true );
+
+   match_result_type result = get_match_result( taker_filled, maker_filled );
+   return result;
+}
+
 
 database::match_result_type database::match( const limit_order_object& bid, const call_order_object& ask,
                      const price& match_price,
@@ -1930,8 +2017,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
       if( settled_some ) // which implies that BSRM is individual settlement to fund or to order
       {
          call_collateral_itr = call_collateral_index.lower_bound( call_min );
-         if( call_collateral_itr == call_collateral_end )
+         if( call_collateral_itr == call_collateral_end ) // no call order left
+         {
+            check_settled_debt_order( bitasset );
             return true;
+         }
          margin_called = true;
          if( bsrm_type::individual_settlement_to_fund == bsrm )
             limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
@@ -1945,7 +2035,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
                             ( after_hardfork_436 && bitasset.current_feed.settlement_price > ~call_order.call_price )
                           : ( bitasset.current_maintenance_collateralization < call_order.collateralization() );
       if( feed_protected )
+      {
+         check_settled_debt_order( bitasset );
          return margin_called;
+      }
 
       // match call orders with limit orders
       if( limit_itr != limit_end )
@@ -2133,6 +2226,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
          return margin_called;
 
       // If no force settlements, we return
+      // Note: there is no matching limit order due to MSSR, or no limit order at all,
+      //       in either case, the settled debt order can't be matched
       auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
       if( settle_itr == settlement_index.end() || settle_itr->balance.asset_id != bitasset.asset_id )
          return margin_called;
@@ -2154,6 +2249,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
       }
       // else : no more force settlements, or feed protected, both will be handled in the next loop
    } // while there exists a call order
+   check_settled_debt_order( bitasset );
    return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -2222,6 +2318,47 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
       call_itr = call_collateral_index.lower_bound( call_min );
    }
    return false;
+}
+
+void database::check_settled_debt_order( const asset_bitasset_data_object& bitasset )
+{
+   const auto& head_time = head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+   if( !after_core_hardfork_2591 )
+      return;
+
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   const auto bsrm = bitasset.get_black_swan_response_method();
+   if( bsrm_type::individual_settlement_to_order != bsrm )
+      return;
+
+   const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
+   if( !limit_ptr )
+      return;
+
+   const limit_order_index& limit_index = get_index_type<limit_order_index>();
+   const auto& limit_price_index = limit_index.indices().get<by_price>();
+
+   // Looking for limit orders selling the most USD for the least CORE.
+   auto max_price = price::max( bitasset.asset_id, bitasset.options.short_backing_asset );
+   // Stop when limit orders are selling too little USD for too much CORE.
+   auto min_price = ~limit_ptr->sell_price;
+
+   // NOTE limit_price_index is sorted from greatest to least
+   auto limit_itr = limit_price_index.lower_bound( max_price );
+   auto limit_end = limit_price_index.upper_bound( min_price );
+
+   bool finished = false; // whether the settled debt order is gone
+   while( !finished && limit_itr != limit_end )
+   {
+      const limit_order_object& matching_limit_order = *limit_itr;
+      ++limit_itr;
+      price old_price = limit_ptr->sell_price;
+      finished = ( match_settled_debt_limit( *limit_ptr, matching_limit_order, matching_limit_order.sell_price )
+                   != match_result_type::only_maker_filled );
+      if( !finished && old_price != limit_ptr->sell_price )
+         limit_end = limit_price_index.upper_bound( ~limit_ptr->sell_price );
+   }
 }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
