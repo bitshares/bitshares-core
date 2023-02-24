@@ -45,16 +45,26 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    // multiple passes,
-   // 0 : individual settlement to order
-   // 1, 2 : individual settlement to fund
-   for( int i = 0; i < 3; ++ i )
+   // 0 : individual settlement to order, before hf core-2582
+   // 1, 2 : individual settlement to fund, before hf core-2582
+   // 3 : individual settlement to order, after hf core-2582
+   // 4, 5 : individual settlement to fund, after hf core-2582
+   // 6 : individual settlement to order, after hf core-2591
+   // 7, 8 : individual settlement to fund, after hf core-2591
+   for( int i = 0; i < 9; ++ i )
    {
       idump( (i) );
 
-      if( 1 == i )
+      if( 3 == i )
       {
          // Advance to core-2582 hard fork
          generate_blocks(HARDFORK_CORE_2582_TIME);
+         generate_block();
+      }
+      else if( 6 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
          generate_block();
       }
 
@@ -72,8 +82,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       fund( borrower5, asset(init_amount) );
 
       using bsrm_type = bitasset_options::black_swan_response_type;
-      uint8_t bsrm_value = (i == 0) ? static_cast<uint8_t>(bsrm_type::individual_settlement_to_order)
-                                    : static_cast<uint8_t>(bsrm_type::individual_settlement_to_fund);
+      uint8_t bsrm_value = ( 0 == ( i % 3 ) ) ? static_cast<uint8_t>(bsrm_type::individual_settlement_to_order)
+                                              : static_cast<uint8_t>(bsrm_type::individual_settlement_to_fund);
 
       // Create asset
       asset_create_operation acop;
@@ -96,10 +106,10 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
       asset_id_type mpa_id = mpa.get_id();
 
-      if( 0 == i )
+      if( 0 == ( i % 3 ) )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_order );
-      else if( 1 == i || 2 == i )
+      else
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_fund );
 
@@ -305,7 +315,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
          // fund gets round_up(605 * 1239/1250) = 600, margin call fee = 605 - 600 = 5
          // fund debt = 30029
 
-         if( 0 == i ) // to order
+         if( 0 == ( i % 3 ) ) // to order
          {
             // call2 is matched with sell_mid
             // the size is the same, consider call2 as smaller
@@ -372,7 +382,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             BOOST_CHECK_EQUAL( get_balance( seller4_id, mpa_id ), 980000 ); // no change
             BOOST_CHECK_EQUAL( get_balance( seller4_id, asset_id_type() ), 439 ); // 439
          }
-         else if( 1 == i || 2 == i ) // to fund
+         else // to fund
          {
             // sell_mid price is 100000/2000 = 50
             // call pays price is (100000/2000) * (1239:1250) = 49.56
@@ -478,7 +488,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
 
       check_result();
 
-      if( 1 == i ) // additional tests
+      if( ( i >= 3 ) && ( 1 == ( i % 3 ) ) ) // additional tests, only pass after hf core-2582
       {
          set_expiration( db, trx );
 
@@ -504,7 +514,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
          // reset
          db.pop_block();
       }
-      else if( 2 == i ) // additional tests
+      else if( ( i >= 3 ) && ( 2 == ( i % 3 ) ) ) // additional tests. NOTE: infinity loop and OOM before hf core-2582
       {
          set_expiration( db, trx );
 
