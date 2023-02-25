@@ -679,7 +679,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       f.settlement_price = price( asset(100000,mpa_id), asset(1650,samcoin_id) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -929,7 +929,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
       f.settlement_price = price( asset(100000,mpa_id), asset(1650,samcoin_id) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -1157,7 +1157,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       f.settlement_price = price( asset(100000,mpa_id), asset(1650) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -1479,7 +1479,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
       f.settlement_price = price( asset(100000,mpa_id), asset(1650) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -1982,7 +1982,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
       f.settlement_price = price( asset(100000,mpa_id), asset(1650) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -2490,7 +2490,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       f.settlement_price = price( asset(100000,mpa_id), asset(1650) );
       publish_feed( mpa_id, feeder_id, f, feed_icr );
       // call pays price = 100000:1650 * 1000:1250 = 100000:2062.5 = 48.484848485
-      // call match price = 100000:1650 * 1000:1239 = 100000:2048.75 = 48.915303153
+      // call match price = 100000:1650 * 1000:1239 = 100000:2044.35 = 48.915303153
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
