@@ -396,6 +396,16 @@ namespace graphene { namespace chain {
                                  bool mute_exceptions = false,
                                  bool skip_matching_settle_orders = false );
 
+         /**
+          * @brief Match the settled debt order of the specified asset as taker with other orders on the opposite side
+          *        of the order book
+          * @param bitasset The bitasset data object
+          *
+          * Since the core-2591 hard fork, this function is called after processed all call orders in
+          * @ref check_call_orders().
+          */
+         void check_settled_debt_order( const asset_bitasset_data_object& bitasset );
+
          // Note: Ideally this should be private.
          //       Now it is public because we use it in a non-member function in db_market.cpp .
          enum class match_result_type
@@ -418,6 +428,8 @@ namespace graphene { namespace chain {
          match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
                                                      const price& trade_price );
          match_result_type match_limit_settled_debt( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
+         match_result_type match_settled_debt_limit( const limit_order_object& taker, const limit_order_object& maker,
                                                      const price& trade_price );
          /***
           * @brief Match limit order as taker to a call order as maker
