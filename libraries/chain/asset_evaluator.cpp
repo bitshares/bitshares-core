@@ -1201,7 +1201,8 @@ static optional<asset> pay_collateral_fees( database& d,
 {
    const auto& head_time = d.head_block_time();
    bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill settlement at MCOP)
-   if( after_core_hardfork_2591 && !bitasset.current_feed.settlement_price.is_null() )
+   if( after_core_hardfork_2591 && !bitasset.is_prediction_market
+         && !bitasset.current_feed.settlement_price.is_null() )
    {
       price fill_price = bitasset.get_margin_call_order_price();
       try
