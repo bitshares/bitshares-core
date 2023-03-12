@@ -2088,6 +2088,109 @@ BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
 
 } FC_LOG_AND_RETHROW() }
 
+/// Tests instant settlement:
+/// * After hf core-2591, for prediction markets, forced-settlements are NOT filled at margin call order price (MCOP)
+BOOST_AUTO_TEST_CASE( pm_instant_settlement_price_test )
+{ try {
+
+   // Advance to a recent hard fork
+   generate_blocks(HARDFORK_CORE_2582_TIME);
+   generate_block();
+
+   // multiple passes,
+   // i == 0 : before hf core-2591
+   // i == 1 : after hf core-2591
+   for( int i = 0; i < 2; ++ i )
+   {
+      idump( (i) );
+
+      if( 1 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
+         generate_block();
+      }
+
+      set_expiration( db, trx );
+
+      ACTORS((judge)(alice)(feeder));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      asset_id_type pm_id = pmark.get_id();
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, alice_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( alice, pmark.amount(1000), asset(1000) );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( pm_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,pm_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,pm_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( pm_id, feeder_id, f, feed_icr );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      BOOST_TEST_MESSAGE( "Globally settling" );
+      force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      // alice settles
+      auto result = force_settle( alice, asset(300, pm_id) );
+      auto op_result = result.get<extendable_operation_result>().value;
+
+      BOOST_CHECK( !op_result.new_objects.valid() ); // force settlement order not created
+
+      BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
+      BOOST_CHECK( *op_result.paid->begin() == asset( 300, pm_id ) );
+      BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
+      BOOST_CHECK( *op_result.received->begin() == asset( 300 ) );
+      BOOST_REQUIRE( op_result.fees.valid() && 1U == op_result.fees->size() );
+      BOOST_CHECK( *op_result.fees->begin() == asset( 0 ) );
+
+      auto check_result = [&]
+      {
+         BOOST_CHECK( !pm_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( pm_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK_EQUAL( pm_id(db).bitasset_data(db).settlement_fund.value, 700 );
+
+         BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).accumulated_collateral_fees.value, 0 );
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 700 );
+         BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 700 );
+      };
+
+      check_result();
+
+      BOOST_TEST_MESSAGE( "Generate a block" );
+      generate_block();
+
+      check_result();
+
+      // reset
+      db.pop_block();
+
+   } // for i
+
+} FC_LOG_AND_RETHROW() }
+
 /**
  * Test case to reproduce https://github.com/bitshares/bitshares-core/issues/1883.
  * When there is only one fill_order object in the ticker rolling buffer, it should only be rolled out once.
