@@ -319,7 +319,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
    const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
    if( limit_ptr )
    {
-      collateral_gathered.amount += limit_ptr->for_sale;
+      collateral_gathered.amount += limit_ptr->settled_collateral_amount;
       remove( *limit_ptr );
    }
 

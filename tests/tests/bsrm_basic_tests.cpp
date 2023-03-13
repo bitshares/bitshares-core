@@ -1364,11 +1364,21 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
 
    using bsrm_type = bitasset_options::black_swan_response_type;
 
-   // Several passes for each BSRM type
-   for( uint8_t i = 0; i <= 3; ++i )
+   // Several passes, for each BSRM type, before and after core-2591 hf
+   for( uint8_t i = 0; i < 8; ++i )
    {
-      idump( (i) );
+      uint8_t bsrm = i % 4;
 
+      idump( (i)(bsrm) );
+
+      if( 4 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
+         generate_block();
+      }
+
+      set_expiration( db, trx );
       ACTORS((sam)(feeder)(borrower)(borrower2));
 
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -1387,7 +1397,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
       acop.bitasset_opts = bitasset_options();
       acop.bitasset_opts->minimum_feeds = 1;
-      acop.bitasset_opts->extensions.value.black_swan_response_method = i;
+      acop.bitasset_opts->extensions.value.black_swan_response_method = bsrm;
       acop.bitasset_opts->extensions.value.margin_call_fee_ratio = 11;
 
       trx.operations.clear();
@@ -1396,7 +1406,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
       asset_id_type mpa_id = mpa.get_id();
 
-      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(i) );
+      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(bsrm) );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
@@ -1431,7 +1441,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       const auto& check_result = [&]
       {
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-         switch( static_cast<bsrm_type>(i) )
+         switch( static_cast<bsrm_type>(bsrm) )
          {
          case bsrm_type::global_settlement:
             BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
@@ -1505,11 +1515,15 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
 
       check_result();
 
+      // publish a new feed (collateral price rises)
+      f.settlement_price = price( asset(1000,mpa_id), asset(15) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
       // globally settle
-      if( bsrm_type::no_settlement == static_cast<bsrm_type>(i) )
+      if( bsrm_type::no_settlement == static_cast<bsrm_type>(bsrm) )
          force_global_settle( mpa_id(db), price( asset(1000,mpa_id), asset(18) ) );
-      else if( bsrm_type::individual_settlement_to_fund == static_cast<bsrm_type>(i)
-               || bsrm_type::individual_settlement_to_order == static_cast<bsrm_type>(i) )
+      else if( bsrm_type::individual_settlement_to_fund == static_cast<bsrm_type>(bsrm)
+               || bsrm_type::individual_settlement_to_order == static_cast<bsrm_type>(bsrm) )
          force_global_settle( mpa_id(db), price( asset(1000,mpa_id), asset(22) ) );
 
       // check
@@ -1526,7 +1540,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
 
-         switch( static_cast<bsrm_type>(i) )
+         switch( static_cast<bsrm_type>(bsrm) )
          {
          case bsrm_type::global_settlement:
             break;
