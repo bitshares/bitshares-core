@@ -129,6 +129,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          BOOST_CHECK_EQUAL(last_transfer_amount, "300");
          auto last_transfer_payer = j["_source"]["operation_history"]["fee_payer"].as_string();
          BOOST_CHECK_EQUAL(last_transfer_payer, "1.2.0");
+         auto is_virtual = j["_source"]["operation_history"]["is_virtual"].as_bool();
+         BOOST_CHECK( !is_virtual );
 
          // To test credit offers
          generate_blocks( HARDFORK_CORE_2362_TIME );
@@ -374,6 +376,9 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
+
+         BOOST_CHECK( !histories[0].is_virtual );
+         BOOST_CHECK( histories[0].block_time == db.head_block_time() );
 
          // f(A, 0, 4, 6) = { 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(6));
@@ -627,7 +632,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories.size(), 0u);
 
          // create a new account C = alice { 7 }
-         create_account("alice");
+         auto alice = create_account("alice");
+         account_id_type alice_id = alice.get_id();
 
          generate_block();
 
@@ -662,6 +668,47 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
          BOOST_REQUIRE( his_obj7.op.is_type<account_create_operation>() );
          BOOST_CHECK_EQUAL( his_obj7.op.get<account_create_operation>().name, "alice" );
+
+         // Test virtual operation
+
+         // Prepare funds
+         transfer( account_id_type()(db), alice_id(db), asset(100) );
+         // Create a limit order that expires in 300 seconds
+         create_sell_order( alice_id, asset(1), asset(1, asset_id_type(1)), db.head_block_time() + 300 );
+
+         generate_block();
+
+         // f(C, 0, 4, 0) = { 9, 8, 7 }
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "alice", operation_history_id_type(0), 4, operation_history_id_type(0));
+            return (histories.size() == 3u);
+         });
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
+         BOOST_CHECK( histories[0].op.is_type<limit_order_create_operation>() );
+         BOOST_CHECK( !histories[0].is_virtual );
+         BOOST_CHECK( histories[0].block_time == db.head_block_time() );
+         BOOST_CHECK( histories[1].op.is_type<transfer_operation>() );
+         BOOST_CHECK( !histories[1].is_virtual );
+
+         // Let the limit order expire
+         generate_blocks( db.head_block_time() + 300 );
+         generate_block();
+
+         // f(C, 0, 4, 0) = { 10, 9, 8, 7 }
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "alice", operation_history_id_type(0), 4, operation_history_id_type(0));
+            return (histories.size() == 4u);
+         });
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+         BOOST_CHECK( histories[0].op.is_type<limit_order_cancel_operation>() );
+         BOOST_CHECK( histories[0].is_virtual );
+         BOOST_CHECK( histories[1].op.is_type<limit_order_create_operation>() );
+         BOOST_CHECK( !histories[1].is_virtual );
+         BOOST_CHECK( histories[2].op.is_type<transfer_operation>() );
+         BOOST_CHECK( !histories[2].is_virtual );
+
       }
    }
    catch (fc::exception &e) {
