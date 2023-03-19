@@ -138,8 +138,8 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
    }
 }
 
-BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test) {
-   try {
+BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test)
+{ try {
       graphene::app::history_api hist_api(app);
 
       asset_id_type usd_id = create_user_issued_asset("USD").get_id();
@@ -164,11 +164,38 @@ BOOST_AUTO_TEST_CASE(get_account_history_virtual_operation_test) {
       BOOST_CHECK( histories.front().block_time == db.head_block_time() );
       BOOST_CHECK( histories.front().is_virtual );
 
-   } catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+      // Create a limit order that expires in 300 seconds
+      create_sell_order( dan_id, asset(10, usd_id), asset(10), db.head_block_time() + 300 );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(100));
+
+      auto order_create_op_id = operation::tag<limit_order_create_operation>::value;
+
+      histories = hist_api.get_account_history("dan", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+
+      BOOST_REQUIRE_GT( histories.size(), 0 );
+      BOOST_CHECK_EQUAL( histories.front().op.which(), order_create_op_id );
+      BOOST_CHECK( histories.front().block_time == db.head_block_time() );
+      BOOST_CHECK( !histories.front().is_virtual );
+
+      // Let the limit order expire
+      generate_blocks( db.head_block_time() + 300 );
+      generate_block();
+      fc::usleep(fc::milliseconds(100));
+
+      auto order_cancel_op_id = operation::tag<limit_order_cancel_operation>::value;
+
+      histories = hist_api.get_account_history("dan", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+
+      BOOST_REQUIRE_GT( histories.size(), 0 );
+      BOOST_CHECK_EQUAL( histories.front().op.which(), order_cancel_op_id );
+      BOOST_CHECK( histories.front().is_virtual );
+      BOOST_CHECK( histories.front().result.is_type<asset>() );
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE(get_account_history_notify_all_on_creation) {
    try {
