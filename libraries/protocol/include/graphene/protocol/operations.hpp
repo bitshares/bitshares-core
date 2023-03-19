@@ -128,7 +128,8 @@ namespace graphene { namespace protocol {
             /* 72 */ credit_offer_accept_operation,
             /* 73 */ credit_deal_repay_operation,
             /* 74 */ credit_deal_expired_operation,   // VIRTUAL
-            /* 75 */ liquidity_pool_update_operation
+            /* 75 */ liquidity_pool_update_operation,
+            /* 76 */ credit_deal_update_operation
          >;
 
    /// @} // operations group

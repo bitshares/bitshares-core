@@ -205,6 +205,10 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_expired_operation>(),
                    "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
       }
+      if (!HARDFORK_CORE_2595_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_update_operation>(),
+                   "Unable to define fees for credit deal update operation prior to the core-2595 hardfork");
+      }
       if (!HARDFORK_CORE_2604_PASSED(block_time)) {
          FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_update_operation>(),
                    "Unable to define fees for liquidity pool update operation prior to the core-2604 hardfork");
@@ -286,13 +290,20 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::credit_offer_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
    }
-   void operator()(const graphene::chain::credit_offer_accept_operation&) const {
+   void operator()(const graphene::chain::credit_offer_accept_operation& op) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+      if( !HARDFORK_CORE_2595_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.auto_repay.valid(),
+                    "auto_repay unavailable until the core-2595 hardfork");
+      }
    }
    void operator()(const graphene::chain::credit_deal_repay_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
    }
    // Note: credit_deal_expired_operation is a virtual operation thus no need to add code here
+   void operator()(const graphene::chain::credit_deal_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
+   }
 
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {

@@ -770,6 +770,71 @@ void database::update_credit_offers_and_deals()
    {
       const credit_deal_object& deal = *deal_itr;
 
+      // Note: automatic repayment fails if the borrower became unauthorized by the debt asset or the collateral asset
+      using repay_type = credit_deal_auto_repayment_type;
+      if( static_cast<uint8_t>(repay_type::no_auto_repayment) != deal.auto_repay )
+      {
+         credit_deal_repay_operation op;
+         op.account = deal.borrower;
+         op.deal_id = deal.get_id();
+         // Amounts
+         // Note: the result can be larger than 64 bit
+         auto required_fee = ( ( ( fc::uint128_t( deal.debt_amount.value ) * deal.fee_rate )
+                                 + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+         fc::uint128_t total_required = required_fee + deal.debt_amount.value;
+         auto balance = get_balance( deal.borrower, deal.debt_asset );
+         if( static_cast<uint8_t>(repay_type::only_full_repayment) == deal.auto_repay
+               || fc::uint128_t( balance.amount.value ) >= total_required )
+         { // if only full repayment or account balance is sufficient
+            op.repay_amount = asset( deal.debt_amount, deal.debt_asset );
+            op.credit_fee = asset( static_cast<int64_t>( required_fee ), deal.debt_asset );
+         }
+         else // Allow partial repayment
+         {
+            fc::uint128_t debt_to_repay = ( fc::uint128_t( balance.amount.value ) * GRAPHENE_FEE_RATE_DENOM )
+                                          / ( GRAPHENE_FEE_RATE_DENOM + deal.fee_rate ); // Round down
+            fc::uint128_t collateral_to_release = ( debt_to_repay * deal.collateral_amount.value )
+                                                  / deal.debt_amount.value; // Round down
+            debt_to_repay = ( ( ( collateral_to_release * deal.debt_amount.value ) + deal.collateral_amount.value )
+                              - 1 ) / deal.collateral_amount.value; // Round up
+            fc::uint128_t fee_to_pay = ( ( ( debt_to_repay * deal.fee_rate )
+                                           + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+            op.repay_amount = asset( static_cast<int64_t>( debt_to_repay ), deal.debt_asset );
+            op.credit_fee = asset( static_cast<int64_t>( fee_to_pay ), deal.debt_asset );
+         }
+
+         auto deal_copy = deal; // Make a copy for logging
+
+         transaction_evaluation_state eval_state(this);
+         eval_state.skip_fee_schedule_check = true;
+
+         size_t old_applied_ops_size = _applied_ops.size();
+         auto old_op_in_trx = _current_op_in_trx;
+         auto old_vop = _current_virtual_op;
+         try
+         {
+            auto temp_session = _undo_db.start_undo_session();
+            apply_operation( eval_state, op ); // This is a virtual operation
+            temp_session.merge();
+         }
+         catch( const fc::exception& e )
+         {
+            // We can in fact get here,
+            // e.g. if asset issuer of debt/collateral asset blacklists/whitelists the account,
+            //      or insufficient account balance
+            wlog( "Automatic repayment ${op} for credit deal ${credit_deal} failed at block ${n}; "
+                  "account balance was ${balance}; exception was ${e}",
+                  ("op", op)("credit_deal", deal_copy)
+                  ("n", head_block_num())("balance", balance)("e", e.to_detail_string()) );
+            _current_virtual_op = old_vop;
+            _current_op_in_trx = old_op_in_trx;
+            _applied_ops.resize( old_applied_ops_size );
+         }
+
+         if( !find( op.deal_id ) ) // The credit deal is fully repaid
+            continue;
+      }
+
       // Update offer
       // Note: offer balance can be zero after updated. TODO remove zero-balance offers after a period
       const credit_offer_object& offer = deal.offer_id(*this);

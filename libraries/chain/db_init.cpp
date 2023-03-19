@@ -147,6 +147,7 @@ void database::initialize_evaluators()
    register_evaluator<credit_offer_update_evaluator>();
    register_evaluator<credit_offer_accept_evaluator>();
    register_evaluator<credit_deal_repay_evaluator>();
+   register_evaluator<credit_deal_update_evaluator>();
 }
 
 void database::initialize_indexes()
