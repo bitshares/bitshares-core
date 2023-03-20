@@ -94,6 +94,164 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_hardfork_time_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( liquidity_pool_update_hardfork_time_test )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_LIQUIDITY_POOL_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      const asset_object& core = asset_id_type()(db);
+      const asset_object& usd = create_user_issued_asset( "MYUSD" );
+      const asset_object& lpa = create_user_issued_asset( "LPATEST", sam, charge_market_fee );
+
+      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa.get_id(),
+                                                                0, 0 );
+
+      // Before the hard fork, unable to update a liquidity pool
+      // or update with proposals
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo.get_id(), 1, 0 ), fc::exception );
+
+      liquidity_pool_update_operation updop = make_liquidity_pool_update_op( sam_id, lpo.get_id(), 1, 0 );
+      BOOST_CHECK_THROW( propose( updop ), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( liquidity_pool_update_test )
+{
+   try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_CORE_2604_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      const asset_object& core = asset_id_type()(db);
+      const asset_object& usd = create_user_issued_asset( "MYUSD" );
+      issue_uia( sam, usd.amount(init_amount) );
+      issue_uia( ted, usd.amount(init_amount) );
+
+      const asset_object& lpa1 = create_user_issued_asset( "LPATEST1", sam, charge_market_fee );
+      const asset_object& lpa2 = create_user_issued_asset( "LPATEST2", ted, charge_market_fee );
+
+      const liquidity_pool_object& lpo1 = create_liquidity_pool( sam_id, core.get_id(), usd.get_id(), lpa1.get_id(),
+                                                                0, 0 );
+
+      BOOST_CHECK( lpo1.asset_a == core.id );
+      BOOST_CHECK( lpo1.asset_b == usd.id );
+      BOOST_CHECK( lpo1.balance_a == 0 );
+      BOOST_CHECK( lpo1.balance_b == 0 );
+      BOOST_CHECK( lpo1.share_asset == lpa1.id );
+      BOOST_CHECK( lpo1.taker_fee_percent == 0 );
+      BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
+      BOOST_CHECK( lpo1.virtual_value == 0 );
+
+      deposit_to_liquidity_pool( sam_id, lpo1.get_id(), asset(10), asset( 20, usd.get_id() ) );
+
+      BOOST_CHECK( lpo1.asset_a == core.id );
+      BOOST_CHECK( lpo1.asset_b == usd.id );
+      BOOST_CHECK( lpo1.balance_a == 10 );
+      BOOST_CHECK( lpo1.balance_b == 20 );
+      BOOST_CHECK( lpo1.share_asset == lpa1.id );
+      BOOST_CHECK( lpo1.taker_fee_percent == 0 );
+      BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
+      BOOST_CHECK( lpo1.virtual_value == 200 );
+
+      const liquidity_pool_object& lpo2 = create_liquidity_pool( ted_id, core.get_id(), usd.get_id(), lpa2.get_id(),
+                                                                1, 2 );
+
+      BOOST_CHECK( lpo2.asset_a == core.id );
+      BOOST_CHECK( lpo2.asset_b == usd.id );
+      BOOST_CHECK( lpo2.balance_a == 0 );
+      BOOST_CHECK( lpo2.balance_b == 0 );
+      BOOST_CHECK( lpo2.share_asset == lpa2.id );
+      BOOST_CHECK( lpo2.taker_fee_percent == 1 );
+      BOOST_CHECK( lpo2.withdrawal_fee_percent == 2 );
+      BOOST_CHECK( lpo2.virtual_value == 0 );
+
+      // Able to propose
+      {
+         liquidity_pool_update_operation updop = make_liquidity_pool_update_op( sam_id, lpo1.get_id(), 1, 0 );
+         propose( updop );
+      }
+
+      // Unable to update a liquidity pool with invalid data
+      // update nothing
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo1.get_id(), {}, {} ), fc::exception );
+      BOOST_CHECK_THROW( propose( make_liquidity_pool_update_op( sam_id, lpo1.get_id(), {}, {} ) ), fc::exception );
+      // non-zero withdrawal fee
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo1.get_id(), {}, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose( make_liquidity_pool_update_op( sam_id, lpo1.get_id(), {}, 1 ) ), fc::exception );
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo1.get_id(), 0, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose( make_liquidity_pool_update_op( sam_id, lpo1.get_id(), 0, 1 ) ), fc::exception );
+      // taker fee exceeds 100%
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo1.get_id(), 10001, {} ), fc::exception );
+      BOOST_CHECK_THROW( update_liquidity_pool( sam_id, lpo1.get_id(), 10001, 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose( make_liquidity_pool_update_op( sam_id, lpo1.get_id(), 10001, {} ) ), fc::exception);
+      BOOST_CHECK_THROW( propose( make_liquidity_pool_update_op( sam_id, lpo1.get_id(), 10001, 0 ) ), fc::exception );
+      // Owner mismatch (able to propose)
+      BOOST_CHECK_THROW( update_liquidity_pool( ted_id, lpo1.get_id(), 1, {} ), fc::exception );
+      propose( make_liquidity_pool_update_op( ted_id, lpo1.get_id(), 1, {} ) );
+      // Updating taker fee when withdrawal fee is non-zero (able to propose)
+      BOOST_CHECK_THROW( update_liquidity_pool( ted_id, lpo2.get_id(), 1, {} ), fc::exception );
+      propose( make_liquidity_pool_update_op( ted_id, lpo2.get_id(), 1, {} ) );
+
+      // Sam is able to update lpo1
+      update_liquidity_pool( sam_id, lpo1.get_id(), 2, 0 );
+      BOOST_CHECK( lpo1.asset_a == core.id );
+      BOOST_CHECK( lpo1.asset_b == usd.id );
+      BOOST_CHECK( lpo1.balance_a == 10 );
+      BOOST_CHECK( lpo1.balance_b == 20 );
+      BOOST_CHECK( lpo1.share_asset == lpa1.id );
+      BOOST_CHECK( lpo1.taker_fee_percent == 2 );
+      BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
+      BOOST_CHECK( lpo1.virtual_value == 200 );
+
+      update_liquidity_pool( sam_id, lpo1.get_id(), 1, {} );
+      BOOST_CHECK( lpo1.asset_a == core.id );
+      BOOST_CHECK( lpo1.asset_b == usd.id );
+      BOOST_CHECK( lpo1.balance_a == 10 );
+      BOOST_CHECK( lpo1.balance_b == 20 );
+      BOOST_CHECK( lpo1.share_asset == lpa1.id );
+      BOOST_CHECK( lpo1.taker_fee_percent == 1 );
+      BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
+      BOOST_CHECK( lpo1.virtual_value == 200 );
+
+      // Sam is able to update lpo2 if to update its withdrawal fee to 0
+      update_liquidity_pool( ted_id, lpo2.get_id(), 2, 0 );
+
+      BOOST_CHECK( lpo2.asset_a == core.id );
+      BOOST_CHECK( lpo2.asset_b == usd.id );
+      BOOST_CHECK( lpo2.balance_a == 0 );
+      BOOST_CHECK( lpo2.balance_b == 0 );
+      BOOST_CHECK( lpo2.share_asset == lpa2.id );
+      BOOST_CHECK( lpo2.taker_fee_percent == 2 );
+      BOOST_CHECK( lpo2.withdrawal_fee_percent == 0 );
+      BOOST_CHECK( lpo2.virtual_value == 0 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
 { try {
 

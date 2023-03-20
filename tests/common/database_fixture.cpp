@@ -575,14 +575,18 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       if( for_sale.asset_id == asset_id_type() && !o.is_settled_debt )
          // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
          core_in_orders += for_sale.amount;
-      total_balances[for_sale.asset_id] += for_sale.amount;
       total_balances[asset_id_type()] += o.deferred_fee;
       total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
       if( o.is_settled_debt )
       {
-         total_debts[o.receive_asset_id()] += o.sell_price.quote.amount;
-         BOOST_CHECK_EQUAL( o.sell_price.base.amount.value, for_sale.amount.value );
+         total_balances[for_sale.asset_id] += o.settled_collateral_amount;
+         total_debts[o.receive_asset_id()] += o.settled_debt_amount;
+         BOOST_CHECK_LE( o.for_sale.value, o.settled_collateral_amount.value );
+         auto settled_debt = asset( o.settled_debt_amount.value, o.receive_asset_id() );
+         BOOST_CHECK_EQUAL( settled_debt.multiply_and_round_up( o.sell_price ).amount.value, o.for_sale.value );
       }
+      else
+         total_balances[for_sale.asset_id] += for_sale.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -1531,6 +1535,35 @@ generic_operation_result database_fixture_base::delete_liquidity_pool( account_i
    trx.operations.clear();
    verify_asset_supplies(db);
    return op_result.get<generic_operation_result>();
+}
+
+liquidity_pool_update_operation database_fixture_base::make_liquidity_pool_update_op( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )const
+{
+   liquidity_pool_update_operation op;
+   op.account = account;
+   op.pool = pool;
+   op.taker_fee_percent = taker_fee_percent;
+   op.withdrawal_fee_percent = withdrawal_fee_percent;
+   return op;
+}
+
+void database_fixture_base::update_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )
+{
+   liquidity_pool_update_operation op = make_liquidity_pool_update_op( account, pool, taker_fee_percent,
+                                                                       withdrawal_fee_percent );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
 }
 
 liquidity_pool_deposit_operation database_fixture_base::make_liquidity_pool_deposit_op( account_id_type account,

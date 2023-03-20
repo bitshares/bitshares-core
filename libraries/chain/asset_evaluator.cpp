@@ -1193,6 +1193,32 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+static optional<asset> pay_collateral_fees( database& d,
+                                            const asset& pays,
+                                            const asset& settled_amount,
+                                            const asset_object& asset_to_settle,
+                                            const asset_bitasset_data_object& bitasset )
+{
+   const auto& head_time = d.head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill settlement at MCOP)
+   if( after_core_hardfork_2591 && !bitasset.is_prediction_market
+         && !bitasset.current_feed.settlement_price.is_null() )
+   {
+      price fill_price = bitasset.get_margin_call_order_price();
+      try
+      {
+         asset settled_amount_by_mcop = pays.multiply_and_round_up( fill_price ); // Throws fc::exception if overflow
+         if( settled_amount_by_mcop < settled_amount )
+         {
+            asset collateral_fees = settled_amount - settled_amount_by_mcop;
+            asset_to_settle.accumulate_fee( d, collateral_fees );
+            return collateral_fees;
+         }
+      } FC_CAPTURE_AND_LOG( (pays)(settled_amount)(fill_price) ) // Catch and log the exception
+   }
+   return optional<asset>();
+}
+
 static extendable_operation_result pay_settle_from_gs_fund( database& d,
                                                  const asset_settle_evaluator::operation_type& op,
                                                  const account_object* fee_paying_account,
@@ -1229,11 +1255,18 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
    d.adjust_balance( op.account, -pays );
 
    asset issuer_fees( 0, bitasset.options.short_backing_asset );
+   optional<asset> collateral_fees;
+
    if( settled_amount.amount > 0 )
    {
       d.modify( bitasset, [&settled_amount]( asset_bitasset_data_object& obj ){
          obj.settlement_fund -= settled_amount.amount;
       });
+
+      // Calculate and pay collateral fees after HF core-2591
+      collateral_fees = pay_collateral_fees( d, pays, settled_amount, asset_to_settle, bitasset );
+      if( collateral_fees.valid() )
+         settled_amount -= *collateral_fees;
 
       // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
       //
@@ -1259,7 +1292,8 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
 
    result.value.paid = vector<asset>({ pays });
    result.value.received = vector<asset>({ settled_amount });
-   result.value.fees  = vector<asset>({ issuer_fees });
+   result.value.fees = collateral_fees.valid() ? vector<asset>({ *collateral_fees, issuer_fees })
+                                               : vector<asset>({ issuer_fees });
 
    return result;
 }
@@ -1288,6 +1322,12 @@ static extendable_operation_result pay_settle_from_individual_pool( database& d,
    d.modify( asset_to_settle.dynamic_asset_data_id(d), [&pays]( asset_dynamic_data_object& obj ){
       obj.current_supply -= pays.amount;
    });
+
+   // Calculate and pay collateral fees after HF core-2591
+   optional<asset> collateral_fees = pay_collateral_fees( d, pays, settled_amount, asset_to_settle, bitasset );
+   if( collateral_fees.valid() )
+      settled_amount -= *collateral_fees;
+
    auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
    settled_amount -= issuer_fees;
 
@@ -1310,7 +1350,8 @@ static extendable_operation_result pay_settle_from_individual_pool( database& d,
 
    result.value.paid = vector<asset>({ pays });
    result.value.received = vector<asset>({ settled_amount });
-   result.value.fees  = vector<asset>({ issuer_fees });
+   result.value.fees = collateral_fees.valid() ? vector<asset>({ *collateral_fees, issuer_fees })
+                                               : vector<asset>({ issuer_fees });
 
    return result;
 }
@@ -1341,13 +1382,16 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    // Process the rest
    const auto& head_time = d.head_block_time();
-   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
-   d.adjust_balance( op.account, -to_settle );
 
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
    if( after_core_hardfork_2582 && 0 == to_settle.amount )
       return result;
 
+   bool after_core_hardfork_2587 = HARDFORK_CORE_2587_PASSED( head_time );
+   if( after_core_hardfork_2587 && bitasset.current_feed.settlement_price.is_null() )
+      return result;
+
+   d.adjust_balance( op.account, -to_settle );
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
       s.owner = op.account;
@@ -1357,6 +1401,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    result.value.new_objects = flat_set<object_id_type>({ settle.id });
 
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    if( HARDFORK_CORE_2481_PASSED( maint_time ) )
    {
       d.apply_force_settlement( settle, bitasset, *asset_to_settle );

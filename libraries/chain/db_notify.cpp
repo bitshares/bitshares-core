@@ -326,6 +326,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const liquidity_pool_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
    void operator()( const liquidity_pool_deposit_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // account

@@ -54,6 +54,7 @@ struct hardfork_visitor {
                                                   protocol::liquidity_pool_deposit_operation,
                                                   protocol::liquidity_pool_withdraw_operation,
                                                   protocol::liquidity_pool_exchange_operation >;
+   using liquidity_pool_update_op = fc::typelist::list< protocol::liquidity_pool_update_operation >;
    using samet_fund_ops = fc::typelist::list< protocol::samet_fund_create_operation,
                                               protocol::samet_fund_delete_operation,
                                               protocol::samet_fund_update_operation,
@@ -90,6 +91,9 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<credit_offer_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2362_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<liquidity_pool_update_op, Op>(), bool>
+   visit() { return HARDFORK_CORE_2604_PASSED(now); }
    /// @}
 
    /// typelist::runtime::dispatch adaptor

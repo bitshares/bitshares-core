@@ -114,6 +114,44 @@ generic_operation_result liquidity_pool_delete_evaluator::do_apply(const liquidi
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void_result liquidity_pool_update_evaluator::do_evaluate(const liquidity_pool_update_operation& op)
+{ try {
+   const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
+
+   _pool = &op.pool(d);
+
+   const asset_object* _share_asset = &_pool->share_asset(d);
+
+   FC_ASSERT( _share_asset->issuer == op.account, "The account is not the owner of the liquidity pool" );
+
+   if( op.taker_fee_percent.valid() )
+   {
+      FC_ASSERT( 0 == _pool->withdrawal_fee_percent
+                     || ( op.withdrawal_fee_percent.valid() && 0 == *op.withdrawal_fee_percent ),
+                 "Taker fee percent can only be updated if withdrawal fee percent is zero or "
+                 "withdrawal fee percent is to be updated to zero at the same time" );
+   }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
+
+void_result liquidity_pool_update_evaluator::do_apply(const liquidity_pool_update_operation& op) const
+{ try {
+   database& d = db();
+
+   d.modify( *_pool, [&op](liquidity_pool_object& obj) {
+      if( op.taker_fee_percent.valid() )
+         obj.taker_fee_percent = *op.taker_fee_percent;
+      if( op.withdrawal_fee_percent.valid() )
+         obj.withdrawal_fee_percent = *op.withdrawal_fee_percent;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
+
 void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_deposit_operation& op)
 { try {
    const database& d = db();

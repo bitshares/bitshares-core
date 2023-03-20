@@ -55,6 +55,17 @@ namespace graphene { namespace chain {
          const asset_object* _share_asset = nullptr;
    };
 
+   class liquidity_pool_update_evaluator : public evaluator<liquidity_pool_update_evaluator>
+   {
+      public:
+         using operation_type = liquidity_pool_update_operation;
+
+         void_result do_evaluate( const liquidity_pool_update_operation& op );
+         void_result do_apply( const liquidity_pool_update_operation& op ) const;
+
+         const liquidity_pool_object* _pool = nullptr;
+   };
+
    class liquidity_pool_deposit_evaluator : public evaluator<liquidity_pool_deposit_evaluator>
    {
       public:

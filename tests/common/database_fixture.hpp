@@ -440,6 +440,13 @@ struct database_fixture_base {
    liquidity_pool_delete_operation make_liquidity_pool_delete_op( account_id_type account,
                                                   liquidity_pool_id_type pool )const;
    generic_operation_result delete_liquidity_pool( account_id_type account, liquidity_pool_id_type pool );
+   liquidity_pool_update_operation make_liquidity_pool_update_op( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )const;
+   void update_liquidity_pool( account_id_type account, liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent );
    liquidity_pool_deposit_operation make_liquidity_pool_deposit_op( account_id_type account,
                                                   liquidity_pool_id_type pool, const asset& amount_a,
                                                   const asset& amount_b )const;
