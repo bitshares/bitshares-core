@@ -272,6 +272,7 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
    os.virtual_op = oho->virtual_op;
+   os.is_virtual = oho->is_virtual;
    os.fee_payer = oho->op.visit( get_fee_payer_visitor() );
 
    if(_options.operation_string)
@@ -611,6 +612,9 @@ static operation_history_object fromEStoOperation(const variant& source)
    result.trx_in_block = source["operation_history"]["trx_in_block"].as_uint64();
    result.op_in_trx = source["operation_history"]["op_in_trx"].as_uint64();
    result.trx_in_block = source["operation_history"]["virtual_op"].as_uint64();
+   result.is_virtual = source["operation_history"]["is_virtual"].as_bool();
+
+   result.block_time = fc::time_point_sec::from_iso_string( source["block_data"]["block_time"].as_string() );
 
    return result;
 }
