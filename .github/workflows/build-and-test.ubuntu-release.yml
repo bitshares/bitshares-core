@@ -87,6 +87,7 @@ jobs:
         make -j 2 -C _build
         df -h
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         _build/tests/es_test -l test_suite
