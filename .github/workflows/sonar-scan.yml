@@ -164,6 +164,7 @@ jobs:
         rm -rf _build/programs/genesis_util/get_dev_key
         df -h
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         df -h

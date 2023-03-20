@@ -110,6 +110,7 @@ jobs:
         du -hs _build/*
         du -hs /_build/*
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         df -h

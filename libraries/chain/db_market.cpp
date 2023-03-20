@@ -621,7 +621,10 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    }
 
    if( create_virtual_op )
-      push_applied_operation( vop );
+   {
+      auto op_id = push_applied_operation( vop );
+      set_applied_operation_result( op_id, refunded );
+   }
 
    remove(order);
 }
