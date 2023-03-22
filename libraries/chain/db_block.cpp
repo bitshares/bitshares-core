@@ -783,6 +783,31 @@ operation_result database::apply_operation( transaction_evaluation_state& eval_s
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+operation_result database::try_push_virtual_operation( transaction_evaluation_state& eval_state, const operation& op )
+{
+   operation_validate( op );
+
+   // Note: these variables could be updated during the apply_operation() call
+   size_t old_applied_ops_size = _applied_ops.size();
+   auto old_vop = _current_virtual_op;
+
+   try
+   {
+      auto temp_session = _undo_db.start_undo_session();
+      auto result = apply_operation( eval_state, op ); // This is a virtual operation
+      temp_session.merge();
+      return result;
+   }
+   catch( const fc::exception& e )
+   {
+      wlog( "Failed to push virtual operation ${op} at block ${n}; exception was ${e}",
+            ("op", op)("n", head_block_num())("e", e.to_detail_string()) );
+      _current_virtual_op = old_vop;
+      _applied_ops.resize( old_applied_ops_size );
+      throw;
+   }
+}
+
 const witness_object& database::validate_block_header( uint32_t skip, const signed_block& next_block )const
 {
    FC_ASSERT( head_block_id() == next_block.previous, "", ("head_block_id",head_block_id())("next.prev",next_block.previous) );
