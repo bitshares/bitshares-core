@@ -2150,6 +2150,63 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, jpy_id ).amount.value, init_amount );
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, core_id ).amount.value, init_amount - 1 );
 
+      // Check history API
+      graphene::app::history_api hist_api(app);
+
+      // np5's last 2 operations are credit_deal_expired_op and credit_offer_accept_op
+      auto histories = hist_api.get_relative_account_history( "np5", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[1].is_virtual );
+
+      // np4's last 2 operations are credit_deal_expired_op and credit_offer_accept_op
+      histories = hist_api.get_relative_account_history( "np4", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[1].is_virtual );
+
+      // np2's last 4 operations are credit_deal_expired_op, credit_deal_repay_op, account_whitelist_op,
+      //                             and credit_offer_accept_op
+      histories = hist_api.get_relative_account_history( "np2", 0, 4, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 4U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[1].is_virtual );
+      BOOST_CHECK( histories[2].op.is_type<account_whitelist_operation>() );
+      BOOST_CHECK( !histories[2].is_virtual );
+      BOOST_CHECK( histories[3].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[3].is_virtual );
+
+      // ray's last 10 operations are 1 * credit_deal_expired_op, 3 * credit_deal_repay_op, 2 * credit_offer_accept_op,
+      //                             3 * credit_offer_update_op, 1 * credit_accept_op
+      histories = hist_api.get_relative_account_history( "ray", 0, 10, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 10U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[1].is_virtual );
+      BOOST_CHECK( histories[2].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[2].is_virtual );
+      BOOST_CHECK( histories[3].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[3].is_virtual );
+      BOOST_CHECK( histories[4].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[4].is_virtual );
+      BOOST_CHECK( histories[5].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[5].is_virtual );
+      BOOST_CHECK( histories[6].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[6].is_virtual );
+      BOOST_CHECK( histories[7].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[7].is_virtual );
+      BOOST_CHECK( histories[8].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[8].is_virtual );
+      BOOST_CHECK( histories[9].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[9].is_virtual );
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
