@@ -1885,12 +1885,12 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
 
       const asset_object& jpy = create_user_issued_asset( "MYJPY", ted, white_list );
       asset_id_type jpy_id = jpy.get_id();
-      issue_uia( sam, jpy.amount(init_amount * 100) );
+      issue_uia( sam, jpy.amount(init_amount * 1000) );
 
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 0 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, init_amount );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, 0 );
-      BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, init_amount * 100 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, init_amount * 1000 );
 
       // create a credit offer
       auto disable_time1 = db.head_block_time() + fc::minutes(20); // 20 minutes after init
@@ -1907,8 +1907,8 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       flat_map<asset_id_type, price> collateral_map2;
       collateral_map2[core_id] = price( asset(init_amount, jpy_id), asset(1, core_id) );
 
-      const credit_offer_object& coo2 = create_credit_offer( sam_id, jpy_id, init_amount * 100,
-                                              1000 * GRAPHENE_FEE_RATE_DENOM, 3600, 0, true,
+      const credit_offer_object& coo2 = create_credit_offer( sam_id, jpy_id, init_amount * 1000,
+                                              4000 * GRAPHENE_FEE_RATE_DENOM, 3600, 0, true,
                                               disable_time1, collateral_map2, {} );
       credit_offer_id_type co2_id = coo2.get_id();
 
@@ -2010,25 +2010,25 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       BOOST_CHECK_EQUAL( co1_id(db).current_balance.value, 8670 ); // 10000 - 190 * 7
 
       const credit_deal_object& cdo21 = borrow_from_credit_offer( np4_id, co2_id,
-                                                   asset(init_amount * 99, jpy_id),
-                                                   asset(99), GRAPHENE_FEE_RATE_DENOM * 1000, 0, 1 );
+                                                   asset(init_amount * 999, jpy_id),
+                                                   asset(999), GRAPHENE_FEE_RATE_DENOM * 4000, 0, 1 );
       credit_deal_id_type cd21_id = cdo21.get_id();
 
       BOOST_CHECK_EQUAL( cd21_id(db).auto_repay, 1U );
 
       const credit_deal_object& cdo22 = borrow_from_credit_offer( np5_id, co2_id,
                                                    asset(init_amount, jpy_id),
-                                                   asset(1), GRAPHENE_FEE_RATE_DENOM * 1000, 0, 2 );
+                                                   asset(1), GRAPHENE_FEE_RATE_DENOM * 4000, 0, 2 );
       credit_deal_id_type cd22_id = cdo22.get_id();
 
       BOOST_CHECK_EQUAL( cd22_id(db).auto_repay, 2U );
 
-      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 99 );
-      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 99 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 999 );
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, jpy_id ).amount.value, init_amount );
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, core_id ).amount.value, init_amount - 1 );
 
-      BOOST_CHECK_EQUAL( co2_id(db).total_balance.value, init_amount * 100 );
+      BOOST_CHECK_EQUAL( co2_id(db).total_balance.value, init_amount * 1000 );
       BOOST_CHECK_EQUAL( co2_id(db).current_balance.value, 0 );
 
       // Setup blacklists
@@ -2129,7 +2129,7 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       BOOST_CHECK_EQUAL( co2_id(db).total_balance.value, 0 );
       BOOST_CHECK_EQUAL( co2_id(db).current_balance.value, 0 );
 
-      BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 310 + 99 + 1 ); // cd13, cd21, cd22
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 310 + 999 + 1 ); // cd13, cd21, cd22
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, init_amount - 10000 ); // no change
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, 170 * 2 + 6 + 17 ); // cd12, cd14, cd15, cd17
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, 0 ); // no change
@@ -2145,8 +2145,8 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       BOOST_CHECK_EQUAL( db.get_balance( np3_id, usd_id ).amount.value, 190 );
       BOOST_CHECK_EQUAL( db.get_balance( np3_id, eur_id ).amount.value, init_amount - 170 );
 
-      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 99 );
-      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 99 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 999 );
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, jpy_id ).amount.value, init_amount );
       BOOST_CHECK_EQUAL( db.get_balance( np5_id, core_id ).amount.value, init_amount - 1 );
 
