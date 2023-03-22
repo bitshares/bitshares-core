@@ -222,6 +222,7 @@ struct database_fixture_base {
    bool hf2467 = false; // Note: used by hf core-2281 too, assuming hf core-2281 and core-2467 occur at the same time
    bool hf2481 = false;
    bool bsip77 = false;
+   bool hf2595 = false;
 
    string es_index_prefix; ///< Index prefix for elasticsearch plugin
    string es_obj_index_prefix; ///< Index prefix for es_objects plugin
@@ -526,17 +527,22 @@ struct database_fixture_base {
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
                                        uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
-                                       uint32_t min_duration = 0 )const;
+                                       uint32_t min_duration = 0, const optional<uint8_t>& auto_repay = {} )const;
    const credit_deal_object& borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
                                        uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
-                                       uint32_t min_duration = 0 );
+                                       uint32_t min_duration = 0, const optional<uint8_t>& auto_repay = {} );
    credit_deal_repay_operation make_credit_deal_repay_op(
                                        account_id_type account, credit_deal_id_type deal_id,
                                        const asset& repay_amount, const asset& credit_fee )const;
    extendable_operation_result_dtl repay_credit_deal( account_id_type account, credit_deal_id_type deal_id,
                                        const asset& repay_amount, const asset& credit_fee );
+   credit_deal_update_operation make_credit_deal_update_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )const;
+   void update_credit_deal( account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay );
 
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you

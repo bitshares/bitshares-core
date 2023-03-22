@@ -1921,7 +1921,8 @@ void database_fixture_base::update_credit_offer( account_id_type account, credit
 credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )const
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )const
 {
    credit_offer_accept_operation op;
    op.borrower = account;
@@ -1930,16 +1931,18 @@ credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op
    op.collateral = collateral;
    op.max_fee_rate = max_fee_rate;
    op.min_duration_seconds = min_duration;
+   op.extensions.value.auto_repay = auto_repay;
    return op;
 }
 
 const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )
 {
    credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral,
-                                                                   max_fee_rate, min_duration );
+                                                                   max_fee_rate, min_duration, auto_repay );
    trx.operations.clear();
    trx.operations.push_back( op );
 
@@ -1986,6 +1989,33 @@ extendable_operation_result_dtl database_fixture_base::repay_credit_deal(
    trx.operations.clear();
    verify_asset_supplies(db);
    return op_result.get<extendable_operation_result>().value;
+}
+
+credit_deal_update_operation database_fixture_base::make_credit_deal_update_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )const
+{
+   credit_deal_update_operation op;
+   op.account = account;
+   op.deal_id = deal_id;
+   op.auto_repay = auto_repay;
+   return op;
+}
+
+void database_fixture_base::update_credit_deal(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )
+{
+   credit_deal_update_operation op = make_credit_deal_update_op( account, deal_id, auto_repay );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
 }
 
 
