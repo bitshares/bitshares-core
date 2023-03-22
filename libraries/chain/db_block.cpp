@@ -335,6 +335,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    processed_transaction ptrx(proposal.proposed_transaction);
    eval_state._trx = &ptrx;
    size_t old_applied_ops_size = _applied_ops.size();
+   auto old_vop = _current_virtual_op;
 
    try {
       push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
@@ -360,6 +361,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       }
       else
       {
+         _current_virtual_op = old_vop;
          _applied_ops.resize( old_applied_ops_size );
       }
       wlog( "${e}", ("e",e.to_detail_string() ) );
