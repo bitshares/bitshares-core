@@ -2182,8 +2182,9 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
       BOOST_CHECK( histories[3].op.is_type<credit_offer_accept_operation>() );
       BOOST_CHECK( !histories[3].is_virtual );
 
-      // ray's last 10 operations are 1 * credit_deal_expired_op, 3 * credit_deal_repay_op, 2 * credit_offer_accept_op,
-      //                             3 * credit_offer_update_op, 1 * credit_accept_op
+      // ray's last 10 operations are 1 * credit_deal_expired_op, 3 * credit_deal_repay_op,
+      //                              2 * credit_offer_accept_op,
+      //                              3 * credit_deal_update_op, 1 * credit_accept_op
       histories = hist_api.get_relative_account_history( "ray", 0, 10, 0 );
       BOOST_REQUIRE_EQUAL( histories.size(), 10U );
       BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
