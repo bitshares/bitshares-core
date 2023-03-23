@@ -37,7 +37,7 @@ namespace graphene { namespace protocol {
     */
    struct custom_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct fee_params_t {
          uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; 
          uint32_t price_per_kbyte = 10;
       };
@@ -50,7 +50,7 @@ namespace graphene { namespace protocol {
 
       account_id_type   fee_payer()const { return payer; }
       void              validate()const;
-      share_type        calculate_fee(const fee_parameters_type& k)const;
+      share_type        calculate_fee(const fee_params_t& k)const;
       void              get_required_active_authorities( flat_set<account_id_type>& auths )const {
          auths.insert( required_auths.begin(), required_auths.end() );
       }
@@ -58,8 +58,8 @@ namespace graphene { namespace protocol {
 
 } } // namespace graphene::protocol
 
-FC_REFLECT( graphene::protocol::custom_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::custom_operation::fee_params_t, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::custom_operation, (fee)(payer)(required_auths)(id)(data) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::custom_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::custom_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::custom_operation )

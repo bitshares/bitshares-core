@@ -30,48 +30,48 @@ namespace graphene { namespace protocol {
    template<typename ...T>
    struct transform_to_fee_parameters<fc::static_variant<T...>>
    {
-      using type = fc::static_variant< typename T::fee_parameters_type... >;
+      using type = fc::static_variant< typename T::fee_params_t... >;
    };
    using fee_parameters = transform_to_fee_parameters<operation>::type;
 
    template<typename Operation>
    class fee_helper {
      public:
-      const typename Operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const typename Operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         auto itr = parameters.find( typename Operation::fee_params_t() );
          FC_ASSERT( itr != parameters.end() );
-         return itr->template get<typename Operation::fee_parameters_type>();
+         return itr->template get<typename Operation::fee_params_t>();
       }
    };
 
    template<>
    class fee_helper<account_create_operation> {
      public:
-      const account_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const account_create_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
+         auto itr = parameters.find( account_create_operation::fee_params_t() );
          FC_ASSERT( itr != parameters.end() );
-         return itr->get<account_create_operation::fee_parameters_type>();
+         return itr->get<account_create_operation::fee_params_t>();
       }
-      typename account_create_operation::fee_parameters_type& get(fee_parameters::flat_set_type& parameters)const
+      typename account_create_operation::fee_params_t& get(fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
+         auto itr = parameters.find( account_create_operation::fee_params_t() );
          FC_ASSERT( itr != parameters.end() );
-         return itr->get<account_create_operation::fee_parameters_type>();
+         return itr->get<account_create_operation::fee_params_t>();
       }
    };
 
    template<>
    class fee_helper<bid_collateral_operation> {
      public:
-      const bid_collateral_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const bid_collateral_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( bid_collateral_operation::fee_parameters_type() );
+         auto itr = parameters.find( bid_collateral_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<bid_collateral_operation::fee_parameters_type>();
+            return itr->get<bid_collateral_operation::fee_params_t>();
 
-         static bid_collateral_operation::fee_parameters_type bid_collateral_dummy;
+         static bid_collateral_operation::fee_params_t bid_collateral_dummy;
          bid_collateral_dummy.fee = fee_helper<call_order_update_operation>().cget(parameters).fee;
          return bid_collateral_dummy;
       }
@@ -80,13 +80,13 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<asset_update_issuer_operation> {
      public:
-      const asset_update_issuer_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const asset_update_issuer_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( asset_update_issuer_operation::fee_parameters_type() );
+         auto itr = parameters.find( asset_update_issuer_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<asset_update_issuer_operation::fee_parameters_type>();
+            return itr->get<asset_update_issuer_operation::fee_params_t>();
 
-         static asset_update_issuer_operation::fee_parameters_type dummy;
+         static asset_update_issuer_operation::fee_params_t dummy;
          dummy.fee = fee_helper<asset_update_operation>().cget(parameters).fee;
          return dummy;
       }
@@ -95,13 +95,13 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<asset_claim_pool_operation> {
      public:
-      const asset_claim_pool_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const asset_claim_pool_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( asset_claim_pool_operation::fee_parameters_type() );
+         auto itr = parameters.find( asset_claim_pool_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<asset_claim_pool_operation::fee_parameters_type>();
+            return itr->get<asset_claim_pool_operation::fee_params_t>();
 
-         static asset_claim_pool_operation::fee_parameters_type asset_claim_pool_dummy;
+         static asset_claim_pool_operation::fee_params_t asset_claim_pool_dummy;
          asset_claim_pool_dummy.fee = fee_helper<asset_fund_fee_pool_operation>().cget(parameters).fee;
          return asset_claim_pool_dummy;
       }
@@ -110,9 +110,9 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<ticket_create_operation> {
      public:
-      const ticket_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const ticket_create_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         static ticket_create_operation::fee_parameters_type param;
+         static ticket_create_operation::fee_params_t param;
          return param;
       }
    };
@@ -120,9 +120,9 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<ticket_update_operation> {
      public:
-      const ticket_update_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const ticket_update_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         static ticket_update_operation::fee_parameters_type param;
+         static ticket_update_operation::fee_params_t param;
          return param;
       }
    };
@@ -130,13 +130,13 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<htlc_create_operation> {
      public:
-      const htlc_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const htlc_create_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( htlc_create_operation::fee_parameters_type() );
+         auto itr = parameters.find( htlc_create_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<htlc_create_operation::fee_parameters_type>();
+            return itr->get<htlc_create_operation::fee_params_t>();
 
-         static htlc_create_operation::fee_parameters_type htlc_create_operation_fee_dummy;
+         static htlc_create_operation::fee_params_t htlc_create_operation_fee_dummy;
          return htlc_create_operation_fee_dummy;
       }
    };
@@ -144,26 +144,26 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<htlc_redeem_operation> {
      public:
-      const htlc_redeem_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const htlc_redeem_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( htlc_redeem_operation::fee_parameters_type() );
+         auto itr = parameters.find( htlc_redeem_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<htlc_redeem_operation::fee_parameters_type>();
+            return itr->get<htlc_redeem_operation::fee_params_t>();
 
-         static htlc_redeem_operation::fee_parameters_type htlc_redeem_operation_fee_dummy;
+         static htlc_redeem_operation::fee_params_t htlc_redeem_operation_fee_dummy;
          return htlc_redeem_operation_fee_dummy;
       }
    };
    template<>
    class fee_helper<htlc_extend_operation> {
      public:
-      const htlc_extend_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const htlc_extend_operation::fee_params_t& cget(const fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( htlc_extend_operation::fee_parameters_type() );
+         auto itr = parameters.find( htlc_extend_operation::fee_params_t() );
          if ( itr != parameters.end() )
-            return itr->get<htlc_extend_operation::fee_parameters_type>();
+            return itr->get<htlc_extend_operation::fee_params_t>();
 
-         static htlc_extend_operation::fee_parameters_type htlc_extend_operation_fee_dummy;
+         static htlc_extend_operation::fee_params_t htlc_extend_operation_fee_dummy;
          return htlc_extend_operation_fee_dummy;
       }
    };
@@ -198,19 +198,19 @@ namespace graphene { namespace protocol {
       void validate()const {}
 
       template<typename Operation>
-      const typename Operation::fee_parameters_type& get()const
+      const typename Operation::fee_params_t& get()const
       {
          return fee_helper<Operation>().cget(parameters);
       }
       template<typename Operation>
-      typename Operation::fee_parameters_type& get()
+      typename Operation::fee_params_t& get()
       {
          return fee_helper<Operation>().get(parameters);
       }
       template<typename Operation>
       bool exists()const
       {
-         auto itr = parameters.find(typename Operation::fee_parameters_type());
+         auto itr = parameters.find(typename Operation::fee_params_t());
          return itr != parameters.end();
       }
 

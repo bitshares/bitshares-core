@@ -2225,24 +2225,24 @@ flat_map< uint64_t, graphene::chain::fee_parameters > database_fixture_base::get
 {
    flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
 
-   htlc_create_operation::fee_parameters_type create_param;
+   htlc_create_operation::fee_params_t create_param;
    create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_create_operation()).which()] = create_param;
 
-   htlc_redeem_operation::fee_parameters_type redeem_param;
+   htlc_redeem_operation::fee_params_t redeem_param;
    redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
 
-   htlc_extend_operation::fee_parameters_type extend_param;
+   htlc_extend_operation::fee_params_t extend_param;
    extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
 
    // set the transfer kb fee to something other than default, to verify we're looking
    // at the correct fee
-   transfer_operation::fee_parameters_type transfer_param;
+   transfer_operation::fee_params_t transfer_param;
    transfer_param.price_per_kbyte *= 2;
    ret_val[ ((operation)transfer_operation()).which() ] = transfer_param;
 

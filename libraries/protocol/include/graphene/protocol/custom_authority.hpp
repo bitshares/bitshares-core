@@ -34,7 +34,7 @@ namespace graphene { namespace protocol {
     * @ingroup operations
     */
    struct custom_authority_create_operation : public base_operation {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t basic_fee = GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_byte = GRAPHENE_BLOCKCHAIN_PRECISION / 10;
       };
@@ -60,7 +60,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return account; }
       void validate()const;
-      share_type calculate_fee(const fee_parameters_type& k)const;
+      share_type calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -68,7 +68,7 @@ namespace graphene { namespace protocol {
     * @ingroup operations
     */
    struct custom_authority_update_operation : public base_operation {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t basic_fee = GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_byte = GRAPHENE_BLOCKCHAIN_PRECISION / 10;
       };
@@ -96,7 +96,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return account; }
       void validate()const;
-      share_type calculate_fee(const fee_parameters_type& k)const;
+      share_type calculate_fee(const fee_params_t& k)const;
    };
 
 
@@ -105,7 +105,7 @@ namespace graphene { namespace protocol {
     * @ingroup operations
     */
    struct custom_authority_delete_operation : public base_operation {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       /// Operation fee
       asset fee;
@@ -118,14 +118,14 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return account; }
       void validate()const;
-      share_type calculate_fee(const fee_parameters_type& k)const { return k.fee; }
+      share_type calculate_fee(const fee_params_t& k)const { return k.fee; }
    };
 
 } } // graphene::protocol
 
-FC_REFLECT(graphene::protocol::custom_authority_create_operation::fee_parameters_type, (basic_fee)(price_per_byte))
-FC_REFLECT(graphene::protocol::custom_authority_update_operation::fee_parameters_type, (basic_fee)(price_per_byte))
-FC_REFLECT(graphene::protocol::custom_authority_delete_operation::fee_parameters_type, (fee))
+FC_REFLECT(graphene::protocol::custom_authority_create_operation::fee_params_t, (basic_fee)(price_per_byte))
+FC_REFLECT(graphene::protocol::custom_authority_update_operation::fee_params_t, (basic_fee)(price_per_byte))
+FC_REFLECT(graphene::protocol::custom_authority_delete_operation::fee_params_t, (fee))
 
 FC_REFLECT(graphene::protocol::custom_authority_create_operation,
            (fee)(account)(enabled)(valid_from)(valid_to)(operation_type)(auth)(restrictions)(extensions))

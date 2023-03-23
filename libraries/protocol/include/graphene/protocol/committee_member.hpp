@@ -37,7 +37,7 @@ namespace graphene { namespace protocol {
     */
    struct committee_member_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5000 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 5000 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                                 fee;
       /// The account which owns the committee_member. This account pays the fee for this operation.
@@ -57,7 +57,7 @@ namespace graphene { namespace protocol {
     */
    struct committee_member_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                                 fee;
       /// The committee member to update.
@@ -83,7 +83,7 @@ namespace graphene { namespace protocol {
     */
    struct committee_member_update_global_parameters_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset             fee;
       chain_parameters  new_parameters;
@@ -96,9 +96,9 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::committee_member_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::committee_member_update_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::committee_member_update_global_parameters_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::committee_member_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::committee_member_update_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::committee_member_update_global_parameters_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::committee_member_create_operation,
             (fee)(committee_member_account)(url) )
@@ -106,9 +106,9 @@ FC_REFLECT( graphene::protocol::committee_member_update_operation,
             (fee)(committee_member)(committee_member_account)(new_url) )
 FC_REFLECT( graphene::protocol::committee_member_update_global_parameters_operation, (fee)(new_parameters) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_global_parameters_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_global_parameters_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::committee_member_update_global_parameters_operation )
