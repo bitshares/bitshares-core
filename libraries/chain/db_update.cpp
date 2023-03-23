@@ -770,7 +770,8 @@ void database::update_credit_offers_and_deals()
    {
       const credit_deal_object& deal = *deal_itr;
 
-      // Note: automatic repayment fails if the borrower became unauthorized by the debt asset or the collateral asset
+      // Process automatic repayment
+      // Note: an automatic repayment may fail, in which case we consider the credit deal past due without repayment
       using repay_type = credit_deal_auto_repayment_type;
       if( static_cast<uint8_t>(repay_type::no_auto_repayment) != deal.auto_repay )
       {
