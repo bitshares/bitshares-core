@@ -109,7 +109,6 @@ jobs:
       with:
         path: |
           ccache
-          sonar_cache
         key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
           sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
@@ -185,7 +184,6 @@ jobs:
         df -h
     - name: Prepare for scanning with SonarScanner
       run: |
-        mkdir -p sonar_cache
         find _build/libraries/[acdenptuw]*/CMakeFiles/*.dir \
              _build/libraries/plugins/*/CMakeFiles/*.dir \
              -type d -print \
