@@ -50,6 +50,7 @@ jobs:
           sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
         sudo apt-get install -y \
                      ccache \
+                     gcovr \
                      parallel \
                      libboost-thread-dev \
                      libboost-iostreams-dev \
@@ -109,7 +110,6 @@ jobs:
       with:
         path: |
           ccache
-          sonar_cache
         key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
           sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
@@ -185,24 +185,11 @@ jobs:
         df -h
     - name: Prepare for scanning with SonarScanner
       run: |
-        mkdir -p sonar_cache
-        find _build/libraries/[acdenptuw]*/CMakeFiles/*.dir \
-             _build/libraries/plugins/*/CMakeFiles/*.dir \
-             -type d -print \
-          | while read d; do \
-              tmpd="${d:7}"; \
-              srcd="${tmpd/CMakeFiles*.dir/.}"; \
-              gcov -o "$d" "${srcd}"/*.[ch][px][px] \
-                           "${srcd}"/include/graphene/*/*.[ch][px][px] ; \
-            done >/dev/null
-        find _build/programs/[cdgjsw]*/CMakeFiles/*.dir \
-             -type d -print \
-          | while read d; do \
-              tmpd="${d:7}"; \
-              srcd="${tmpd/CMakeFiles*.dir/.}"; \
-              gcov -o "$d" "${srcd}"/*.[ch][px][px] ; \
-            done >/dev/null
         programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
+        pushd _build
+        gcovr --version
+        gcovr --exclude-unreachable-branches --sonarqube ../coverage.xml -r ..
+        popd
     - name: Scan with SonarScanner
       env:
         # to get access to secrets.SONAR_TOKEN, provide GITHUB_TOKEN
