@@ -1551,7 +1551,7 @@ BOOST_AUTO_TEST_CASE( create_bitassets )
       transfer( committee_account, rachelregistrar_id, asset( 10000000 ) );
       transfer( committee_account, rachelreferrer_id, asset( 10000000 ) );
       transfer( committee_account, rachel.get_id(), asset( 10000000) );
-      transfer( committee_account, paul_id, asset( 10000000000 ) );
+      transfer( committee_account, paul_id, asset( 10000000000LL ) );
 
       asset_update_operation op;
       op.issuer = biteur.issuer;
