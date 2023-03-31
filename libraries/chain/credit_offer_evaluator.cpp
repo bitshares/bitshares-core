@@ -473,7 +473,7 @@ extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result credit_deal_update_evaluator::do_evaluate(const credit_deal_update_operation& op)
-{ try {
+{
    const database& d = db();
    const auto block_time = d.head_block_time();
 
@@ -486,10 +486,10 @@ void_result credit_deal_update_evaluator::do_evaluate(const credit_deal_update_o
    FC_ASSERT( _deal->auto_repay != op.auto_repay, "The automatic repayment type does not change" );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+}
 
 void_result credit_deal_update_evaluator::do_apply( const credit_deal_update_operation& op) const
-{ try {
+{
    database& d = db();
 
    d.modify( *_deal, [&op]( credit_deal_object& obj ){
@@ -497,6 +497,6 @@ void_result credit_deal_update_evaluator::do_apply( const credit_deal_update_ope
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+}
 
 } } // graphene::chain
