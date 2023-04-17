@@ -1,0 +1,15 @@
+[NAME]
+witness_node - Start the bitshares core program.
+
+[SYNOPSIS]
+\fBwitness_node\fR [OPTIONS]...
+
+[AUTHOR]
+The BitShares Core Team and contributors.
+
+[REPORTING BUGS]
+https://github.com/bitshares/bitshares-core/issues/
+
+[COPYRIGHT]
+
+The MIT license.
