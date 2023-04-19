@@ -3907,4 +3907,96 @@ BOOST_AUTO_TEST_CASE( issue_433_indirect_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( fee_change_test )
+{ try {
+
+   // At the beginning, the fee schedule is all zero
+   const auto& check_zero_fees = [&]() {
+      BOOST_REQUIRE( db.get_global_properties().parameters.current_fees );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->scale, 0 );
+      BOOST_REQUIRE( !db.get_global_properties().parameters.current_fees->parameters.empty() );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->parameters.begin()->get<
+                               transfer_operation::fee_params_t>().fee, 0 );
+   };
+
+   check_zero_fees();
+
+   {
+      // Try to set default fees, it should fail, because some operations aren't available
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time() );
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation cmuop;
+      cmuop.new_parameters = db.get_global_properties().parameters;
+      cmuop.new_parameters.get_mutable_fees() = fee_schedule::get_default();
+      cop.proposed_ops.emplace_back( cmuop );
+      trx.operations.push_back( cop );
+
+      // It should fail
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      trx.clear();
+   }
+
+   // The fee schedule is still all zero
+   check_zero_fees();
+
+   // Pass the BSIP-40 hardfork
+   generate_blocks( HARDFORK_BSIP_40_TIME );
+   set_expiration( db, trx );
+
+   // The fee schedule is still all zero
+   check_zero_fees();
+
+   {
+      // Try to set default fees, it should succeed
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time() );
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation cmuop;
+      cmuop.new_parameters = db.get_global_properties().parameters;
+      cmuop.new_parameters.get_mutable_fees() = fee_schedule::get_default();
+      cop.proposed_ops.emplace_back( cmuop );
+      trx.operations.push_back( cop );
+
+      // It should fail
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      trx.clear();
+      proposal_id_type prop_id { ptx.operation_results[0].get<object_id_type>() };
+
+      // The fee schedule is still all zero
+      check_zero_fees();
+
+      // Approve the proposal
+      proposal_update_operation uop;
+      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      uop.active_approvals_to_add = { get_account("init0").get_id(), get_account("init1").get_id(),
+                                      get_account("init2").get_id(), get_account("init3").get_id(),
+                                      get_account("init4").get_id(), get_account("init5").get_id(),
+                                      get_account("init6").get_id(), get_account("init7").get_id() };
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+
+      // The fee schedule is still all zero
+      check_zero_fees();
+
+      generate_blocks( prop_id( db ).expiration_time + 5 );
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+
+      // The fee schedule is no longer all zero
+      BOOST_REQUIRE( db.get_global_properties().parameters.current_fees );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->scale, GRAPHENE_100_PERCENT );
+      BOOST_REQUIRE( !db.get_global_properties().parameters.current_fees->parameters.empty() );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->parameters.begin()->get<
+                               transfer_operation::fee_params_t>().fee, transfer_operation::fee_params_t().fee );
+      BOOST_CHECK( transfer_operation::fee_params_t().fee != 0 );
+
+      idump( (db.get_global_properties()) );
+
+   }
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
