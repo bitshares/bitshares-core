@@ -92,7 +92,7 @@ namespace graphene { namespace protocol {
     */
    struct assert_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                      fee;
       account_id_type            fee_paying_account;
@@ -102,17 +102,17 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::assert_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::assert_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::account_name_eq_lit_predicate, (account_id)(name) )
 FC_REFLECT( graphene::protocol::asset_symbol_eq_lit_predicate, (asset_id)(symbol) )
 FC_REFLECT( graphene::protocol::block_id_predicate, (id) )
 FC_REFLECT_TYPENAME( graphene::protocol::predicate )
 FC_REFLECT( graphene::protocol::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths)(extensions) )
  
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::assert_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::assert_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::assert_operation )

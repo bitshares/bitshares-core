@@ -191,7 +191,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_create_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t symbol3        = 500000 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint64_t symbol4        = 300000 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint64_t long_symbol    = 5000   * GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -221,7 +221,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_parameters_type& k,
+      share_type      calculate_fee( const fee_params_t& k,
                                      const optional<uint64_t>& sub_asset_creation_fee )const;
    };
 
@@ -237,7 +237,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_global_settle_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
       account_id_type issuer; ///< must equal issuer of @ref asset_to_settle
@@ -266,7 +266,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_settle_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          /** this fee should be high to encourage small settlement requests to
           * be performed on the market rather than via forced settlement.
           *
@@ -292,7 +292,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_settle_cancel_operation : public base_operation
    {
-      struct fee_parameters_type { };
+      struct fee_params_t { };
 
       asset_settle_cancel_operation() = default;
       asset_settle_cancel_operation( const force_settlement_id_type& fsid, const account_id_type& aid,
@@ -312,7 +312,7 @@ namespace graphene { namespace protocol {
        */
       void validate() const { FC_ASSERT( !"Virtual operation"); }
 
-      share_type calculate_fee(const fee_parameters_type& params)const
+      share_type calculate_fee(const fee_params_t& params)const
       { return 0; }
    };
 
@@ -321,7 +321,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_fund_fee_pool_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee; ///< core asset
       account_id_type from_account;
@@ -360,7 +360,7 @@ namespace graphene { namespace protocol {
          fc::optional<bool> skip_core_exchange_rate;
       };
 
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee            = 500 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10;
       };
@@ -378,7 +378,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -397,7 +397,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_update_bitasset_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
       account_id_type issuer;
@@ -429,7 +429,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_update_feed_producers_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
       account_id_type issuer;
@@ -467,7 +467,7 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> initial_collateral_ratio;  // BSIP-77
       };
 
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                  fee; ///< paid for by publisher
       account_id_type        publisher;
@@ -484,7 +484,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_issue_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
       };
@@ -501,7 +501,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -512,7 +512,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_reserve_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset             fee;
       account_id_type   payer;
@@ -528,7 +528,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_claim_fees_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -564,7 +564,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_update_issuer_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -600,7 +600,7 @@ namespace graphene { namespace protocol {
     */
    struct asset_claim_pool_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -617,11 +617,11 @@ namespace graphene { namespace protocol {
 } } // graphene::protocol
 
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
-FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation::additional_options_type, (claim_from_asset_id) )
 
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
-FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::asset_options,
             (max_supply)
@@ -663,20 +663,20 @@ FC_REFLECT( graphene::protocol::additional_asset_options,
 FC_REFLECT( graphene::protocol::asset_update_operation::ext, (new_precision)(skip_core_exchange_rate) )
 FC_REFLECT( graphene::protocol::asset_publish_feed_operation::ext, (initial_collateral_ratio) )
 
-FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type,
+FC_REFLECT( graphene::protocol::asset_create_operation::fee_params_t,
             (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 
-FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_settle_cancel_operation::fee_parameters_type, )
-FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::asset_update_issuer_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_update_feed_producers_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_publish_feed_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::asset_issue_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::asset_reserve_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_settle_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_settle_cancel_operation::fee_params_t, )
+FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_update_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::asset_update_issuer_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_update_bitasset_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_update_feed_producers_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_publish_feed_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::asset_issue_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::asset_reserve_operation::fee_params_t, (fee) )
 
 
 FC_REFLECT( graphene::protocol::asset_create_operation,
@@ -735,21 +735,21 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_asset_op
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::ext )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::ext )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::additional_options_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(
-   graphene::protocol::asset_update_feed_producers_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_issue_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_reserve_operation::fee_parameters_type )
+   graphene::protocol::asset_update_feed_producers_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_issue_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_reserve_operation::fee_params_t )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation )

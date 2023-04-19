@@ -66,6 +66,8 @@ struct hardfork_visitor {
                                                 protocol::credit_offer_accept_operation,
                                                 protocol::credit_deal_repay_operation,
                                                 protocol::credit_deal_expired_operation >;
+   using credit_deal_update_op = fc::typelist::list< protocol::credit_deal_update_operation >;
+
    fc::time_point_sec now;
 
    /// @note using head block time for all operations
@@ -91,6 +93,9 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<credit_offer_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2362_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<credit_deal_update_op, Op>(), bool>
+   visit() { return HARDFORK_CORE_2595_PASSED(now); }
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<liquidity_pool_update_op, Op>(), bool>
    visit() { return HARDFORK_CORE_2604_PASSED(now); }

@@ -1921,7 +1921,8 @@ void database_fixture_base::update_credit_offer( account_id_type account, credit
 credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )const
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )const
 {
    credit_offer_accept_operation op;
    op.borrower = account;
@@ -1930,16 +1931,18 @@ credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op
    op.collateral = collateral;
    op.max_fee_rate = max_fee_rate;
    op.min_duration_seconds = min_duration;
+   op.extensions.value.auto_repay = auto_repay;
    return op;
 }
 
 const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )
 {
    credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral,
-                                                                   max_fee_rate, min_duration );
+                                                                   max_fee_rate, min_duration, auto_repay );
    trx.operations.clear();
    trx.operations.push_back( op );
 
@@ -1986,6 +1989,33 @@ extendable_operation_result_dtl database_fixture_base::repay_credit_deal(
    trx.operations.clear();
    verify_asset_supplies(db);
    return op_result.get<extendable_operation_result>().value;
+}
+
+credit_deal_update_operation database_fixture_base::make_credit_deal_update_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )const
+{
+   credit_deal_update_operation op;
+   op.account = account;
+   op.deal_id = deal_id;
+   op.auto_repay = auto_repay;
+   return op;
+}
+
+void database_fixture_base::update_credit_deal(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )
+{
+   credit_deal_update_operation op = make_credit_deal_update_op( account, deal_id, auto_repay );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
 }
 
 
@@ -2195,24 +2225,24 @@ flat_map< uint64_t, graphene::chain::fee_parameters > database_fixture_base::get
 {
    flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
 
-   htlc_create_operation::fee_parameters_type create_param;
+   htlc_create_operation::fee_params_t create_param;
    create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_create_operation()).which()] = create_param;
 
-   htlc_redeem_operation::fee_parameters_type redeem_param;
+   htlc_redeem_operation::fee_params_t redeem_param;
    redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
 
-   htlc_extend_operation::fee_parameters_type extend_param;
+   htlc_extend_operation::fee_params_t extend_param;
    extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
 
    // set the transfer kb fee to something other than default, to verify we're looking
    // at the correct fee
-   transfer_operation::fee_parameters_type transfer_param;
+   transfer_operation::fee_params_t transfer_param;
    transfer_param.price_per_kbyte *= 2;
    ret_val[ ((operation)transfer_operation()).which() ] = transfer_param;
 

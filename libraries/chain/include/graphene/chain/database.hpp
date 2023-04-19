@@ -703,6 +703,11 @@ namespace graphene { namespace chain {
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
 
+         /// Validate, evaluate and apply a virtual operation using a temporary undo_database session,
+         /// if fail, rewind any changes made
+         operation_result      try_push_virtual_operation( transaction_evaluation_state& eval_state,
+                                                           const operation& op );
+
          ///Steps involved in applying a new block
          ///@{
 

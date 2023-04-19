@@ -387,6 +387,10 @@ struct get_impacted_account_visitor
       _impacted.insert( op.offer_owner );
       _impacted.insert( op.borrower );
    }
+   void operator()( const credit_deal_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 } // namespace detail

@@ -35,7 +35,7 @@ namespace graphene { namespace protocol {
     */
    struct credit_offer_create_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee             = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
@@ -60,7 +60,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return owner_account; }
       void            validate()const override;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -69,7 +69,7 @@ namespace graphene { namespace protocol {
     */
    struct credit_offer_delete_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_params_t { uint64_t fee = 0; };
 
       asset                fee;                ///< Operation fee
       account_id_type      owner_account;      ///< The account who owns the credit offer
@@ -87,7 +87,7 @@ namespace graphene { namespace protocol {
     */
    struct credit_offer_update_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee             = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
@@ -112,16 +112,35 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return owner_account; }
       void            validate()const override;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
+   };
+
+   /// Defines automatic repayment types
+   enum class credit_deal_auto_repayment_type
+   {
+      /// Do not repay automatically
+      no_auto_repayment = 0,
+      /// Automatically repay fully when and only when the account balance is sufficient
+      only_full_repayment = 1,
+      /// Automatically repay as much as possible using available account balance
+      allow_partial_repayment = 2,
+      /// Total number of available automatic repayment types
+      CDAR_TYPE_COUNT = 3
    };
 
    /**
-    * @brief Accept a creadit offer and create a credit deal
+    * @brief Accept a credit offer, thereby creating a credit deal
     * @ingroup operations
     */
    struct credit_offer_accept_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct ext
+      {
+         /// After the core-2595 hard fork, the account can specify whether and how to automatically repay
+         fc::optional<uint8_t> auto_repay;
+      };
+
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          borrower;           ///< The account who accepts the offer
@@ -131,7 +150,7 @@ namespace graphene { namespace protocol {
       uint32_t                 max_fee_rate = 0;   ///< The maximum acceptable fee rate
       uint32_t                 min_duration_seconds = 0; ///< The minimum acceptable duration
 
-      extensions_type extensions;  ///< Unused. Reserved for future use.
+      extension<ext> extensions; ///< Extensions
 
       account_id_type fee_payer()const { return borrower; }
       void            validate()const override;
@@ -143,7 +162,7 @@ namespace graphene { namespace protocol {
     */
    struct credit_deal_repay_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who repays to the credit offer
@@ -164,7 +183,7 @@ namespace graphene { namespace protocol {
     */
    struct credit_deal_expired_operation : public base_operation
    {
-      struct fee_parameters_type {};
+      struct fee_params_t {};
 
       credit_deal_expired_operation() = default;
 
@@ -186,17 +205,37 @@ namespace graphene { namespace protocol {
       void            validate()const override { FC_ASSERT( !"virtual operation" ); }
 
       /// This is a virtual operation; there is no fee
-      share_type      calculate_fee(const fee_parameters_type&)const { return 0; }
+      share_type      calculate_fee(const fee_params_t&)const { return 0; }
+   };
+
+   /**
+    * @brief Update a credit deal
+    * @ingroup operations
+    */
+   struct credit_deal_update_operation : public base_operation
+   {
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset                    fee;                ///< Operation fee
+      account_id_type          account;            ///< The account who owns the credit deal
+      credit_deal_id_type      deal_id;            ///< ID of the credit deal
+      uint8_t                  auto_repay;         ///< The specified automatic repayment type
+
+      extensions_type extensions;  ///< Unused. Reserved for future use.
+
+      account_id_type fee_payer()const { return account; }
+      void            validate()const override;
    };
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::credit_offer_create_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::credit_offer_delete_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::credit_offer_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::credit_offer_accept_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::credit_deal_repay_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::credit_deal_expired_operation::fee_parameters_type, ) // VIRTUAL
+FC_REFLECT( graphene::protocol::credit_offer_create_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::credit_offer_delete_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::credit_offer_update_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::credit_offer_accept_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::credit_deal_repay_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::credit_deal_expired_operation::fee_params_t, ) // VIRTUAL
+FC_REFLECT( graphene::protocol::credit_deal_update_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::credit_offer_create_operation,
             (fee)
@@ -235,6 +274,10 @@ FC_REFLECT( graphene::protocol::credit_offer_update_operation,
             (extensions)
           )
 
+FC_REFLECT( graphene::protocol::credit_offer_accept_operation::ext,
+            (auto_repay)
+          )
+
 FC_REFLECT( graphene::protocol::credit_offer_accept_operation,
             (fee)
             (borrower)
@@ -266,12 +309,23 @@ FC_REFLECT( graphene::protocol::credit_deal_expired_operation,
             (fee_rate)
           )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation::fee_parameters_type )
-// Note: credit_deal_expired_operation is virtual so no external serialization for its fee_parameters_type
+FC_REFLECT( graphene::protocol::credit_deal_update_operation,
+            (fee)
+            (account)
+            (deal_id)
+            (auto_repay)
+            (extensions)
+          )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::ext )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation::fee_params_t )
+// Note: credit_deal_expired_operation is virtual so no external serialization for its fee_params_t
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_update_operation::fee_params_t )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation )
@@ -279,3 +333,4 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_update
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_expired_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_update_operation )

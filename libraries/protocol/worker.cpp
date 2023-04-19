@@ -39,5 +39,5 @@ void worker_create_operation::validate() const
 
 } }
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation )

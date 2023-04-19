@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
     */
    struct vesting_balance_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                       fee;
       account_id_type             creator; ///< Who provides funds initially
@@ -100,7 +100,7 @@ namespace graphene { namespace protocol {
     */
    struct vesting_balance_withdraw_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                   fee;
       vesting_balance_id_type vesting_balance;
@@ -118,8 +118,8 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::vesting_balance_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::vesting_balance_withdraw_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::vesting_balance_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::vesting_balance_withdraw_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::vesting_balance_create_operation, (fee)(creator)(owner)(amount)(policy) )
 FC_REFLECT( graphene::protocol::vesting_balance_withdraw_operation, (fee)(vesting_balance)(owner)(amount) )
@@ -129,7 +129,7 @@ FC_REFLECT(graphene::protocol::cdd_vesting_policy_initializer, (start_claim)(ves
 FC_REFLECT_EMPTY( graphene::protocol::instant_vesting_policy_initializer )
 FC_REFLECT_TYPENAME( graphene::protocol::vesting_policy_initializer )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation )

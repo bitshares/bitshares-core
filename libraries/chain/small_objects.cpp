@@ -234,6 +234,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::credit_deal_object, (graphene::
                     (collateral_amount)
                     (fee_rate)
                     (latest_repay_time)
+                    (auto_repay)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::credit_deal_summary_object, (graphene::db::object),

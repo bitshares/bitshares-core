@@ -2927,7 +2927,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    PUSH_TX( db, trx );
    auto pay_fee_time = db.head_block_time().sec_since_epoch();
    trx.clear();
-   BOOST_CHECK( get_balance(*nathan, *core) == 20000*prec - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
+   BOOST_CHECK( get_balance(*nathan, *core) == 20000*prec - account_upgrade_operation::fee_params_t().membership_lifetime_fee );;
 
    generate_block();
    nathan = &get_account("nathan");

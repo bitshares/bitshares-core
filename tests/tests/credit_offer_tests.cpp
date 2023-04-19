@@ -38,8 +38,7 @@ using namespace graphene::chain::test;
 BOOST_FIXTURE_TEST_SUITE( credit_offer_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( credit_offer_hardfork_time_test )
-{
-   try {
+{ try {
 
       // Proceeds to a recent hard fork
       generate_blocks( HARDFORK_CORE_2262_TIME );
@@ -107,17 +106,95 @@ BOOST_AUTO_TEST_CASE( credit_offer_hardfork_time_test )
       set_expiration( db, trx );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_hardfork_time_test )
+{ try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_2362_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((ray)(sam)(ted));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( ray, asset(init_amount) );
+      fund( sam, asset(init_amount) );
+
+      const asset_object& core = asset_id_type()(db);
+      asset_id_type core_id;
+
+      const asset_object& usd = create_user_issued_asset( "MYUSD", ted, white_list );
+      asset_id_type usd_id = usd.get_id();
+      issue_uia( ray, usd.amount(init_amount) );
+      issue_uia( sam, usd.amount(init_amount) );
+
+      const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
+      asset_id_type eur_id = eur.get_id();
+      issue_uia( ray, eur.amount(init_amount) );
+      issue_uia( sam, eur.amount(init_amount) );
+
+      // create a credit offer
+      auto disable_time1 = db.head_block_time() + fc::minutes(20); // 20 minutes after init
+
+      flat_map<asset_id_type, price> collateral_map1;
+      collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
+      collateral_map1[eur_id] = price( asset(1), asset(1, eur_id) );
+
+      const credit_offer_object& coo1 = create_credit_offer( sam_id, core.get_id(), 10000, 30000, 3600, 0, true,
+                                              disable_time1, collateral_map1, {} );
+      credit_offer_id_type co1_id = coo1.get_id();
+
+      // Before the hard fork, unable to borrow with the "auto-repay" extension field enabled
+      // or propose to do so
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 0 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 1 ),
+                         fc::exception );
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 ),
+                         fc::exception );
+
+      credit_offer_accept_operation accop = make_credit_offer_accept_op( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 0 );
+      BOOST_CHECK_THROW( propose( accop ), fc::exception );
+
+      accop = make_credit_offer_accept_op( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 1 );
+      BOOST_CHECK_THROW( propose( accop ), fc::exception );
+
+      accop = make_credit_offer_accept_op( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 );
+      BOOST_CHECK_THROW( propose( accop ), fc::exception );
+
+      // borrow
+      BOOST_TEST_MESSAGE( "Ray borrows" );
+      const credit_deal_object& cdo11 = borrow_from_credit_offer( ray_id, co1_id, asset(100),
+                                                   asset(200, usd_id), GRAPHENE_FEE_RATE_DENOM, 0, {} );
+      credit_deal_id_type cd11_id = cdo11.get_id();
+
+      BOOST_CHECK_EQUAL( cd11_id(db).auto_repay, 0U );
+
+      // Before the hard fork, unable to update a credit deal
+      // or update with proposals
+      BOOST_CHECK_THROW( update_credit_deal( sam_id, cd11_id, 1 ), fc::exception );
+
+      credit_deal_update_operation updop = make_credit_deal_update_op( sam_id, cd11_id, 1 );
+      BOOST_CHECK_THROW( propose( updop ), fc::exception );
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
 { try {
 
       // Pass the hard fork time
-      generate_blocks( HARDFORK_CORE_2362_TIME );
+      if( hf2595 )
+         generate_blocks( HARDFORK_CORE_2595_TIME );
+      else
+         generate_blocks( HARDFORK_CORE_2362_TIME );
+
       set_expiration( db, trx );
 
       ACTORS((sam)(ted)(por));
@@ -669,17 +746,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test )
 
       generate_block();
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 { try {
 
       // Pass the hard fork time
-      generate_blocks( HARDFORK_CORE_2362_TIME );
+      if( hf2595 )
+         generate_blocks( HARDFORK_CORE_2595_TIME );
+      else
+         generate_blocks( HARDFORK_CORE_2362_TIME );
       set_expiration( db, trx );
 
       ACTORS((ray)(sam)(ted)(por));
@@ -801,7 +877,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       check_balances();
 
-      // Unable to borrow : the credit offer is disabled
+      // Unable to borrow : the credit offer does not exist
       credit_offer_id_type tmp_co_id;
       BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, tmp_co_id, asset(100), asset(200, usd_id) ),
                          fc::exception );
@@ -1766,11 +1842,373 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       generate_block();
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( credit_offer_crud_and_proposal_test_after_hf2595 )
+{
+   hf2595 = true;
+   INVOKE( credit_offer_crud_and_proposal_test );
 }
+
+BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test_after_hf2595 )
+{
+   hf2595 = true;
+   INVOKE( credit_offer_borrow_repay_test );
+}
+
+BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_CORE_2595_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((ray)(sam)(ted)(por)(np1)(np2)(np3)(np4)(np5));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( por, asset(init_amount) );
+      fund( np4, asset(init_amount) );
+      fund( np5, asset(init_amount) );
+
+      asset_id_type core_id;
+
+      const asset_object& usd = create_user_issued_asset( "MYUSD", ted, white_list );
+      asset_id_type usd_id = usd.get_id();
+      issue_uia( sam, usd.amount(init_amount) );
+
+      const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
+      asset_id_type eur_id = eur.get_id();
+      issue_uia( ray, eur.amount(init_amount) );
+      issue_uia( np1, eur.amount(init_amount) );
+      issue_uia( np2, eur.amount(init_amount) );
+      issue_uia( np3, eur.amount(init_amount) );
+
+      const asset_object& jpy = create_user_issued_asset( "MYJPY", ted, white_list );
+      asset_id_type jpy_id = jpy.get_id();
+      issue_uia( sam, jpy.amount(init_amount * 1000) );
+
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, init_amount );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, init_amount * 1000 );
+
+      // create a credit offer
+      auto disable_time1 = db.head_block_time() + fc::minutes(20); // 20 minutes after init
+
+      flat_map<asset_id_type, price> collateral_map1;
+      collateral_map1[core_id] = price( asset(19, usd_id), asset(23, core_id) );
+      collateral_map1[eur_id] = price( asset(19, usd_id), asset(17, eur_id) );
+
+      const credit_offer_object& coo1 = create_credit_offer( sam_id, usd_id, 10000, 30000, 3600, 0, true,
+                                              disable_time1, collateral_map1, {} );
+      credit_offer_id_type co1_id = coo1.get_id();
+
+      // create another credit offer with a very high fee rate
+      flat_map<asset_id_type, price> collateral_map2;
+      collateral_map2[core_id] = price( asset(init_amount, jpy_id), asset(1, core_id) );
+
+      const credit_offer_object& coo2 = create_credit_offer( sam_id, jpy_id, init_amount * 1000,
+                                              4000 * GRAPHENE_FEE_RATE_DENOM, 3600, 0, true,
+                                              disable_time1, collateral_map2, {} );
+      credit_offer_id_type co2_id = coo2.get_id();
+
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, init_amount - 10000 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, 0 );
+
+      // Unable to accept offer with an invalid auto-repayment type
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 3 ),
+                         fc::exception );
+      // Unable to accept offer with a proposal with an invalid auto-repayment type
+      credit_offer_accept_operation accop = make_credit_offer_accept_op( ray_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 3 );
+      BOOST_CHECK_THROW( propose( accop ), fc::exception );
+
+      // Able to accept offer with a valid auto-repayment type
+      const credit_deal_object& cdo11 = borrow_from_credit_offer( ray_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 );
+      credit_deal_id_type cd11_id = cdo11.get_id();
+
+      BOOST_CHECK_EQUAL( cd11_id(db).auto_repay, 2U );
+
+      // Unable to update the deal with an invalid auto-repayment type
+      BOOST_CHECK_THROW( update_credit_deal( ray_id, cd11_id, 3 ), fc::exception );
+      // Unable to propose an update with an invalid auto-repayment type
+      credit_deal_update_operation updop = make_credit_deal_update_op( ray_id, cd11_id, 3 );
+      BOOST_CHECK_THROW( propose( updop ), fc::exception );
+
+      // Unable to update the deal if nothing would change
+      BOOST_CHECK_THROW( update_credit_deal( ray_id, cd11_id, 2 ), fc::exception );
+      // Unable to update a deal if it does not exist
+      BOOST_CHECK_THROW( update_credit_deal( ray_id, cd11_id + 100, 1 ), fc::exception );
+      // Unable to update a deal if the account is not the owner
+      BOOST_CHECK_THROW( update_credit_deal( sam_id, cd11_id, 1 ), fc::exception );
+
+      // Able to propose an update with a valid auto-repayment type
+      updop = make_credit_deal_update_op( sam_id, cd11_id + 100, 2 );
+      propose( updop );
+
+      // Able to update a deal with valid data
+      update_credit_deal( ray_id, cd11_id, 1 );
+      BOOST_CHECK_EQUAL( cd11_id(db).auto_repay, 1U );
+      update_credit_deal( ray_id, cd11_id, 0 );
+      BOOST_CHECK_EQUAL( cd11_id(db).auto_repay, 0U );
+      update_credit_deal( ray_id, cd11_id, 2 );
+      BOOST_CHECK_EQUAL( cd11_id(db).auto_repay, 2U );
+
+      // People borrow more
+      const credit_deal_object& cdo12 = borrow_from_credit_offer( por_id, co1_id, asset(190, usd_id),
+                                                   asset(310), GRAPHENE_FEE_RATE_DENOM, 0, 1 );
+      credit_deal_id_type cd12_id = cdo12.get_id();
+
+      BOOST_CHECK_EQUAL( cd12_id(db).auto_repay, 1U );
+
+      const credit_deal_object& cdo13 = borrow_from_credit_offer( np1_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 0 );
+      credit_deal_id_type cd13_id = cdo13.get_id();
+
+      BOOST_CHECK_EQUAL( cd13_id(db).auto_repay, 0U );
+
+      const credit_deal_object& cdo14 = borrow_from_credit_offer( np2_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 );
+      credit_deal_id_type cd14_id = cdo14.get_id();
+
+      BOOST_CHECK_EQUAL( cd14_id(db).auto_repay, 2U );
+
+      const credit_deal_object& cdo15 = borrow_from_credit_offer( np3_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 );
+      credit_deal_id_type cd15_id = cdo15.get_id();
+
+      BOOST_CHECK_EQUAL( cd15_id(db).auto_repay, 2U );
+
+      const credit_deal_object& cdo16 = borrow_from_credit_offer( ray_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 1 );
+      credit_deal_id_type cd16_id = cdo16.get_id();
+
+      BOOST_CHECK_EQUAL( cd16_id(db).auto_repay, 1U );
+
+      const credit_deal_object& cdo17 = borrow_from_credit_offer( ray_id, co1_id, asset(190, usd_id),
+                                                   asset(170, eur_id), GRAPHENE_FEE_RATE_DENOM, 0, 2 );
+      credit_deal_id_type cd17_id = cdo17.get_id();
+
+      BOOST_CHECK_EQUAL( cd17_id(db).auto_repay, 2U );
+
+      BOOST_CHECK_EQUAL( db.get_balance( ray_id, usd_id ).amount.value, 190 * 3 );
+      BOOST_CHECK_EQUAL( db.get_balance( ray_id, eur_id ).amount.value, init_amount - 170 * 3 );
+      BOOST_CHECK_EQUAL( db.get_balance( por_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( por_id, core_id ).amount.value, init_amount - 310 );
+      BOOST_CHECK_EQUAL( db.get_balance( np1_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( np1_id, eur_id ).amount.value, init_amount - 170 );
+      BOOST_CHECK_EQUAL( db.get_balance( np2_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( np2_id, eur_id ).amount.value, init_amount - 170 );
+      BOOST_CHECK_EQUAL( db.get_balance( np3_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( np3_id, eur_id ).amount.value, init_amount - 170 );
+
+      BOOST_CHECK_EQUAL( co1_id(db).total_balance.value, 10000 );
+      BOOST_CHECK_EQUAL( co1_id(db).current_balance.value, 8670 ); // 10000 - 190 * 7
+
+      const credit_deal_object& cdo21 = borrow_from_credit_offer( np4_id, co2_id,
+                                                   asset(init_amount * 999, jpy_id),
+                                                   asset(999), GRAPHENE_FEE_RATE_DENOM * 4000, 0, 1 );
+      credit_deal_id_type cd21_id = cdo21.get_id();
+
+      BOOST_CHECK_EQUAL( cd21_id(db).auto_repay, 1U );
+
+      const credit_deal_object& cdo22 = borrow_from_credit_offer( np5_id, co2_id,
+                                                   asset(init_amount, jpy_id),
+                                                   asset(1), GRAPHENE_FEE_RATE_DENOM * 4000, 0, 2 );
+      credit_deal_id_type cd22_id = cdo22.get_id();
+
+      BOOST_CHECK_EQUAL( cd22_id(db).auto_repay, 2U );
+
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np5_id, jpy_id ).amount.value, init_amount );
+      BOOST_CHECK_EQUAL( db.get_balance( np5_id, core_id ).amount.value, init_amount - 1 );
+
+      BOOST_CHECK_EQUAL( co2_id(db).total_balance.value, init_amount * 1000 );
+      BOOST_CHECK_EQUAL( co2_id(db).current_balance.value, 0 );
+
+      // Setup blacklists
+      {
+         BOOST_TEST_MESSAGE( "Setting up EUR blacklisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = eur.id;
+         uop.issuer = sam_id;
+         uop.new_options = eur.options;
+         // The EUR blacklist is managed by Sam
+         uop.new_options.blacklist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the blacklist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add np2 to the EUR blacklist
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = np2_id;
+         wop.new_listing = account_whitelist_operation::black_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+      {
+         BOOST_TEST_MESSAGE( "Setting up USD blacklisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = usd.id;
+         uop.issuer = ted_id;
+         uop.new_options = usd.options;
+         // The USD blacklist is managed by Ted
+         uop.new_options.blacklist_authorities.insert(ted_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Ted so that he can manage the blacklist
+         upgrade_to_lifetime_member( ted_id );
+
+         // Add np3 to the USD blacklist
+         account_whitelist_operation wop;
+         wop.authorizing_account = ted_id;
+         wop.account_to_list = np3_id;
+         wop.new_listing = account_whitelist_operation::black_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Let the credit deals expire
+      generate_blocks( db.head_block_time() + 3600 );
+      generate_block();
+
+      BOOST_CHECK( !db.find( cd11_id ) );
+      BOOST_CHECK( !db.find( cd12_id ) );
+      BOOST_CHECK( !db.find( cd13_id ) );
+      BOOST_CHECK( !db.find( cd14_id ) );
+      BOOST_CHECK( !db.find( cd15_id ) );
+      BOOST_CHECK( !db.find( cd16_id ) );
+      BOOST_CHECK( !db.find( cd17_id ) );
+      BOOST_CHECK( !db.find( cd21_id ) );
+      BOOST_CHECK( !db.find( cd22_id ) );
+
+      // Ray fully repaid cd11, fee = round_up(190 * 3 / 100) = 6
+      // Por is unable to repay cd12 due to insufficient balance
+      // Np1 decided to not pay cd13
+      // Np2 failed to repay cd14 due to blacklisting
+      // Np3 is blacklisted by the collateral asset (EUR), however it doesn't affect the repayment for cd15
+      //   Balance was 190
+      //   cd15 debt was 190, collateral was 170
+      //   To repay: round_down(190 * 100 / 103) = 184
+      //   Collateral released = round_down(184 * 170 / 190) = 164
+      //   Updated repay amount = round_up(164 * 190 / 170) = 184
+      //   Fee = round_up(184 * 3 / 100) = 6
+      //   Total Pays = 184 + 6 = 190
+      //   New balance = 190 - 190 = 0
+      //   cd17 unpaid debt = 190 - 184 = 6, unreleased collateral = 170 - 164 = 6
+      // Ray fully repaid cd16, fee = round_up(190 * 3 / 100) = 6
+      // Ray partially repaid cd17
+      //   Balance was 190 - 6 * 2 = 178
+      //   cd17 debt was 190, collateral was 170
+      //   To repay: round_down(178 * 100 / 103) = 172
+      //   Collateral released = round_down(172 * 170 / 190) = 153
+      //   Updated repay amount = round_up(153 * 190 / 170) = 171
+      //   Fee = round_up(171 * 3 / 100) = 6
+      //   Total Pays = 171 + 6 = 177
+      //   New balance = 178 - 177 = 1
+      //   cd17 unpaid debt = 190 - 171 = 19, unreleased collateral = 170 - 153 = 17
+      // Np4 is unable to repay cd21 due to amount overflow or insufficient balance
+      // Np5 did not repay cd22 because no collateral will be returned on partial repayment
+
+      BOOST_CHECK_EQUAL( co1_id(db).total_balance.value, 9429 ); // 10000 - 190 * 3 - 6 - 19 + 6 * 4
+      BOOST_CHECK_EQUAL( co1_id(db).current_balance.value, 9429 );
+
+      BOOST_CHECK_EQUAL( co2_id(db).total_balance.value, 0 );
+      BOOST_CHECK_EQUAL( co2_id(db).current_balance.value, 0 );
+
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, 310 + 999 + 1 ); // cd13, cd21, cd22
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, init_amount - 10000 ); // no change
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, 170 * 2 + 6 + 17 ); // cd12, cd14, cd15, cd17
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, jpy_id ).amount.value, 0 ); // no change
+
+      BOOST_CHECK_EQUAL( db.get_balance( ray_id, usd_id ).amount.value, 1 );
+      BOOST_CHECK_EQUAL( db.get_balance( ray_id, eur_id ).amount.value, init_amount - 17 );
+      BOOST_CHECK_EQUAL( db.get_balance( por_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( por_id, core_id ).amount.value, init_amount - 310 );
+      BOOST_CHECK_EQUAL( db.get_balance( np1_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( np1_id, eur_id ).amount.value, init_amount - 170 );
+      BOOST_CHECK_EQUAL( db.get_balance( np2_id, usd_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( np2_id, eur_id ).amount.value, init_amount - 6 );
+      BOOST_CHECK_EQUAL( db.get_balance( np3_id, usd_id ).amount.value, 190 );
+      BOOST_CHECK_EQUAL( db.get_balance( np3_id, eur_id ).amount.value, init_amount - 170 );
+
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, jpy_id ).amount.value, init_amount * 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np4_id, core_id ).amount.value, init_amount - 999 );
+      BOOST_CHECK_EQUAL( db.get_balance( np5_id, jpy_id ).amount.value, init_amount );
+      BOOST_CHECK_EQUAL( db.get_balance( np5_id, core_id ).amount.value, init_amount - 1 );
+
+      // Check history API
+      graphene::app::history_api hist_api(app);
+
+      // np5's last 2 operations are credit_deal_expired_op and credit_offer_accept_op
+      auto histories = hist_api.get_relative_account_history( "np5", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[1].is_virtual );
+
+      // np4's last 2 operations are credit_deal_expired_op and credit_offer_accept_op
+      histories = hist_api.get_relative_account_history( "np4", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[1].is_virtual );
+
+      // np2's last 4 operations are credit_deal_expired_op, credit_deal_repay_op, account_whitelist_op,
+      //                             and credit_offer_accept_op
+      histories = hist_api.get_relative_account_history( "np2", 0, 4, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 4U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[1].is_virtual );
+      BOOST_CHECK( histories[2].op.is_type<account_whitelist_operation>() );
+      BOOST_CHECK( !histories[2].is_virtual );
+      BOOST_CHECK( histories[3].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[3].is_virtual );
+
+      // ray's last 10 operations are 1 * credit_deal_expired_op, 3 * credit_deal_repay_op,
+      //                              2 * credit_offer_accept_op,
+      //                              3 * credit_deal_update_op, 1 * credit_accept_op
+      histories = hist_api.get_relative_account_history( "ray", 0, 10, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 10U );
+      BOOST_CHECK( histories[0].op.is_type<credit_deal_expired_operation>() );
+      BOOST_CHECK( histories[0].is_virtual );
+      BOOST_CHECK( histories[1].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[1].is_virtual );
+      BOOST_CHECK( histories[2].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[2].is_virtual );
+      BOOST_CHECK( histories[3].op.is_type<credit_deal_repay_operation>() );
+      BOOST_CHECK( histories[3].is_virtual );
+      BOOST_CHECK( histories[4].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[4].is_virtual );
+      BOOST_CHECK( histories[5].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[5].is_virtual );
+      BOOST_CHECK( histories[6].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[6].is_virtual );
+      BOOST_CHECK( histories[7].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[7].is_virtual );
+      BOOST_CHECK( histories[8].op.is_type<credit_deal_update_operation>() );
+      BOOST_CHECK( !histories[8].is_virtual );
+      BOOST_CHECK( histories[9].op.is_type<credit_offer_accept_operation>() );
+      BOOST_CHECK( !histories[9].is_virtual );
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
 { try {
@@ -1992,10 +2430,6 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       BOOST_CHECK( deals[2].id == cd21_id );
       BOOST_CHECK( deals[3].id == cd51_id );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

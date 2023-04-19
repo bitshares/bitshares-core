@@ -58,7 +58,7 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::balance_claim_ope
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::buyback_account_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::fba_distribute_operation )
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::vesting_balance_withdraw_operation )

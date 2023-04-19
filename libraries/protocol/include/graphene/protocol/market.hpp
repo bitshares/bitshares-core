@@ -47,7 +47,7 @@ namespace graphene { namespace protocol {
     */
    struct limit_order_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
       account_id_type seller;
@@ -82,7 +82,7 @@ namespace graphene { namespace protocol {
     */
    struct limit_order_cancel_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_params_t { uint64_t fee = 0; };
 
       asset               fee;
       limit_order_id_type order;
@@ -120,7 +120,7 @@ namespace graphene { namespace protocol {
       };
 
       /** this is slightly more expensive than limit orders, this pricing impacts prediction markets */
-      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset               fee;
       account_id_type     funding_account; ///< pays fee, collateral, and cover
@@ -143,7 +143,7 @@ namespace graphene { namespace protocol {
     */
    struct fill_order_operation : public base_operation
    {
-      struct fee_parameters_type {};
+      struct fee_params_t {};
 
       fill_order_operation(){}
       fill_order_operation( object_id_type o, account_id_type a, asset p, asset r, asset f, price fp, bool m )
@@ -167,7 +167,7 @@ namespace graphene { namespace protocol {
       void            validate()const { FC_ASSERT( !"virtual operation" ); }
 
       /// This is a virtual operation; there is no fee
-      share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+      share_type      calculate_fee(const fee_params_t& k)const { return 0; }
    };
 
    /**
@@ -179,7 +179,7 @@ namespace graphene { namespace protocol {
    struct bid_collateral_operation : public base_operation
    {
       /** should be equivalent to call_order_update fee */
-      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset               fee;
       account_id_type     bidder; ///< pays fee and additional collateral
@@ -199,7 +199,7 @@ namespace graphene { namespace protocol {
     */
    struct execute_bid_operation : public base_operation
    {
-      struct fee_parameters_type {};
+      struct fee_params_t {};
 
       execute_bid_operation(){}
       execute_bid_operation( account_id_type a, asset d, asset c )
@@ -214,16 +214,16 @@ namespace graphene { namespace protocol {
       void            validate()const { FC_ASSERT( !"virtual operation" ); }
 
       /// This is a virtual operation; there is no fee
-      share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+      share_type      calculate_fee(const fee_params_t& k)const { return 0; }
    };
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::limit_order_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::limit_order_cancel_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::call_order_update_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::bid_collateral_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::fill_order_operation::fee_parameters_type,  ) // VIRTUAL
-FC_REFLECT( graphene::protocol::execute_bid_operation::fee_parameters_type,  ) // VIRTUAL
+FC_REFLECT( graphene::protocol::limit_order_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::limit_order_cancel_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::call_order_update_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::bid_collateral_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::fill_order_operation::fee_params_t,  ) // VIRTUAL
+FC_REFLECT( graphene::protocol::execute_bid_operation::fee_params_t,  ) // VIRTUAL
 
 FC_REFLECT( graphene::protocol::call_order_update_operation::options_type, (target_collateral_ratio) )
 
@@ -241,10 +241,10 @@ FC_REFLECT( graphene::protocol::execute_bid_operation,
             (fee)(bidder)(debt)(collateral) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::options_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation )

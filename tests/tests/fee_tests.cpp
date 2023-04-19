@@ -758,8 +758,8 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          enable_fees();
          /*
          change_fees({
-                       limit_order_create_operation::fee_parameters_type { order_create_fee },
-                       limit_order_cancel_operation::fee_parameters_type { order_cancel_fee }
+                       limit_order_create_operation::fee_params_t { order_create_fee },
+                       limit_order_cancel_operation::fee_params_t { order_cancel_fee }
                      });
          */
          // C++ -- The above commented out statement doesn't work, I don't know why
@@ -767,12 +767,12 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          {
             fee_parameters::flat_set_type new_fees;
             {
-               limit_order_create_operation::fee_parameters_type create_fee_params;
+               limit_order_create_operation::fee_params_t create_fee_params;
                create_fee_params.fee = order_create_fee;
                new_fees.insert( create_fee_params );
             }
             {
-               limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+               limit_order_cancel_operation::fee_params_t cancel_fee_params;
                cancel_fee_params.fee = order_cancel_fee;
                new_fees.insert( cancel_fee_params );
             }
@@ -884,17 +884,17 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
 
       fee_parameters::flat_set_type new_fees;
       {
-         limit_order_create_operation::fee_parameters_type create_fee_params;
+         limit_order_create_operation::fee_params_t create_fee_params;
          create_fee_params.fee = order_create_fee;
          new_fees.insert( create_fee_params );
       }
       {
-         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         limit_order_cancel_operation::fee_params_t cancel_fee_params;
          cancel_fee_params.fee = order_cancel_fee;
          new_fees.insert( cancel_fee_params );
       }
       {
-         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_operation::fee_params_t transfer_fee_params;
          transfer_fee_params.fee = 0;
          transfer_fee_params.price_per_kbyte = 0;
          new_fees.insert( transfer_fee_params );
@@ -1271,17 +1271,17 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       fee_parameters::flat_set_type new_fees;
       {
-         limit_order_create_operation::fee_parameters_type create_fee_params;
+         limit_order_create_operation::fee_params_t create_fee_params;
          create_fee_params.fee = order_create_fee;
          new_fees.insert( create_fee_params );
       }
       {
-         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         limit_order_cancel_operation::fee_params_t cancel_fee_params;
          cancel_fee_params.fee = order_cancel_fee;
          new_fees.insert( cancel_fee_params );
       }
       {
-         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_operation::fee_params_t transfer_fee_params;
          transfer_fee_params.fee = 0;
          transfer_fee_params.price_per_kbyte = 0;
          new_fees.insert( transfer_fee_params );
@@ -1782,23 +1782,23 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
       fee_parameters::flat_set_type new_fees1;
       fee_parameters::flat_set_type new_fees2;
       {
-         limit_order_create_operation::fee_parameters_type create_fee_params;
+         limit_order_create_operation::fee_params_t create_fee_params;
          create_fee_params.fee = order_create_fee;
          new_fees1.insert( create_fee_params );
          new_fees2.insert( create_fee_params );
       }
       {
-         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         limit_order_cancel_operation::fee_params_t cancel_fee_params;
          cancel_fee_params.fee = order_cancel_fee1;
          new_fees1.insert( cancel_fee_params );
       }
       {
-         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         limit_order_cancel_operation::fee_params_t cancel_fee_params;
          cancel_fee_params.fee = order_cancel_fee2;
          new_fees2.insert( cancel_fee_params );
       }
       {
-         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_operation::fee_params_t transfer_fee_params;
          transfer_fee_params.fee = 0;
          transfer_fee_params.price_per_kbyte = 0;
          new_fees1.insert( transfer_fee_params );
@@ -2338,17 +2338,17 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       fee_parameters::flat_set_type new_fees;
       {
-         limit_order_create_operation::fee_parameters_type create_fee_params;
+         limit_order_create_operation::fee_params_t create_fee_params;
          create_fee_params.fee = order_create_fee;
          new_fees.insert( create_fee_params );
       }
       {
-         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         limit_order_cancel_operation::fee_params_t cancel_fee_params;
          cancel_fee_params.fee = order_cancel_fee;
          new_fees.insert( cancel_fee_params );
       }
       {
-         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_operation::fee_params_t transfer_fee_params;
          transfer_fee_params.fee = 0;
          transfer_fee_params.price_per_kbyte = 0;
          new_fees.insert( transfer_fee_params );
@@ -3640,13 +3640,13 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
 BOOST_AUTO_TEST_CASE( defaults_test )
 { try {
     fee_schedule schedule;
-    const limit_order_create_operation::fee_parameters_type default_order_fee {};
+    const limit_order_create_operation::fee_params_t default_order_fee {};
 
     // no fees set yet -> default
     asset fee = schedule.calculate_fee( limit_order_create_operation() );
     BOOST_CHECK_EQUAL( (int64_t)default_order_fee.fee, fee.amount.value );
 
-    limit_order_create_operation::fee_parameters_type new_order_fee; new_order_fee.fee = 123;
+    limit_order_create_operation::fee_params_t new_order_fee; new_order_fee.fee = 123;
     // set fee + check
     schedule.parameters.insert( new_order_fee );
     fee = schedule.calculate_fee( limit_order_create_operation() );
@@ -3654,8 +3654,8 @@ BOOST_AUTO_TEST_CASE( defaults_test )
 
     // bid_collateral fee defaults to call_order_update fee
     // call_order_update fee is unset -> default
-    const call_order_update_operation::fee_parameters_type default_short_fee {};
-    call_order_update_operation::fee_parameters_type new_short_fee; new_short_fee.fee = 123;
+    const call_order_update_operation::fee_params_t default_short_fee {};
+    call_order_update_operation::fee_params_t new_short_fee; new_short_fee.fee = 123;
     fee = schedule.calculate_fee( bid_collateral_operation() );
     BOOST_CHECK_EQUAL( (int64_t)default_short_fee.fee, fee.amount.value );
 
@@ -3665,7 +3665,7 @@ BOOST_AUTO_TEST_CASE( defaults_test )
     BOOST_CHECK_EQUAL( (int64_t)new_short_fee.fee, fee.amount.value );
 
     // set bid_collateral fee + check
-    bid_collateral_operation::fee_parameters_type new_bid_fee; new_bid_fee.fee = 124;
+    bid_collateral_operation::fee_params_t new_bid_fee; new_bid_fee.fee = 124;
     schedule.parameters.insert( new_bid_fee );
     fee = schedule.calculate_fee( bid_collateral_operation() );
     BOOST_CHECK_EQUAL( (int64_t)new_bid_fee.fee, fee.amount.value );
@@ -3681,7 +3681,7 @@ BOOST_AUTO_TEST_CASE( sub_asset_creation_fee_test )
 { try {
    fee_schedule schedule;
 
-   asset_create_operation::fee_parameters_type default_ac_fee;
+   asset_create_operation::fee_params_t default_ac_fee;
 
    asset_create_operation op;
    op.symbol = "TEST.SUB";
@@ -3697,7 +3697,7 @@ BOOST_AUTO_TEST_CASE( sub_asset_creation_fee_test )
    BOOST_CHECK_EQUAL( fee.amount.value, expected_fee );
 
    // set fee + check
-   asset_create_operation::fee_parameters_type ac_fee;
+   asset_create_operation::fee_params_t ac_fee;
    ac_fee.long_symbol = 100100;
    ac_fee.symbol4 = 2000200;
    ac_fee.symbol3 = 30000300;
@@ -3713,7 +3713,7 @@ BOOST_AUTO_TEST_CASE( sub_asset_creation_fee_test )
 
    // set fee for account_transfer_operation, no change on asset creation fee
    BOOST_TEST_MESSAGE("Testing our fee schedule without sub-asset creation fee enabled");
-   account_transfer_operation::fee_parameters_type at_fee;
+   account_transfer_operation::fee_params_t at_fee;
    at_fee.fee = 5500;
 
    schedule.parameters.insert( at_fee );
@@ -3723,7 +3723,7 @@ BOOST_AUTO_TEST_CASE( sub_asset_creation_fee_test )
 
    // enable sub-asset creation fee
    BOOST_TEST_MESSAGE("Testing our fee schedule with sub-asset creation fee enabled");
-   schedule.parameters.insert( ticket_create_operation::fee_parameters_type() );
+   schedule.parameters.insert( ticket_create_operation::fee_params_t() );
 
    expected_fee = at_fee.fee + expected_data_fee;
 
@@ -3906,5 +3906,97 @@ BOOST_AUTO_TEST_CASE( issue_433_indirect_test )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( fee_change_test )
+{ try {
+
+   // At the beginning, the fee schedule is all zero
+   const auto& check_zero_fees = [&]() {
+      BOOST_REQUIRE( db.get_global_properties().parameters.current_fees );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->scale, 0 );
+      BOOST_REQUIRE( !db.get_global_properties().parameters.current_fees->parameters.empty() );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->parameters.begin()->get<
+                               transfer_operation::fee_params_t>().fee, 0 );
+   };
+
+   check_zero_fees();
+
+   {
+      // Try to set default fees, it should fail, because some operations aren't available
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time() );
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation cmuop;
+      cmuop.new_parameters = db.get_global_properties().parameters;
+      cmuop.new_parameters.get_mutable_fees() = fee_schedule::get_default();
+      cop.proposed_ops.emplace_back( cmuop );
+      trx.operations.push_back( cop );
+
+      // It should fail
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      trx.clear();
+   }
+
+   // The fee schedule is still all zero
+   check_zero_fees();
+
+   // Pass the BSIP-40 hardfork
+   generate_blocks( HARDFORK_BSIP_40_TIME );
+   set_expiration( db, trx );
+
+   // The fee schedule is still all zero
+   check_zero_fees();
+
+   {
+      // Try to set default fees, it should succeed
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time() );
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation cmuop;
+      cmuop.new_parameters = db.get_global_properties().parameters;
+      cmuop.new_parameters.get_mutable_fees() = fee_schedule::get_default();
+      cop.proposed_ops.emplace_back( cmuop );
+      trx.operations.push_back( cop );
+
+      // It should fail
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      trx.clear();
+      proposal_id_type prop_id { ptx.operation_results[0].get<object_id_type>() };
+
+      // The fee schedule is still all zero
+      check_zero_fees();
+
+      // Approve the proposal
+      proposal_update_operation uop;
+      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      uop.active_approvals_to_add = { get_account("init0").get_id(), get_account("init1").get_id(),
+                                      get_account("init2").get_id(), get_account("init3").get_id(),
+                                      get_account("init4").get_id(), get_account("init5").get_id(),
+                                      get_account("init6").get_id(), get_account("init7").get_id() };
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+
+      // The fee schedule is still all zero
+      check_zero_fees();
+
+      generate_blocks( prop_id( db ).expiration_time + 5 );
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+
+      // The fee schedule is no longer all zero
+      BOOST_REQUIRE( db.get_global_properties().parameters.current_fees );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->scale, GRAPHENE_100_PERCENT );
+      BOOST_REQUIRE( !db.get_global_properties().parameters.current_fees->parameters.empty() );
+      BOOST_CHECK_EQUAL( db.get_global_properties().parameters.current_fees->parameters.begin()->get<
+                               transfer_operation::fee_params_t>().fee, transfer_operation::fee_params_t().fee );
+      BOOST_CHECK( transfer_operation::fee_params_t().fee != 0 );
+
+      idump( (db.get_global_properties()) );
+
+   }
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

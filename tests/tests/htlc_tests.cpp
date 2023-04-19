@@ -803,7 +803,7 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
             .parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
       const graphene::chain::fee_schedule& current_fee_schedule =
             *(db.get_global_properties().parameters.current_fees);
-      const htlc_create_operation::fee_parameters_type& htlc_fee 
+      const htlc_create_operation::fee_params_t& htlc_fee
             = current_fee_schedule.get<htlc_create_operation>();
       BOOST_CHECK_EQUAL(htlc_fee.fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
@@ -904,7 +904,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
 {
    // create
    {
-      htlc_create_operation::fee_parameters_type create_fee;
+      htlc_create_operation::fee_params_t create_fee;
       create_fee.fee = 2;
       create_fee.fee_per_day = 2;
       htlc_create_operation create;
@@ -920,7 +920,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
    }
    // redeem
    {
-      htlc_redeem_operation::fee_parameters_type redeem_fee;
+      htlc_redeem_operation::fee_params_t redeem_fee;
       redeem_fee.fee_per_kb = 2;
       redeem_fee.fee = 2;
       htlc_redeem_operation redeem;
@@ -938,7 +938,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
    }
    // extend
    {
-      htlc_extend_operation::fee_parameters_type extend_fee;
+      htlc_extend_operation::fee_params_t extend_fee;
       extend_fee.fee = 2;
       extend_fee.fee_per_day = 2;
       htlc_extend_operation extend;

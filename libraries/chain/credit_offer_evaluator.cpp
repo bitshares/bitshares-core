@@ -229,6 +229,13 @@ void_result credit_offer_update_evaluator::do_apply( const credit_offer_update_o
 void_result credit_offer_accept_evaluator::do_evaluate(const credit_offer_accept_operation& op)
 { try {
    const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   if( !HARDFORK_CORE_2595_PASSED(block_time) )
+   {
+      FC_ASSERT( !op.extensions.value.auto_repay.valid(),
+                 "auto_repay unavailable until the core-2595 hardfork");
+   }
 
    _offer = &op.offer_id(d);
 
@@ -325,6 +332,7 @@ extendable_operation_result credit_offer_accept_evaluator::do_apply( const credi
       obj.collateral_amount = op.collateral.amount;
       obj.fee_rate = _offer->fee_rate;
       obj.latest_repay_time = repay_time;
+      obj.auto_repay = ( op.extensions.value.auto_repay.valid() ? *op.extensions.value.auto_repay : 0 );
    });
 
    if( _deal_summary != nullptr )
@@ -377,7 +385,7 @@ void_result credit_deal_repay_evaluator::do_evaluate(const credit_deal_repay_ope
 
    // Note: the result can be larger than 64 bit, but since we don't store it, it is allowed
    auto required_fee = ( ( ( fc::uint128_t( op.repay_amount.amount.value ) * _deal->fee_rate )
-                         + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+                           + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
 
    FC_ASSERT( fc::uint128_t(op.credit_fee.amount.value) >= required_fee,
               "Insuffient credit fee, requires ${r}, offered ${p}",
@@ -442,6 +450,9 @@ extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_
    }
    else // to partially repay
    {
+      // Note:
+      // Due to rounding, it is possible that the account is paying too much debt asset for too little collateral,
+      // in extreme cases, the amount to release can be zero.
       auto amount_to_release = ( fc::uint128_t( op.repay_amount.amount.value ) * _deal->collateral_amount.value )
                                  / _deal->debt_amount.value; // Round down
       FC_ASSERT( amount_to_release < fc::uint128_t( _deal->collateral_amount.value ), "Internal error" );
@@ -460,5 +471,32 @@ extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
+
+void_result credit_deal_update_evaluator::do_evaluate(const credit_deal_update_operation& op)
+{
+   const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
+
+   _deal = &op.deal_id(d);
+
+   FC_ASSERT( _deal->borrower == op.account, "A credit deal can only be updated by the borrower" );
+
+   FC_ASSERT( _deal->auto_repay != op.auto_repay, "The automatic repayment type does not change" );
+
+   return void_result();
+}
+
+void_result credit_deal_update_evaluator::do_apply( const credit_deal_update_operation& op) const
+{
+   database& d = db();
+
+   d.modify( *_deal, [&op]( credit_deal_object& obj ){
+      obj.auto_repay = op.auto_repay;
+   });
+
+   return void_result();
+}
 
 } } // graphene::chain
