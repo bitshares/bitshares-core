@@ -24,6 +24,8 @@
 
 #include <graphene/chain/vesting_balance_object.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace chain {
 
 inline bool sum_below_max_shares(const asset& a, const asset& b)
@@ -48,7 +50,8 @@ asset linear_vesting_policy::get_allowed_withdraw( const vesting_policy_context&
             share_type total_vested = 0;
             if( elapsed_seconds < vesting_duration_seconds )
             {
-                total_vested = (fc::uint128_t( begin_balance.value ) * elapsed_seconds / vesting_duration_seconds).to_uint64();
+                total_vested = static_cast<uint64_t>(fc::uint128_t( begin_balance.value ) * elapsed_seconds
+                                                     / vesting_duration_seconds);
             }
             else
             {
@@ -114,8 +117,8 @@ asset cdd_vesting_policy::get_allowed_withdraw(const vesting_policy_context& ctx
       return asset(0, ctx.balance.asset_id);
    fc::uint128_t cs_earned = compute_coin_seconds_earned(ctx);
    fc::uint128_t withdraw_available = cs_earned / std::max(vesting_seconds, 1u);
-   assert(withdraw_available <= ctx.balance.amount.value);
-   return asset(withdraw_available.to_uint64(), ctx.balance.asset_id);
+   assert(withdraw_available <= static_cast<fc::uint128_t>(ctx.balance.amount.value));
+   return asset(static_cast<uint64_t>(withdraw_available), ctx.balance.asset_id);
 }
 
 void cdd_vesting_policy::on_deposit(const vesting_policy_context& ctx)
@@ -155,6 +158,36 @@ bool cdd_vesting_policy::is_deposit_vested_allowed(const vesting_policy_context&
 bool cdd_vesting_policy::is_withdraw_allowed(const vesting_policy_context& ctx)const
 {
    return (ctx.amount <= get_allowed_withdraw(ctx));
+}
+
+asset instant_vesting_policy::get_allowed_withdraw( const vesting_policy_context& ctx )const
+{
+   return ctx.balance;
+}
+
+void instant_vesting_policy::on_deposit(const vesting_policy_context& ctx)
+{
+}
+
+void instant_vesting_policy::on_deposit_vested(const vesting_policy_context&)
+{
+
+}
+
+bool instant_vesting_policy::is_deposit_allowed(const vesting_policy_context& ctx)const
+{
+   return (ctx.amount.asset_id == ctx.balance.asset_id)
+      && sum_below_max_shares(ctx.amount, ctx.balance);
+}
+
+void instant_vesting_policy::on_withdraw(const vesting_policy_context& ctx)
+{
+}
+
+bool instant_vesting_policy::is_withdraw_allowed(const vesting_policy_context& ctx)const
+{
+   return (ctx.amount.asset_id == ctx.balance.asset_id)
+          && (ctx.amount <= get_allowed_withdraw(ctx));
 }
 
 #define VESTING_VISITOR(NAME, MAYBE_CONST)                    \
@@ -238,3 +271,7 @@ asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)con
 }
 
 } } // graphene::chain
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

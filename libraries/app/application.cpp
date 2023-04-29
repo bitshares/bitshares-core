@@ -28,8 +28,8 @@
 
 #include <graphene/chain/db_with.hpp>
 #include <graphene/chain/genesis_state.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <graphene/egenesis/egenesis.hpp>
 
@@ -43,7 +43,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/network/resolve.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -81,7 +80,7 @@ namespace detail {
       auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
       dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
       graphene::chain::genesis_state_type initial_state;
-      initial_state.initial_parameters.current_fees = std::make_shared<fee_schedule>(fee_schedule::get_default());
+      initial_state.initial_parameters.get_mutable_fees() = fee_schedule::get_default();
       initial_state.initial_active_witnesses = GRAPHENE_DEFAULT_MIN_WITNESS_COUNT;
       initial_state.initial_timestamp = time_point_sec(time_point::now().sec_since_epoch() /
             initial_state.initial_parameters.block_interval *
@@ -98,7 +97,7 @@ namespace detail {
       }
 
       initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
-      initial_state.initial_balances.push_back({nathan_key.get_public_key(),
+      initial_state.initial_balances.push_back({address(nathan_key.get_public_key()),
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
       initial_state.initial_chain_id = fc::sha256::hash( "BOGUS" );
@@ -115,98 +114,70 @@ namespace detail {
 
 namespace graphene { namespace app { namespace detail {
 
+application_impl::~application_impl()
+{
+   this->shutdown();
+}
+
 void application_impl::reset_p2p_node(const fc::path& data_dir)
 { try {
    _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
 
    _p2p_network->load_configuration(data_dir / "p2p");
-   _p2p_network->set_node_delegate(this);
+   _p2p_network->set_node_delegate(shared_from_this());
 
-   if( _options->count("seed-node") )
+   if( _options->count("seed-node") > 0 )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-               _p2p_network->connect_to_endpoint(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
-   if( _options->count("seed-nodes") )
+   if( _options->count("seed-nodes") > 0 )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
    else
    {
-      // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
-         "seed01.liondani.com:1776",          // liondani     (GERMANY)
-         "104.236.144.84:1777",               // puppies      (USA)
-         "128.199.143.47:2015",               // Harvey       (Singapore)
-         "209.105.239.13:1776",               // sahkan       (USA)
-         "45.35.12.22:1776",                  // sahkan       (USA)
-         "51.15.61.160:1776",                 // lafona       (France)
-         "bts-seed1.abit-more.com:62015",     // abit         (China)
-         "node.blckchnd.com:4243",            // blckchnd     (Germany)
-         "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
-         "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
-         "seed.blocktrades.us:1776",          // BlockTrades  (USA)
-         "seed.cubeconnex.com:1777",          // cube         (USA)
-         "seed.roelandp.nl:1776",             // roelandp     (Canada)
-         "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",         // Thom         (USA)
-         "seed06.bts-nodes.net:1776",         // Thom         (USA)
-         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
-         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-         "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
+         #include "../egenesis/seed-nodes.txt"
       };
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
-   if( _options->count("p2p-endpoint") )
-      _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
-   else
-      _p2p_network->listen_on_port(0, false);
+   if( _options->count( "p2p-advertise-peer-algorithm" ) > 0 )
+   {
+      std::string algo = _options->at("p2p-advertise-peer-algorithm").as<string>();
+      std::vector<std::string> list;
+      if( algo == "list" && _options->count("p2p-advertise-peer-endpoint") > 0 )
+         list = _options->at("p2p-advertise-peer-endpoint").as<std::vector<std::string>>();
+      else if( algo == "exclude_list" && _options->count("p2p-exclude-peer-endpoint") > 0 )
+         list = _options->at("p2p-exclude-peer-endpoint").as<std::vector<std::string>>();
+      _p2p_network->set_advertise_algorithm( algo, list );
+   }
+
+   if( _options->count("p2p-endpoint") > 0 )
+      _p2p_network->set_listen_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()),
+                                         true );
+   // else try to listen on the default port first, if failed, use a random port
+
+   if( _options->count("p2p-inbound-endpoint") > 0 )
+      _p2p_network->set_inbound_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-inbound-endpoint")
+                                              .as<string>()) );
+
+   if ( _options->count("p2p-accept-incoming-connections") > 0 )
+      _p2p_network->set_accept_incoming_connections( _options->at("p2p-accept-incoming-connections").as<bool>() );
+
+   if ( _options->count("p2p-connect-to-new-peers") > 0 )
+      _p2p_network->set_connect_to_new_peers( _options->at( "p2p-connect-to-new-peers" ).as<bool>() );
+
    _p2p_network->listen_to_p2p_network();
-   ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
+   fc::ip::endpoint listening_endpoint = _p2p_network->get_actual_listening_endpoint();
+   if( listening_endpoint.port() != 0 )
+      ilog( "Configured p2p node to listen on ${ip}", ("ip", listening_endpoint) );
+   else
+      ilog( "Configured p2p node to not listen for incoming connections" );
 
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
@@ -214,48 +185,10 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
 
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
-
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
-   auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
-   auto login = std::make_shared<graphene::app::login_api>( std::ref(*_self) );
-   login->enable_api("database_api");
-
-   wsc->register_api(login->database());
-   wsc->register_api(fc::api<graphene::app::login_api>(login));
-   c->set_session_data( wsc );
-
-   std::string username = "*";
-   std::string password = "*";
+   auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
+   auto login = std::make_shared<graphene::app::login_api>( _self );
 
     // Try to extract login information from "Authorization" header if present
    std::string auth = c->get_request_header("Authorization");
@@ -269,19 +202,33 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
       FC_ASSERT(parts.size() == 2);
 
-      username = parts[0];
-      password = parts[1];
+      const string& username = parts[0];
+      const string& password = parts[1];
+      login->login(username, password);
    }
+   else
+      login->login("", "");
 
-   login->login(username, password);
+   // API set ID 0. Note: changing it may break client applications
+   if( login->is_database_api_allowed() )
+      wsc->register_api(login->database());
+   else
+      wsc->register_api(login->dummy());
+   // API set ID 1. Note: changing it may break client applications
+   wsc->register_api(fc::api<graphene::app::login_api>(login));
+   c->set_session_data( wsc );
 }
 
 void application_impl::reset_websocket_server()
 { try {
-   if( !_options->count("rpc-endpoint") )
+   if( 0 == _options->count("rpc-endpoint") )
       return;
 
-   _websocket_server = std::make_shared<fc::http::websocket_server>();
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") > 0 )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
+   _websocket_server = std::make_shared<fc::http::websocket_server>( proxy_forward_header );
    _websocket_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
@@ -291,16 +238,22 @@ void application_impl::reset_websocket_server()
 
 void application_impl::reset_websocket_tls_server()
 { try {
-   if( !_options->count("rpc-tls-endpoint") )
+   if( 0 == _options->count("rpc-tls-endpoint") )
       return;
-   if( !_options->count("server-pem") )
+   if( 0 == _options->count("server-pem") )
    {
       wlog( "Please specify a server-pem to use rpc-tls-endpoint" );
       return;
    }
 
-   string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
-   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") > 0 )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
+   string password = ( _options->count("server-pem-password") > 0 ) ?
+                        _options->at("server-pem-password").as<string>() : "";
+   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(
+                                 _options->at("server-pem").as<string>(), password, proxy_forward_header );
    _websocket_tls_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
@@ -308,27 +261,232 @@ void application_impl::reset_websocket_tls_server()
    _websocket_tls_server->start_accept();
 } FC_CAPTURE_AND_RETHROW() }
 
-void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key )
+void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::program_options::variables_map> options)
 {
-   flat_set< std::string > initial_witness_names;
-   public_key_type init_pubkey( init_key );
-   for( uint64_t i=0; i<genesis.initial_active_witnesses; i++ )
-      genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
+   _data_dir = data_dir;
+   _options = options;
+
+   if ( _options->count("io-threads") > 0 )
+   {
+      const uint16_t num_threads = _options->at("io-threads").as<uint16_t>();
+      fc::asio::default_io_service_scope::set_num_threads(num_threads);
+   }
+
+   if( _options->count("force-validate") > 0 )
+   {
+      ilog( "All transaction signatures will be validated" );
+      _force_validate = true;
+   }
+
+   if ( _options->count("enable-subscribe-to-all") > 0 )
+      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
+
+   set_api_limit();
+
+   if( is_plugin_enabled( "market_history" ) )
+      _app_options.has_market_history_plugin = true;
+   else
+      ilog("Market history plugin is not enabled");
+
+   if( is_plugin_enabled( "api_helper_indexes" ) )
+      _app_options.has_api_helper_indexes_plugin = true;
+   else
+      ilog("API helper indexes plugin is not enabled");
+
+   if (_options->count("api-node-info") > 0)
+      _node_info = _options->at("api-node-info").as<string>();
+
+   if( _options->count("api-access") > 0 )
+   {
+
+      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
+
+      FC_ASSERT( fc::exists(api_access_file),
+            "Failed to load file from ${path}", ("path", api_access_file) );
+
+      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
+      ilog( "Using api access file from ${path}",
+            ("path", api_access_file) );
+   }
+   else
+   {
+      // TODO:  Remove this generous default access policy
+      // when the UI logs in properly
+      _apiaccess = api_access();
+      api_access_info wild_access("*", "*");
+      wild_access.allowed_apis.insert( "database_api" );
+      wild_access.allowed_apis.insert( "network_broadcast_api" );
+      wild_access.allowed_apis.insert( "history_api" );
+      wild_access.allowed_apis.insert( "orders_api" );
+      wild_access.allowed_apis.insert( "custom_operations_api" );
+      _apiaccess.permission_map["*"] = wild_access;
+   }
+
+   initialize_plugins();
 }
 
-void application_impl::startup()
-{ try {
-   fc::create_directories(_data_dir / "blockchain");
+void application_impl::set_api_limit() {
+   if (_options->count("api-limit-get-account-history-operations") > 0) {
+      _app_options.api_limit_get_account_history_operations =
+            _options->at("api-limit-get-account-history-operations").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-account-history") > 0){
+      _app_options.api_limit_get_account_history =
+            _options->at("api-limit-get-account-history").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-grouped-limit-orders") > 0){
+      _app_options.api_limit_get_grouped_limit_orders =
+            _options->at("api-limit-get-grouped-limit-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-market-history") > 0){
+      _app_options.api_limit_get_market_history =
+            _options->at("api-limit-get-market-history").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-relative-account-history") > 0){
+      _app_options.api_limit_get_relative_account_history =
+            _options->at("api-limit-get-relative-account-history").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-account-history-by-operations") > 0){
+      _app_options.api_limit_get_account_history_by_operations =
+            _options->at("api-limit-get-account-history-by-operations").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-asset-holders") > 0){
+      _app_options.api_limit_get_asset_holders =
+            _options->at("api-limit-get-asset-holders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-key-references") > 0){
+      _app_options.api_limit_get_key_references =
+            _options->at("api-limit-get-key-references").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-htlc-by") > 0) {
+      _app_options.api_limit_get_htlc_by =
+            _options->at("api-limit-get-htlc-by").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-full-accounts") > 0) {
+      _app_options.api_limit_get_full_accounts =
+            _options->at("api-limit-get-full-accounts").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-full-accounts-lists") > 0) {
+      _app_options.api_limit_get_full_accounts_lists =
+            _options->at("api-limit-get-full-accounts-lists").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-full-accounts-subscribe") > 0) {
+      _app_options.api_limit_get_full_accounts_subscribe =
+            _options->at("api-limit-get-full-accounts-subscribe").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-top-voters") > 0) {
+      _app_options.api_limit_get_top_voters =
+            _options->at("api-limit-get-top-voters").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-call-orders") > 0) {
+      _app_options.api_limit_get_call_orders =
+            _options->at("api-limit-get-call-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-settle-orders") > 0) {
+      _app_options.api_limit_get_settle_orders =
+            _options->at("api-limit-get-settle-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-assets") > 0) {
+      _app_options.api_limit_get_assets =
+            _options->at("api-limit-get-assets").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-limit-orders") > 0){
+      _app_options.api_limit_get_limit_orders =
+            _options->at("api-limit-get-limit-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-limit-orders-by-account") > 0){
+      _app_options.api_limit_get_limit_orders_by_account =
+            _options->at("api-limit-get-limit-orders-by-account").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-order-book") > 0){
+      _app_options.api_limit_get_order_book =
+            _options->at("api-limit-get-order-book").as<uint32_t>();
+   }
+   if(_options->count("api-limit-list-htlcs") > 0){
+      _app_options.api_limit_list_htlcs =
+            _options->at("api-limit-list-htlcs").as<uint32_t>();
+   }
+   if(_options->count("api-limit-lookup-accounts") > 0) {
+      _app_options.api_limit_lookup_accounts =
+            _options->at("api-limit-lookup-accounts").as<uint32_t>();
+   }
+   if(_options->count("api-limit-lookup-witness-accounts") > 0) {
+      _app_options.api_limit_lookup_witness_accounts =
+            _options->at("api-limit-lookup-witness-accounts").as<uint32_t>();
+   }
+   if(_options->count("api-limit-lookup-committee-member-accounts") > 0) {
+      _app_options.api_limit_lookup_committee_member_accounts =
+            _options->at("api-limit-lookup-committee-member-accounts").as<uint32_t>();
+   }
+   if(_options->count("api-limit-lookup-vote-ids") > 0) {
+      _app_options.api_limit_lookup_vote_ids =
+            _options->at("api-limit-lookup-vote-ids").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-account-limit-orders") > 0) {
+      _app_options.api_limit_get_account_limit_orders =
+            _options->at("api-limit-get-account-limit-orders").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-collateral-bids") > 0) {
+      _app_options.api_limit_get_collateral_bids =
+            _options->at("api-limit-get-collateral-bids").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-top-markets") > 0) {
+      _app_options.api_limit_get_top_markets =
+            _options->at("api-limit-get-top-markets").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-trade-history") > 0) {
+      _app_options.api_limit_get_trade_history =
+            _options->at("api-limit-get-trade-history").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-trade-history-by-sequence") > 0) {
+      _app_options.api_limit_get_trade_history_by_sequence =
+            _options->at("api-limit-get-trade-history-by-sequence").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-giver") > 0) {
+      _app_options.api_limit_get_withdraw_permissions_by_giver =
+            _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-recipient") > 0) {
+      _app_options.api_limit_get_withdraw_permissions_by_recipient =
+            _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-tickets") > 0) {
+      _app_options.api_limit_get_tickets =
+            _options->at("api-limit-get-tickets").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-liquidity-pools") > 0) {
+      _app_options.api_limit_get_liquidity_pools =
+            _options->at("api-limit-get-liquidity-pools").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-liquidity-pool-history") > 0) {
+      _app_options.api_limit_get_liquidity_pool_history =
+            _options->at("api-limit-get-liquidity-pool-history").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-samet-funds") > 0) {
+      _app_options.api_limit_get_samet_funds =
+            _options->at("api-limit-get-samet-funds").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-credit-offers") > 0) {
+      _app_options.api_limit_get_credit_offers =
+            _options->at("api-limit-get-credit-offers").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-storage-info") > 0) {
+      _app_options.api_limit_get_storage_info =
+            _options->at("api-limit-get-storage-info").as<uint32_t>();
+   }
+}
 
-   auto initial_state = [this] {
+graphene::chain::genesis_state_type application_impl::initialize_genesis_state() const
+{
+   try {
       ilog("Initializing database...");
-      if( _options->count("genesis-json") )
+      if( _options->count("genesis-json") > 0 )
       {
          std::string genesis_str;
          fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
-         graphene::chain::genesis_state_type genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
+         auto genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
          bool modified_genesis = false;
-         if( _options->count("genesis-timestamp") )
+         if( _options->count("genesis-timestamp") > 0 )
          {
             genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() )
                                       + genesis.initial_parameters.block_interval
@@ -338,15 +496,15 @@ void application_impl::startup()
             modified_genesis = true;
 
             ilog(
-               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)", 
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)",
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
-         if( _options->count("dbg-init-key") )
+         if( _options->count("dbg-init-key") > 0 )
          {
             std::string init_key = _options->at( "dbg-init-key" ).as<string>();
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
-            set_dbg_init_key( genesis, init_key );
+            genesis.override_witness_signing_keys( init_key );
             modified_genesis = true;
             ilog("Set init witness key to ${init_key}", ("init_key", init_key));
          }
@@ -354,10 +512,8 @@ void application_impl::startup()
          {
             wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT");
             genesis_str += "BOGUS";
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
-         else
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
+         genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          return genesis;
       }
       else
@@ -370,13 +526,18 @@ void application_impl::startup()
          genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
          return genesis;
       }
-   };
+   } FC_CAPTURE_AND_RETHROW()
+}
 
-   if( _options->count("resync-blockchain") )
+void application_impl::open_chain_database() const
+{ try {
+   fc::create_directories(_data_dir / "blockchain");
+
+   if( _options->count("resync-blockchain") > 0 )
       _chain_db->wipe(_data_dir / "blockchain", true);
 
    flat_map<uint32_t,block_id_type> loaded_checkpoints;
-   if( _options->count("checkpoint") )
+   if( _options->count("checkpoint") > 0 )
    {
       auto cps = _options->at("checkpoint").as<vector<string>>();
       loaded_checkpoints.reserve( cps.size() );
@@ -388,23 +549,23 @@ void application_impl::startup()
    }
    _chain_db->add_checkpoints( loaded_checkpoints );
 
-   if( _options->count("enable-standby-votes-tracking") )
+   if( _options->count("enable-standby-votes-tracking") > 0 )
    {
       _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
    }
 
-   if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
+   if( _options->count("replay-blockchain") > 0 || _options->count("revalidate-blockchain") > 0 )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
    try
    {
       // these flags are used in open() only, i. e. during replay
       uint32_t skip;
-      if( _options->count("revalidate-blockchain") ) // see also handle_block()
+      if( _options->count("revalidate-blockchain") > 0 ) // see also handle_block()
       {
          if( !loaded_checkpoints.empty() )
             wlog( "Warning - revalidate will not validate before last checkpoint" );
-         if( _options->count("force-validate") )
+         if( _options->count("force-validate") > 0 )
             skip = graphene::chain::database::skip_nothing;
          else
             skip = graphene::chain::database::skip_transaction_signatures;
@@ -418,8 +579,12 @@ void application_impl::startup()
                 graphene::chain::database::skip_tapos_check |
                 graphene::chain::database::skip_witness_schedule_check;
 
-      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
-         _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      auto genesis_loader = [this](){
+         return initialize_genesis_state();
+      };
+
+      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this, &genesis_loader] () {
+         _chain_db->open( _data_dir / "blockchain", genesis_loader, GRAPHENE_CURRENT_DB_VERSION );
       });
    }
    catch( const fc::exception& e )
@@ -427,46 +592,21 @@ void application_impl::startup()
       elog( "Caught exception ${e} in open(), you might want to force a replay", ("e", e.to_detail_string()) );
       throw;
    }
+} FC_LOG_AND_RETHROW() }
 
-   if( _options->count("force-validate") )
-   {
-      ilog( "All transaction signatures will be validated" );
-      _force_validate = true;
-   }
+void application_impl::startup()
+{ try {
+   bool enable_p2p_network = true;
+   if( _options->count("enable-p2p-network") > 0 )
+      enable_p2p_network = _options->at("enable-p2p-network").as<bool>();
 
-   if ( _options->count("enable-subscribe-to-all") )
-      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
+   open_chain_database();
 
-   if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
-      _app_options.has_market_history_plugin = true;
+   startup_plugins();
 
-   if( _options->count("api-access") ) {
+   if( enable_p2p_network && _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
+      reset_p2p_node(_data_dir);
 
-      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
-
-      FC_ASSERT( fc::exists(api_access_file), 
-            "Failed to load file from ${path}", ("path", api_access_file) );
-
-      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
-      ilog( "Using api access file from ${path}",
-            ("path", api_access_file) );
-   }
-   else
-   {
-      // TODO:  Remove this generous default access policy
-      // when the UI logs in properly
-      _apiaccess = api_access();
-      api_access_info wild_access;
-      wild_access.password_hash_b64 = "*";
-      wild_access.password_salt_b64 = "*";
-      wild_access.allowed_apis.push_back( "database_api" );
-      wild_access.allowed_apis.push_back( "network_broadcast_api" );
-      wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "orders_api" );
-      _apiaccess.permission_map["*"] = wild_access;
-   }
-
-   reset_p2p_node(_data_dir);
    reset_websocket_server();
    reset_websocket_tls_server();
 } FC_LOG_AND_RETHROW() }
@@ -487,6 +627,11 @@ optional< api_access_info > application_impl::get_api_access_info(const string& 
 void application_impl::set_api_access_info(const string& username, api_access_info&& permissions)
 {
    _apiaccess.permission_map.insert(std::make_pair(username, std::move(permissions)));
+}
+
+bool application_impl::is_plugin_enabled(const string& name) const
+{
+   return !(_active_plugins.find(name) == _active_plugins.end());
 }
 
 /**
@@ -513,7 +658,7 @@ bool application_impl::has_item(const net::item_id& id)
  * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
  */
 bool application_impl::handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
-                          std::vector<fc::uint160_t>& contained_transaction_message_ids)
+                          std::vector<graphene::net::message_hash_type>& contained_transaction_msg_ids)
 { try {
 
    auto latency = fc::time_point::now() - blk_msg.block.timestamp;
@@ -522,7 +667,8 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} "
+           "latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
            ("bid", blk_msg.block.id())
@@ -531,10 +677,12 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
    }
-   FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
+   GRAPHENE_ASSERT( latency.count()/1000 > -2500, // 2.5 seconds
+                    graphene::net::block_timestamp_in_future_exception,
+                    "Rejecting block with timestamp in the future", );
 
    try {
-      const uint32_t skip = (_is_block_producer | _force_validate) ?
+      const uint32_t skip = (_is_block_producer || _force_validate) ?
                                database::skip_nothing : database::skip_transaction_signatures;
       bool result = valve.do_serial( [this,&blk_msg,skip] () {
          _chain_db->precompute_parallel( blk_msg.block, skip ).wait();
@@ -554,12 +702,12 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
          // happens, there's no reason to fetch the transactions, so  construct a list of the
          // transaction message ids we no longer need.
          // during sync, it is unlikely that we'll see any old
-         contained_transaction_message_ids.reserve( contained_transaction_message_ids.size()
+         contained_transaction_msg_ids.reserve( contained_transaction_msg_ids.size()
                                                     + blk_msg.block.transactions.size() );
-         for (const processed_transaction& transaction : blk_msg.block.transactions)
+         for (const processed_transaction& ptrx : blk_msg.block.transactions)
          {
-            graphene::net::trx_message transaction_message(transaction);
-            contained_transaction_message_ids.emplace_back(graphene::net::message(transaction_message).id());
+            graphene::net::trx_message transaction_message(ptrx);
+            contained_transaction_msg_ids.emplace_back(graphene::net::message(transaction_message).id());
          }
       }
 
@@ -578,7 +726,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
    if( !_is_finished_syncing && !sync_mode )
    {
       _is_finished_syncing = true;
-      _self->syncing_finished();
+      _self.syncing_finished();
    }
 } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
 
@@ -923,58 +1071,272 @@ void application_impl::error_encountered(const std::string& message, const fc::o
 
 uint8_t application_impl::get_current_block_interval_in_seconds() const
 {
+   FC_ASSERT( _chain_db, "Chain database is not operational" );
    return _chain_db->get_global_properties().parameters.block_interval;
 }
 
+void application_impl::shutdown()
+{
+   ilog( "Shutting down application" );
+   if( _websocket_tls_server )
+      _websocket_tls_server.reset();
+   if( _websocket_server )
+      _websocket_server.reset();
+   // TODO wait until all connections are closed and messages handled?
 
+   // plugins E.G. witness_plugin may send data to p2p network, so shutdown them first
+   ilog( "Shutting down plugins" );
+   shutdown_plugins();
+
+   if( _p2p_network )
+   {
+      ilog( "Disconnecting from P2P network" );
+      // FIXME wait() is called in close() but it doesn't block this thread
+      _p2p_network->close();
+      _p2p_network.reset();
+   }
+   else
+      ilog( "P2P network is disabled" );
+
+   if( _chain_db )
+   {
+      ilog( "Closing chain database" );
+      _chain_db->close();
+      _chain_db.reset();
+   }
+   else
+      ilog( "Chain database is not open" );
+}
+
+void application_impl::enable_plugin( const string& name )
+{
+   FC_ASSERT(_available_plugins[name], "Unknown plugin '" + name + "'");
+   _active_plugins[name] = _available_plugins[name];
+}
+
+void application_impl::initialize_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_initialize( *_options );
+      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::startup_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_startup();
+      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::shutdown_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_shutdown();
+      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+{
+   _available_plugins[p->plugin_name()] = p;
+}
+
+void application_impl::set_block_production(bool producing_blocks)
+{
+   _is_block_producer = producing_blocks;
+}
 
 } } } // namespace graphene namespace app namespace detail
 
 namespace graphene { namespace app {
 
 application::application()
-   : my(new detail::application_impl(this))
-{}
+   : my(std::make_shared<detail::application_impl>(*this))
+{
+   //nothing else to do
+}
 
 application::~application()
 {
-   if( my->_p2p_network )
-   {
-      my->_p2p_network->close();
-      my->_p2p_network.reset();
-   }
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-   }
+   ilog("Application quitting");
+   my->shutdown();
 }
 
 void application::set_program_options(boost::program_options::options_description& command_line_options,
                                       boost::program_options::options_description& configuration_file_options) const
 {
+   const auto& default_opts = application_options::get_default();
    configuration_file_options.add_options()
-         ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
+         ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
+          "Whether to enable P2P network (default: true). Note: if delayed_node plugin is enabled, "
+          "this option will be ignored and P2P network will always be disabled.")
+         ("p2p-accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
+          "Whether to accept incoming P2P connections (default: true)")
+         ("p2p-endpoint", bpo::value<string>(),
+          "The endpoint (local IP address:port) on which the node will listen for P2P connections. "
+          "Specify 0.0.0.0 as address to listen on all IP addresses")
+         ("p2p-inbound-endpoint", bpo::value<string>(),
+          "The endpoint (external IP address:port) that other P2P peers should connect to. "
+          "If the address is unknown or dynamic, specify 0.0.0.0")
+         ("p2p-connect-to-new-peers", bpo::value<bool>()->implicit_value(true),
+          "Whether the node will connect to new P2P peers advertised by other peers (default: true)")
+         ("p2p-advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
+          "Determines which P2P peers are advertised in response to address requests from other peers. "
+          "Algorithms: 'all', 'nothing', 'list', exclude_list'. (default: all)")
+         ("p2p-advertise-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to advertise, only takes effect when algorithm "
+          "is 'list' (may specify multiple times)")
+         ("p2p-exclude-peer-endpoint", bpo::value<vector<string>>()->composing(),
+          "The endpoint (IP address:port) of the P2P peer to not advertise, only takes effect when algorithm "
+          "is 'exclude_list' (may specify multiple times)")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
-          "P2P nodes to connect to on startup (may specify multiple times)")
+          "The endpoint (IP address:port) of the P2P peer to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
-          "JSON array of P2P nodes to connect to on startup")
+          "JSON array of P2P peers to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->composing(),
           "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
           "Endpoint for TLS websocket RPC to listen on")
-         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
+         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"),
+          "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
+         ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
+          "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
+          "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
-         ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
+         ("dbg-init-key", bpo::value<string>(),
+          "Block signing key to use for init witnesses, overrides genesis file, for debug")
+         ("api-node-info", bpo::value<string>(),
+          "A string defined by the node operator, which can be retrieved via the login_api::get_info API")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
+          "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
+         ("api-limit-get-account-history-operations",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history_operations),
+          "For history_api::get_account_history_operations to set max limit value")
+         ("api-limit-get-account-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history),
+          "For history_api::get_account_history to set max limit value")
+         ("api-limit-get-grouped-limit-orders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_grouped_limit_orders),
+          "For orders_api::get_grouped_limit_orders to set max limit value")
+         ("api-limit-get-market-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_market_history),
+          "Maximum number of records to return for the history_api::get_market_history API")
+         ("api-limit-get-relative-account-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_relative_account_history),
+          "For history_api::get_relative_account_history to set max limit value")
+         ("api-limit-get-account-history-by-operations",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_history_by_operations),
+          "For history_api::get_account_history_by_operations to set max limit value")
+         ("api-limit-get-asset-holders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_asset_holders),
+          "For asset_api::get_asset_holders to set max limit value")
+         ("api-limit-get-key-references",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_key_references),
+          "For database_api_impl::get_key_references to set max limit value")
+         ("api-limit-get-htlc-by",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_htlc_by),
+          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
+         ("api-limit-get-full-accounts",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts),
+          "For database_api_impl::get_full_accounts to set max accounts to query at once")
+         ("api-limit-get-full-accounts-lists",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts_lists),
+          "For database_api_impl::get_full_accounts to set max items to return in the lists")
+         ("api-limit-get-full-accounts-subscribe",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_full_accounts_subscribe),
+          "Maximum number of accounts allowed to subscribe per connection with the get_full_accounts API")
+         ("api-limit-get-top-voters",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_top_voters),
+          "For database_api_impl::get_top_voters to set max limit value")
+         ("api-limit-get-call-orders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_call_orders),
+          "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
+         ("api-limit-get-settle-orders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_settle_orders),
+          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set max limit value")
+         ("api-limit-get-assets",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_assets),
+          "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
+         ("api-limit-get-limit-orders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_limit_orders),
+          "For database_api_impl::get_limit_orders to set max limit value")
+         ("api-limit-get-limit-orders-by-account",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_limit_orders_by_account),
+          "For database_api_impl::get_limit_orders_by_account to set max limit value")
+         ("api-limit-get-order-book",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_order_book),
+          "For database_api_impl::get_order_book to set max limit value")
+         ("api-limit-list-htlcs",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_list_htlcs),
+          "For database_api_impl::list_htlcs to set max limit value")
+         ("api-limit-lookup-accounts",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_accounts),
+          "For database_api_impl::lookup_accounts to set max limit value")
+         ("api-limit-lookup-witness-accounts",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_witness_accounts),
+          "For database_api_impl::lookup_witness_accounts to set max limit value")
+         ("api-limit-lookup-committee-member-accounts",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_committee_member_accounts),
+          "For database_api_impl::lookup_committee_member_accounts to set max limit value")
+         ("api-limit-lookup-vote-ids",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_lookup_vote_ids),
+          "For database_api_impl::lookup_vote_ids to set max limit value")
+         ("api-limit-get-account-limit-orders",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_account_limit_orders),
+          "For database_api_impl::get_account_limit_orders to set max limit value")
+         ("api-limit-get-collateral-bids",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_collateral_bids),
+          "For database_api_impl::get_collateral_bids to set max limit value")
+         ("api-limit-get-top-markets",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_top_markets),
+          "For database_api_impl::get_top_markets to set max limit value")
+         ("api-limit-get-trade-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_trade_history),
+          "For database_api_impl::get_trade_history to set max limit value")
+         ("api-limit-get-trade-history-by-sequence",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_trade_history_by_sequence),
+          "For database_api_impl::get_trade_history_by_sequence to set max limit value")
+         ("api-limit-get-withdraw-permissions-by-giver",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_giver),
+          "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
+         ("api-limit-get-withdraw-permissions-by-recipient",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_recipient),
+          "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
+         ("api-limit-get-tickets",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_tickets),
+          "Set maximum limit value for database APIs which query for tickets")
+         ("api-limit-get-liquidity-pools",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_liquidity_pools),
+          "Set maximum limit value for database APIs which query for liquidity pools")
+         ("api-limit-get-liquidity-pool-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_liquidity_pool_history),
+          "Set maximum limit value for APIs which query for history of liquidity pools")
+         ("api-limit-get-samet-funds",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_samet_funds),
+          "Set maximum limit value for database APIs which query for SameT Funds")
+         ("api-limit-get-credit-offers",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_credit_offers),
+          "Set maximum limit value for database APIs which query for credit offers or credit deals")
+         ("api-limit-get-storage-info",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_storage_info),
+          "Set maximum limit value for APIs which query for account storage info")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -989,22 +1351,20 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-void application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
+void application::initialize(const fc::path& data_dir,
+                             std::shared_ptr<boost::program_options::variables_map> options) const
 {
-   my->_data_dir = data_dir;
-   my->_options = &options;
-
-   if ( options.count("io-threads") )
-   {
-      const uint16_t num_threads = options["io-threads"].as<uint16_t>();
-      fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
+   ilog( "Initializing application" );
+   my->initialize( data_dir, options );
+   ilog( "Done initializing application" );
 }
 
 void application::startup()
 {
    try {
+      ilog( "Starting up application" );
       my->startup();
+      ilog( "Done starting up application" );
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;
@@ -1014,9 +1374,26 @@ void application::startup()
    }
 }
 
+void application::set_api_limit()
+{
+   try {
+      my->set_api_limit();
+   } catch ( const fc::exception& e ) {
+      elog( "${e}", ("e",e.to_detail_string()) );
+      throw;
+   } catch ( ... ) {
+      elog( "unexpected exception" );
+      throw;
+   }
+}
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
    return my->_active_plugins[name];
+}
+
+bool application::is_plugin_enabled(const string& name) const
+{
+   return my->is_plugin_enabled(name);
 }
 
 net::node_ptr application::p2p_node()
@@ -1031,7 +1408,7 @@ std::shared_ptr<chain::database> application::chain_database() const
 
 void application::set_block_production(bool producing_blocks)
 {
-   my->_is_block_producer = producing_blocks;
+   my->set_block_production(producing_blocks);
 }
 
 optional< api_access_info > application::get_api_access_info( const string& username )const
@@ -1049,56 +1426,27 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void graphene::app::application::enable_plugin(const string& name)
+void application::enable_plugin(const string& name) const
 {
-   FC_ASSERT(my->_available_plugins[name], "Unknown plugin '" + name + "'");
-   my->_active_plugins[name] = my->_available_plugins[name];
-   my->_active_plugins[name]->plugin_set_app(this);
+   my->enable_plugin(name);
 }
 
-void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p) const
 {
-   my->_available_plugins[p->plugin_name()] = p;
+   my->add_available_plugin(p);
 }
 
-void application::shutdown_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-      entry.second->plugin_shutdown();
-   return;
-}
-void application::shutdown()
-{
-   if( my->_p2p_network )
-      my->_p2p_network->close();
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-      my->_chain_db = nullptr;
-   }
-}
-
-void application::initialize_plugins( const boost::program_options::variables_map& options )
-{
-   for( auto& entry : my->_active_plugins )
-      entry.second->plugin_initialize( options );
-   return;
-}
-
-void application::startup_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      entry.second->plugin_startup();
-      ilog( "Plugin ${name} started", ( "name", entry.second->plugin_name() ) );
-   }
-   return;
-}
-
-const application_options& application::get_options()
+const application_options& application::get_options() const
 {
    return my->_app_options;
 }
 
+const string& application::get_node_info() const
+{
+   return my->_node_info;
+}
+
 // namespace detail
 } }
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::application_options )

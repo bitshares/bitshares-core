@@ -38,7 +38,10 @@ using std::vector;
 
 namespace bpo = boost::program_options;
 
-debug_witness_plugin::~debug_witness_plugin() {}
+debug_witness_plugin::~debug_witness_plugin()
+{
+   cleanup();
+}
 
 void debug_witness_plugin::plugin_set_program_options(
    boost::program_options::options_description& command_line_options,
@@ -62,7 +65,7 @@ void debug_witness_plugin::plugin_initialize(const boost::program_options::varia
    ilog("debug_witness plugin:  plugin_initialize() begin");
    _options = &options;
 
-   if( options.count("debug-private-key") )
+   if( options.count("debug-private-key") > 0 )
    {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["debug-private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
@@ -100,7 +103,6 @@ void debug_witness_plugin::plugin_startup()
    _changed_objects_conn = db.changed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts){ on_changed_objects(ids, impacted_accounts); });
    _removed_objects_conn = db.removed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*>& objs, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts){ on_removed_objects(ids, objs, impacted_accounts); });
 
-   return;
 }
 
 void debug_witness_plugin::on_changed_objects( const std::vector<graphene::db::object_id_type>& ids, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts )
@@ -156,10 +158,14 @@ void debug_witness_plugin::flush_json_object_stream()
 
 void debug_witness_plugin::plugin_shutdown()
 {
+   cleanup();
+}
+
+void debug_witness_plugin::cleanup()
+{
    if( _json_object_stream )
    {
       _json_object_stream->close();
       _json_object_stream.reset();
    }
-   return;
 }

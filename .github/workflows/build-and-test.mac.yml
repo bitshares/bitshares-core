@@ -1,0 +1,85 @@
+name: macOS
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  build-osx:
+    name: Build and test in macOS
+    strategy:
+      matrix:
+        os: [macos-11]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install dependencies
+      run: |
+        brew install autoconf automake libtool
+        brew install ccache
+        brew install parallel
+        brew install bitshares/boost/boost@1.69
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        mkdir -p _build
+        pushd _build
+        cmake -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D BOOST_ROOT=/usr/local/opt/boost@1.69 \
+              -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1 \
+              ..
+    - name: Load Cache
+      uses: actions/cache@v3
+      with:
+        path: ccache
+        key: ccache-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ matrix.os }}-${{ github.ref }}-
+          ccache-${{ matrix.os }}-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 3 -C _build witness_node cli_wallet app_test cli_test chain_test
+        df -h
+    - name: Unit-Tests
+      timeout-minutes: 15
+      run: |
+        _build/tests/app_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
+        df -h
+    - name: Quick test for program arguments
+      run: |
+        _build/programs/witness_node/witness_node --version
+        _build/programs/witness_node/witness_node --help
+        if _build/programs/witness_node/witness_node --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        _build/programs/cli_wallet/cli_wallet --version
+        _build/programs/cli_wallet/cli_wallet --help
+        _build/programs/cli_wallet/cli_wallet --suggest-brain-key
+        if _build/programs/cli_wallet/cli_wallet --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+    - name: Node-Test
+      run: |
+        df -h
+        pushd _build
+        ../programs/build_helpers/run-node-test

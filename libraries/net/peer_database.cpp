@@ -50,7 +50,8 @@ namespace graphene { namespace net {
                                            indexed_by<ordered_non_unique<tag<last_seen_time_index>, 
                                                                          member<potential_peer_record, 
                                                                                 fc::time_point_sec, 
-                                                                                &potential_peer_record::last_seen_time> >,
+                                                                                &potential_peer_record::last_seen_time>,
+                                                                         std::greater<fc::time_point_sec> >,
                                                       hashed_unique<tag<endpoint_index>, 
                                                                     member<potential_peer_record, 
                                                                            fc::ip::endpoint, 
@@ -67,8 +68,8 @@ namespace graphene { namespace net {
       void clear();
       void erase(const fc::ip::endpoint& endpointToErase);
       void update_entry(const potential_peer_record& updatedRecord);
-      potential_peer_record lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
-      fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
+      potential_peer_record lookup_or_create_entry_for_ep(const fc::ip::endpoint& endpointToLookup)const;
+      fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)const;
 
       peer_database::iterator begin() const;
       peer_database::iterator end() const;
@@ -124,11 +125,12 @@ namespace graphene { namespace net {
         if (!fc::exists(peer_database_filename_dir))
           fc::create_directories(peer_database_filename_dir);
         fc::json::save_to_file( peer_records, _peer_database_filename, GRAPHENE_NET_MAX_NESTED_OBJECTS );
+        dlog( "Saved peer database to file ${filename}", ( "filename", _peer_database_filename) );
       }
       catch (const fc::exception& e)
       {
-        elog("error saving peer database to file ${peer_database_filename}", 
-             ("peer_database_filename", _peer_database_filename));
+        wlog( "error saving peer database to file ${peer_database_filename}: ${error}",
+              ("peer_database_filename", _peer_database_filename)("error", e.to_detail_string()) );
       }
       _potential_peer_set.clear();
     }
@@ -154,7 +156,8 @@ namespace graphene { namespace net {
         _potential_peer_set.get<endpoint_index>().insert(updatedRecord);
     }
 
-    potential_peer_record peer_database_impl::lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)
+    potential_peer_record peer_database_impl::lookup_or_create_entry_for_ep(
+          const fc::ip::endpoint& endpointToLookup ) const
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToLookup);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
@@ -162,7 +165,8 @@ namespace graphene { namespace net {
       return potential_peer_record(endpointToLookup);
     }
 
-    fc::optional<potential_peer_record> peer_database_impl::lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)
+    fc::optional<potential_peer_record> peer_database_impl::lookup_entry_for_endpoint(
+          const fc::ip::endpoint& endpointToLookup ) const
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToLookup);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
@@ -172,12 +176,14 @@ namespace graphene { namespace net {
 
     peer_database::iterator peer_database_impl::begin() const
     {
-      return peer_database::iterator(new peer_database_iterator_impl(_potential_peer_set.get<last_seen_time_index>().begin()));
+      return peer_database::iterator( std::make_unique<peer_database_iterator_impl>(
+                   _potential_peer_set.get<last_seen_time_index>().begin() ) );
     }
 
     peer_database::iterator peer_database_impl::end() const
     {
-      return peer_database::iterator(new peer_database_iterator_impl(_potential_peer_set.get<last_seen_time_index>().end()));
+      return peer_database::iterator( std::make_unique<peer_database_iterator_impl>(
+                   _potential_peer_set.get<last_seen_time_index>().end() ) );
     }
 
     size_t peer_database_impl::size() const
@@ -193,8 +199,8 @@ namespace graphene { namespace net {
     {
     }
 
-    peer_database_iterator::peer_database_iterator(peer_database_iterator_impl* impl) :
-      my(impl)
+    peer_database_iterator::peer_database_iterator( std::unique_ptr<peer_database_iterator_impl>&& impl) :
+      my( std::move(impl) )
     {
     }
 
@@ -216,7 +222,7 @@ namespace graphene { namespace net {
   } // end namespace detail
 
   peer_database::peer_database() :
-    my(new detail::peer_database_impl)
+    my( std::make_unique<detail::peer_database_impl>() )
   {
   }
 
@@ -248,12 +254,14 @@ namespace graphene { namespace net {
     my->update_entry(updatedRecord);
   }
 
-  potential_peer_record peer_database::lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)
+  potential_peer_record peer_database::lookup_or_create_entry_for_ep(
+        const fc::ip::endpoint& endpointToLookup ) const
   {
-    return my->lookup_or_create_entry_for_endpoint(endpointToLookup);
+    return my->lookup_or_create_entry_for_ep(endpointToLookup);
   }
 
-  fc::optional<potential_peer_record> peer_database::lookup_entry_for_endpoint(const fc::ip::endpoint& endpoint_to_lookup)
+  fc::optional<potential_peer_record> peer_database::lookup_entry_for_endpoint(
+        const fc::ip::endpoint& endpoint_to_lookup ) const
   {
     return my->lookup_entry_for_endpoint(endpoint_to_lookup);
   }
@@ -274,3 +282,14 @@ namespace graphene { namespace net {
   }
 
 } } // end namespace graphene::net
+
+FC_REFLECT_ENUM( graphene::net::potential_peer_last_connection_disposition,
+                 (never_attempted_to_connect)
+                 (last_connection_failed)(last_connection_rejected)
+                 (last_connection_handshaking_failed)(last_connection_succeeded) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::potential_peer_record, BOOST_PP_SEQ_NIL,
+                                (endpoint)(last_seen_time)(last_connection_disposition)
+                                (last_connection_attempt_time)(number_of_successful_connection_attempts)
+                                (number_of_failed_connection_attempts)(last_error) )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::net::potential_peer_record)

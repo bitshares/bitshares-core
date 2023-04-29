@@ -1,0 +1,211 @@
+name: Scan with SonarScanner
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  sonar-scan:
+    name: Scan with SonarScanner
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04 ]
+    runs-on: ${{ matrix.os }}
+    services:
+      elasticsearch8:
+        image: elastic/elasticsearch:8.6.1
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
+    steps:
+    - name: Download and install latest SonarScanner CLI tool
+      run: |
+        SONAR_SCANNER_VERSION=`curl -w %{redirect_url} \
+             https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
+             2>/dev/null | cut -f8 -d'/'`
+        SONAR_DOWNLOAD_PATH=https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
+        curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip \
+             $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+        unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+        curl --create-dirs -sSLo $HOME/.sonar/build-wrapper-linux-x86.zip \
+             https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
+        unzip -o $HOME/.sonar/build-wrapper-linux-x86.zip -d $HOME/.sonar/
+        SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux
+        echo "SONAR_SCANNER_VERSION=$SONAR_SCANNER_VERSION" >> $GITHUB_ENV
+        echo "SONAR_SCANNER_HOME=$SONAR_SCANNER_HOME" >> $GITHUB_ENV
+        echo "SONAR_SCANNER_OPTS=-server" >> $GITHUB_ENV
+        echo "$SONAR_SCANNER_HOME/bin" >> $GITHUB_PATH
+        echo "$HOME/.sonar/build-wrapper-linux-x86" >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        df -h
+        sudo apt-get update
+        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
+        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
+        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
+          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
+        sudo apt-get install -y \
+                     ccache \
+                     gcovr \
+                     parallel \
+                     libboost-thread-dev \
+                     libboost-iostreams-dev \
+                     libboost-date-time-dev \
+                     libboost-system-dev \
+                     libboost-filesystem-dev \
+                     libboost-program-options-dev \
+                     libboost-chrono-dev \
+                     libboost-test-dev \
+                     libboost-context-dev \
+                     libboost-regex-dev \
+                     libboost-coroutine-dev \
+                     libcurl4-openssl-dev
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
+        sudo du -hs /mnt/*
+        sudo ls -alr /mnt/
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - name: Configure
+      run: |
+        pwd
+        df -h .
+        free
+        mkdir -p _build
+        sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
+        sudo chmod a+rwx /_build/libraries /_build/programs /mnt/_build/tests
+        ln -s /_build/libraries _build/libraries
+        ln -s /_build/programs _build/programs
+        ln -s /mnt/_build/tests _build/tests
+        sudo ln -s /_build/libraries /mnt/_build/libraries
+        sudo ln -s /_build/programs /mnt/_build/programs
+        sudo ln -s /mnt/_build/tests /_build/tests
+        ls -al _build
+        sed -i '/tests/d' libraries/fc/CMakeLists.txt
+        pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
+        cmake -D CMAKE_BUILD_TYPE=Debug \
+              -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
+              -D CMAKE_C_COMPILER=gcc \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=g++ \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_C_FLAGS=--coverage \
+              -D CMAKE_CXX_FLAGS=--coverage \
+              -D Boost_USE_STATIC_LIBS=OFF \
+              ..
+        popd
+    # Get OS version to be used in cache key - see https://github.com/actions/cache/issues/543
+    - run: |
+        echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
+    - name: Load Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ccache
+        key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
+          sonar-${{ env.OS_VERSION }}-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        df -h
+        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
+          witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
+          app_test chain_test cli_test es_test
+        df -h
+        du -hs _build/libraries/* _build/programs/* _build/tests/*
+        du -hs _build/*
+        du -hs /_build/*
+    - name: Quick test for program arguments
+      run: |
+        _build/programs/witness_node/witness_node --version
+        _build/programs/witness_node/witness_node --help
+        if _build/programs/witness_node/witness_node --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        _build/programs/cli_wallet/cli_wallet --version
+        _build/programs/cli_wallet/cli_wallet --help
+        _build/programs/cli_wallet/cli_wallet --suggest-brain-key
+        if _build/programs/cli_wallet/cli_wallet --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+    - name: Remove binaries that we no longer need
+      run: |
+        df -h
+        echo "Cleanup"
+        rm -rf _build/programs/witness_node/witness_node
+        rm -rf _build/programs/cli_wallet/cli_wallet
+        rm -rf _build/programs/network_mapper/network_mapper
+        rm -rf _build/programs/js_operation_serializer/js_operation_serializer
+        rm -rf _build/programs/genesis_util/get_dev_key
+        df -h
+    - name: Unit-Tests
+      timeout-minutes: 15
+      run: |
+        _build/tests/app_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        _build/tests/es_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        _build/tests/cli_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        df -h
+    - name: Prepare for scanning with SonarScanner
+      run: |
+        programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
+        pushd _build
+        gcovr --version
+        gcovr --exclude-unreachable-branches --exclude-throw-branches \
+              --exclude '\.\./programs/' \
+              --exclude '\.\./tests/' \
+              --sonarqube ../coverage.xml -r ..
+        popd
+    - name: Scan with SonarScanner
+      env:
+        # to get access to secrets.SONAR_TOKEN, provide GITHUB_TOKEN
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        sonar-scanner \
+           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+    - name: Cleanup
+      run: |
+        df -h
+        echo "Final cleanup"
+        rm -rf _build/tests/app_test
+        rm -rf _build/tests/chain_test
+        rm -rf _build/tests/cli_test
+        rm -rf _build/tests/es_test
+        df -h

@@ -23,20 +23,9 @@
  */
 
 #include <graphene/app/plugin.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace app {
-
-plugin::plugin()
-{
-   _app = nullptr;
-   return;
-}
-
-plugin::~plugin()
-{
-   return;
-}
 
 std::string plugin::plugin_name()const
 {
@@ -50,23 +39,17 @@ std::string plugin::plugin_description()const
 
 void plugin::plugin_initialize( const boost::program_options::variables_map& options )
 {
-   return;
+   // nothing to do
 }
 
 void plugin::plugin_startup()
 {
-   return;
+   // nothing to do
 }
 
 void plugin::plugin_shutdown()
 {
-   return;
-}
-
-void plugin::plugin_set_app( application* app )
-{
-   _app = app;
-   return;
+   // nothing to do
 }
 
 void plugin::plugin_set_program_options(
@@ -74,7 +57,7 @@ void plugin::plugin_set_program_options(
    boost::program_options::options_description& config_file_options
 )
 {
-   return;
+   // nothing to do
 }
 
 } } // graphene::app

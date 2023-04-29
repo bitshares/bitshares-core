@@ -32,45 +32,53 @@ namespace detail
 class template_plugin_impl
 {
    public:
-      template_plugin_impl(template_plugin& _plugin)
-         : _self( _plugin )
-      {  }
+      explicit template_plugin_impl( template_plugin& _plugin );
       virtual ~template_plugin_impl();
 
-      void onBlock( const signed_block& b );
+      void on_block( const signed_block& b );
 
       graphene::chain::database& database()
       {
          return _self.database();
       }
 
+      friend class graphene::template_plugin::template_plugin;
+
+   private:
       template_plugin& _self;
 
       std::string _plugin_option = "";
 
-   private:
-
 };
 
-void template_plugin_impl::onBlock( const signed_block& b )
+void template_plugin_impl::on_block( const signed_block& b )
 {
    wdump((b.block_num()));
 }
 
+template_plugin_impl::template_plugin_impl( template_plugin& _plugin ) :
+   _self( _plugin )
+{
+   // Put other code here
+}
+
 template_plugin_impl::~template_plugin_impl()
 {
-   return;
+   // Put the real code here. If none, remove the destructor.
 }
 
 } // end namespace detail
 
-template_plugin::template_plugin() :
-   my( new detail::template_plugin_impl(*this) )
+template_plugin::template_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::template_plugin_impl>(*this) )
 {
+   // Add needed code here
 }
 
 template_plugin::~template_plugin()
 {
+   cleanup();
 }
 
 std::string template_plugin::plugin_name()const
@@ -95,11 +103,12 @@ void template_plugin::plugin_set_program_options(
 
 void template_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().applied_block.connect( [&]( const signed_block& b) {
-      my->onBlock(b);
+   // connect with group 0 by default to process before some special steps (e.g. snapshot or next_object_id)
+   database().applied_block.connect( 0, [this]( const signed_block& b) {
+      my->on_block(b);
    } );
 
-   if (options.count("template_plugin")) {
+   if (options.count("template_plugin") > 0) {
       my->_plugin_option = options["template_plugin"].as<std::string>();
    }
 }
@@ -107,6 +116,17 @@ void template_plugin::plugin_initialize(const boost::program_options::variables_
 void template_plugin::plugin_startup()
 {
    ilog("template_plugin: plugin_startup() begin");
+}
+
+void template_plugin::plugin_shutdown()
+{
+   ilog("template_plugin: plugin_shutdown() begin");
+   cleanup();
+}
+
+void template_plugin::cleanup()
+{
+   // Add cleanup code here
 }
 
 } }

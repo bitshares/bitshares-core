@@ -25,8 +25,8 @@
 #include <graphene/net/exceptions.hpp>
 #include <graphene/net/config.hpp>
 #include <graphene/chain/config.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
 
+#include <fc/io/raw.hpp>
 #include <fc/thread/thread.hpp>
 
 #include <boost/scope_exit.hpp>
@@ -76,7 +76,6 @@ namespace graphene { namespace net
       _message_connection(this),
       _total_queued_messages_size(0),
       direction(peer_connection_direction::unknown),
-      is_firewalled(firewalled_state::unknown),
       our_state(our_connection_state::disconnected),
       they_have_requested_close(false),
       their_state(their_connection_state::disconnected),
@@ -88,7 +87,6 @@ namespace graphene { namespace net
       inhibit_fetching_sync_blocks(false),
       transaction_fetching_inhibited_until(fc::time_point::min()),
       last_known_fork_block_number(0),
-      firewall_check_state(nullptr),
 #ifndef NDEBUG
       _thread(&fc::thread::current()),
       _send_message_queue_tasks_running(0),
@@ -107,8 +105,14 @@ namespace graphene { namespace net
       // current task yields.  In the (not uncommon) case where it is the task executing
       // connect_to or read_loop, this allows the task to finish before the destructor is forced
       // to cancel it.
-      return peer_connection_ptr(new peer_connection(delegate));
-      //, [](peer_connection* peer_to_delete){ fc::async([peer_to_delete](){delete peer_to_delete;}); });
+
+      // Implementation: derive peer_connection so that make_shared has access to the constructor
+      class peer_connection_subclass : public peer_connection
+      {
+      public:
+         explicit peer_connection_subclass(peer_connection_delegate* delegate) : peer_connection(delegate) {}
+      };
+      return std::make_shared<peer_connection_subclass>(delegate);
     }
 
     void peer_connection::destroy()
@@ -213,7 +217,8 @@ namespace graphene { namespace net
 
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
-        ilog( "established inbound connection from ${remote_endpoint}, sending hello", ("remote_endpoint", _message_connection.get_socket().remote_endpoint() ) );
+        ilog( "established inbound connection from ${remote_endpoint}, sending hello",
+              ("remote_endpoint", _message_connection.get_socket().remote_endpoint() ) );
       }
       catch ( const fc::exception& e )
       {
@@ -222,7 +227,8 @@ namespace graphene { namespace net
       }
     }
 
-    void peer_connection::connect_to( const fc::ip::endpoint& remote_endpoint, fc::optional<fc::ip::endpoint> local_endpoint )
+    void peer_connection::connect_to( const fc::ip::endpoint& remote_endpoint,
+                                      const fc::optional<fc::ip::endpoint>& local_endpoint )
     {
       VERIFY_CORRECT_THREAD();
       try
@@ -232,6 +238,7 @@ namespace graphene { namespace net
         direction = peer_connection_direction::outbound;
 
         _remote_endpoint = remote_endpoint;
+        bool failed_to_bind = false;
         if( local_endpoint )
         {
           // the caller wants us to bind the local side of this socket to a specific ip/port
@@ -248,24 +255,56 @@ namespace graphene { namespace net
           }
           catch ( const fc::exception& except )
           {
-            wlog( "Failed to bind to desired local endpoint ${endpoint}, will connect using an OS-selected endpoint: ${except}", ("endpoint", *local_endpoint )("except", except ) );
+             failed_to_bind = true;
+             wlog( "Failed to bind to desired local endpoint ${endpoint}, will connect using an OS-selected "
+                   "endpoint: ${except}",
+                   ("endpoint", *local_endpoint )("except", except ) );
           }
         }
         negotiation_status = connection_negotiation_status::connecting;
-        _message_connection.connect_to( remote_endpoint );
+        bool retry = false;
+        try
+        {
+           _message_connection.connect_to( remote_endpoint );
+        }
+        catch ( const fc::canceled_exception& )
+        {
+           throw;
+        }
+        catch ( const fc::exception& except )
+        {
+           if( local_endpoint && !failed_to_bind )
+           {
+              retry = true;
+              wlog( "Failed to connect to remote endpoint ${remote_endpoint} from local endpoint ${local_endpoint}, "
+                    "will connect using an OS-selected endpoint: ${except}",
+                    ("remote_endpoint", remote_endpoint )("local_endpoint", *local_endpoint )("except", except ) );
+           }
+           else
+              throw;
+        }
+        if( retry )
+        {
+           get_socket().close();
+           get_socket().open();
+           _message_connection.connect_to( remote_endpoint );
+        }
         negotiation_status = connection_negotiation_status::connected;
         their_state = their_connection_state::just_connected;
         our_state = our_connection_state::just_connected;
+        remote_inbound_endpoint = remote_endpoint;
         ilog( "established outbound connection to ${remote_endpoint}", ("remote_endpoint", remote_endpoint ) );
       }
       catch ( fc::exception& e )
       {
-        wlog( "error connecting to peer ${remote_endpoint}: ${e}", ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
+        wlog( "error connecting to peer ${remote_endpoint}: ${e}",
+              ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
         throw;
       }
     } // connect_to()
 
-    void peer_connection::on_message( message_oriented_connection* originating_connection, const message& received_message )
+    void peer_connection::on_message( message_oriented_connection* originating_connection,
+                                      const message& received_message )
     {
       VERIFY_CORRECT_THREAD();
       _currently_handling_message = true;
@@ -374,8 +413,9 @@ namespace graphene { namespace net
     {
       VERIFY_CORRECT_THREAD();
       //dlog("peer_connection::send_message() enqueueing message of type ${type} for peer ${endpoint}",
-      //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
-      std::unique_ptr<queued_message> message_to_enqueue(new real_queued_message(message_to_send, message_send_time_field_offset));
+      //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint())); // for debug
+      auto message_to_enqueue = std::make_unique<real_queued_message>(
+                                      message_to_send, message_send_time_field_offset );
       send_queueable_message(std::move(message_to_enqueue));
     }
 
@@ -383,8 +423,8 @@ namespace graphene { namespace net
     {
       VERIFY_CORRECT_THREAD();
       //dlog("peer_connection::send_item() enqueueing message of type ${type} for peer ${endpoint}",
-      //     ("type", item_to_send.item_type)("endpoint", get_remote_endpoint()));
-      std::unique_ptr<queued_message> message_to_enqueue(new virtual_queued_message(item_to_send));
+      //     ("type", item_to_send.item_type)("endpoint", get_remote_endpoint())); // for debug
+      auto message_to_enqueue = std::make_unique<virtual_queued_message>(item_to_send);
       send_queueable_message(std::move(message_to_enqueue));
     }
 
@@ -515,16 +555,9 @@ namespace graphene { namespace net
         (GRAPHENE_NET_MAX_INVENTORY_SIZE_IN_MINUTES + 1) * 60 / GRAPHENE_MIN_BLOCK_INTERVAL;
     }
 
-    bool peer_connection::performing_firewall_check() const
-    {
-      return firewall_check_state && firewall_check_state->requesting_peer != node_id_t();
-    }
-
     fc::optional<fc::ip::endpoint> peer_connection::get_endpoint_for_connecting() const
     {
-      if (inbound_port)
-        return fc::ip::endpoint(inbound_address, inbound_port);
-      return fc::optional<fc::ip::endpoint>();
+      return remote_inbound_endpoint;
     }
 
 } } // end namespace graphene::net

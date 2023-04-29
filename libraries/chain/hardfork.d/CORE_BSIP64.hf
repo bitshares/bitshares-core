@@ -1,0 +1,4 @@
+// bitshares BSIP 64 HTLC modifications
+#ifndef HARDFORK_CORE_BSIP64_TIME
+#define HARDFORK_CORE_BSIP64_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#endif

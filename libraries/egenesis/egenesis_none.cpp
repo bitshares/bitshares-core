@@ -24,6 +24,8 @@
 
 #include <graphene/egenesis/egenesis.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace egenesis {
 
 using namespace graphene::chain;

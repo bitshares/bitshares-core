@@ -1,0 +1,5 @@
+// bitshares-core issue #2362 Simple collateralized P2P funding
+#ifndef HARDFORK_CORE_2362_TIME
+#define HARDFORK_CORE_2362_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_2362_PASSED(now) (now >= HARDFORK_CORE_2362_TIME)
+#endif

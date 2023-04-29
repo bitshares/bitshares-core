@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/transaction.hpp>
+#include <graphene/protocol/transaction.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/evaluator.hpp>

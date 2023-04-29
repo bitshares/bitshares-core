@@ -23,6 +23,8 @@
  */
 #pragma once
 
+#include <stddef.h>
+
 #define GRAPHENE_NET_PROTOCOL_VERSION                        106
 
 /**
@@ -65,7 +67,7 @@
  * our peers and save a copy in a cache were we will find it if
  * a peer requests it.  We expire out old items out of the cache
  * after this number of blocks go by.
- * 
+ *
  * Recently lowered from 30 to match the default expiration time
  * the web wallet imposes on transactions.
  */
@@ -90,12 +92,12 @@
  * is being flooded -- typically transactions will be fetched as soon
  * as we find out about them, so only one item will be requested
  * at a time.
- * 
+ *
  * No tests have been done to find the optimal value for this
  * parameter, so consider increasing or decreasing it if performance
  * during flooding is lacking.
  */
-#define GRAPHENE_NET_MAX_ITEMS_PER_PEER_DURING_NORMAL_OPERATION  1 
+#define GRAPHENE_NET_MAX_ITEMS_PER_PEER_DURING_NORMAL_OPERATION  1
 
 /**
  * Instead of fetching all item IDs from a peer, then fetching all blocks
@@ -110,3 +112,8 @@
 #define GRAPHENE_NET_MAX_NESTED_OBJECTS                      (250)
 
 #define MAXIMUM_PEERDB_SIZE 1000
+
+constexpr size_t MAX_ADDRESSES_TO_HANDLE_AT_ONCE = 200;
+
+constexpr size_t MAX_BLOCKS_TO_HANDLE_AT_ONCE = 200;
+constexpr size_t MAX_SYNC_BLOCKS_TO_PREFETCH = 10 * MAX_BLOCKS_TO_HANDLE_AT_ONCE;

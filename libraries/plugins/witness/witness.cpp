@@ -29,6 +29,9 @@
 #include <graphene/utilities/key_conversion.hpp>
 
 #include <fc/thread/thread.hpp>
+#include <fc/io/fstream.hpp>
+
+#include <boost/filesystem/path.hpp>
 
 #include <iostream>
 
@@ -44,7 +47,7 @@ void new_chain_banner( const graphene::chain::database& db )
       "********************************\n"
       "*                              *\n"
       "*   ------- NEW CHAIN ------   *\n"
-      "*   - Welcome to Graphene! -   *\n"
+      "*   - Welcome to BitShares! -  *\n"
       "*   ------------------------   *\n"
       "*                              *\n"
       "********************************\n"
@@ -63,13 +66,21 @@ void witness_plugin::plugin_set_program_options(
    auto default_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan")));
    string witness_id_example = fc::json::to_string(chain::witness_id_type(5));
    command_line_options.add_options()
-         ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale.")
-         ("required-participation", bpo::bool_switch()->notifier([this](int e){_required_witness_participation = uint32_t(e*GRAPHENE_1_PERCENT);}), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
+         ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}),
+               "Enable block production, even if the chain is stale.")
+         ("required-participation", bpo::value<uint32_t>()->default_value(33),
+               "Percent of witnesses (0-100) that must be participating in order to produce blocks")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
-          ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
+               ("ID of witness controlled by this node (e.g. " + witness_id_example +
+               ", quotes are required, may specify multiple times)").c_str())
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
-          DEFAULT_VALUE_VECTOR(std::make_pair(chain::public_key_type(default_priv_key.get_public_key()), graphene::utilities::key_to_wif(default_priv_key))),
-          "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
+          DEFAULT_VALUE_VECTOR(std::make_pair(chain::public_key_type(default_priv_key.get_public_key()),
+                graphene::utilities::key_to_wif(default_priv_key))),
+                "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
+         ("private-key-file", bpo::value<vector<boost::filesystem::path>>()->composing()->multitoken(),
+          "Path to a file containing tuples of [PublicKey, WIF private key]."
+          " The file has to contain exactly one tuple (i.e. private - public key pair) per line."
+          " This option may be specified multiple times, thus multiple files can be provided.")
          ;
    config_file_options.add(command_line_options);
 }
@@ -79,35 +90,79 @@ std::string witness_plugin::plugin_name()const
    return "witness";
 }
 
+void witness_plugin::add_private_key(const std::string& key_id_to_wif_pair_string)
+{
+   auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string>>
+         (key_id_to_wif_pair_string, 5);
+   fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
+   if (!private_key)
+   {
+      // the key isn't in WIF format; see if they are still passing the old native private key format.  This is
+      // just here to ease the transition, can be removed soon
+      try
+      {
+         private_key = fc::variant(key_id_to_wif_pair.second, 2).as<fc::ecc::private_key>(1);
+      }
+      catch (const fc::exception&)
+      {
+         FC_THROW("Invalid WIF-format private key ${key_string}", ("key_string", key_id_to_wif_pair.second));
+      }
+   }
+
+   if (_private_keys.find(key_id_to_wif_pair.first) == _private_keys.end())
+   {
+      ilog("Public Key: ${public}", ("public", key_id_to_wif_pair.first));
+      _private_keys[key_id_to_wif_pair.first] = *private_key;
+   }
+}
+
 void witness_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
    ilog("witness plugin:  plugin_initialize() begin");
    _options = &options;
-   LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
+   LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type);
 
-   if( options.count("private-key") )
+   if( options.count("private-key") > 0 )
    {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
       {
-         auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string> >(key_id_to_wif_pair_string, 5);
-         ilog("Public Key: ${public}", ("public", key_id_to_wif_pair.first));
-         fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
-         if (!private_key)
+         add_private_key(key_id_to_wif_pair_string);
+      }
+   }
+   if (options.count("private-key-file") > 0)
+   {
+      const std::vector<boost::filesystem::path> key_id_to_wif_pair_files =
+            options["private-key-file"].as<std::vector<boost::filesystem::path>>();
+      for (const boost::filesystem::path& key_id_to_wif_pair_file : key_id_to_wif_pair_files)
+      {
+         if (fc::exists(key_id_to_wif_pair_file))
          {
-            // the key isn't in WIF format; see if they are still passing the old native private key format.  This is
-            // just here to ease the transition, can be removed soon
-            try
+            std::string file_content;
+            fc::read_file_contents(key_id_to_wif_pair_file, file_content);
+            std::istringstream file_content_as_stream(file_content);
+
+            std::string line; // key_id_to_wif_pair_string
+            while (std::getline(file_content_as_stream, line))
             {
-               private_key = fc::variant(key_id_to_wif_pair.second, 2).as<fc::ecc::private_key>(1);
-            }
-            catch (const fc::exception&)
-            {
-               FC_THROW("Invalid WIF-format private key ${key_string}", ("key_string", key_id_to_wif_pair.second));
+               add_private_key(line);
             }
          }
-         _private_keys[key_id_to_wif_pair.first] = *private_key;
+         else
+         {
+            FC_THROW("Failed to load private key file from ${path}", ("path", key_id_to_wif_pair_file.string()));
+         }
       }
+   }
+   if(options.count("required-participation") > 0)
+   {
+       auto required_participation = options["required-participation"].as<uint32_t>();
+       FC_ASSERT(required_participation <= 100);
+       _required_witness_participation = options["required-participation"].as<uint32_t>()*GRAPHENE_1_PERCENT;
+       if(required_participation < 10)
+           wlog("witness plugin: Warning - Low required participation of ${rp}% found", ("rp", required_participation));
+       else if(required_participation > 90)
+           wlog("witness plugin: Warning - High required participation of ${rp}% found", ("rp", required_participation));
    }
    ilog("witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
@@ -140,11 +195,6 @@ void witness_plugin::plugin_startup()
    ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
-void witness_plugin::plugin_shutdown()
-{
-   stop_block_production();
-}
-
 void witness_plugin::stop_block_production()
 {
    _shutting_down = true;
@@ -162,7 +212,7 @@ void witness_plugin::stop_block_production()
 void witness_plugin::refresh_witness_key_cache()
 {
    const auto& db = database();
-   for( const chain::witness_id_type wit_id : _witnesses )
+   for( const chain::witness_id_type& wit_id : _witnesses )
    {
       const chain::witness_object* wit_obj = db.find( wit_id );
       if( wit_obj )
@@ -222,7 +272,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Generated block #${n} with ${x} transaction(s) and timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
-         ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
+         ilog("Not producing block because production is disabled until we receive a recent block "
+              "(see: --enable-stale-production)");
          break;
       case block_production_condition::not_my_turn:
          break;
@@ -232,7 +283,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Not producing block because I don't have the private key for ${scheduled_key}", (capture) );
          break;
       case block_production_condition::low_participation:
-         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation", (capture) );
+         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation",
+               (capture) );
          break;
       case block_production_condition::lag:
          elog("Not producing block because node didn't wake up within 2500ms of the slot time.");
@@ -243,6 +295,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::shutdown:
          ilog( "shutdown producing block" );
          return result;
+      case block_production_condition::no_network:
+         ilog( "not connected to P2P network" );
+         return result;
       default:
          elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
@@ -252,7 +307,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
    return result;
 }
 
-block_production_condition::block_production_condition_enum witness_plugin::maybe_produce_block( fc::limited_mutable_variant_object& capture )
+block_production_condition::block_production_condition_enum witness_plugin::maybe_produce_block(
+      fc::limited_mutable_variant_object& capture )
 {
    chain::database& db = database();
    fc::time_point now_fine = fc::time_point::now();
@@ -316,6 +372,9 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       return block_production_condition::lag;
    }
 
+   if( p2p_node() == nullptr )
+      return block_production_condition::no_network;
+
    auto block = db.generate_block(
       scheduled_time,
       scheduled_witness,
@@ -323,7 +382,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       _production_skip_flags
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
-   fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
+   fc::async( [this,block](){ p2p_node()->broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;
 }

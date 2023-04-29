@@ -22,9 +22,9 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/hardfork.hpp>
+
+#include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -36,10 +36,10 @@ share_type cut_fee(share_type a, uint16_t p)
    if( p == GRAPHENE_100_PERCENT )
       return a;
 
-   fc::uint128 r(a.value);
+   fc::uint128_t r = a.value;
    r *= p;
    r /= GRAPHENE_100_PERCENT;
-   return r.to_uint64();
+   return static_cast<uint64_t>(r);
 }
 
 void account_balance_object::adjust_balance(const asset& delta)
@@ -66,13 +66,6 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
          assert( network_cut <= core_fee_total );
 
-#ifndef NDEBUG
-         const auto& props = d.get_global_properties();
-
-         share_type reserveed = cut_fee(network_cut, props.parameters.reserve_percent_of_fee);
-         share_type accumulated = network_cut - reserveed;
-         assert( accumulated + reserveed == network_cut );
-#endif
          share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
          share_type referral = core_fee_total - network_cut - lifetime_cut;
 
@@ -90,7 +83,7 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          d.deposit_cashback(d.get(account.referrer), referrer_cut, require_vesting);
          d.deposit_cashback(d.get(account.registrar), registrar_cut, require_vesting);
 
-         assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
+         assert( referrer_cut + registrar_cut + network_cut + lifetime_cut == core_fee_total );
       };
 
       pay_out_fees(a, pending_fees, true);
@@ -138,7 +131,6 @@ set<address> account_member_index::get_address_members(const account_object& a)c
       result.insert(auth.first);
    for( auto auth : a.active.address_auths )
       result.insert(auth.first);
-   result.insert( a.options.memo_key );
    return result;
 }
 
@@ -146,36 +138,38 @@ void account_member_index::object_inserted(const object& obj)
 {
     assert( dynamic_cast<const account_object*>(&obj) ); // for debug only
     const account_object& a = static_cast<const account_object&>(obj);
+    const account_id_type account_id = a.get_id();
 
     auto account_members = get_account_members(a);
     for( auto item : account_members )
-       account_to_account_memberships[item].insert(obj.id);
+       account_to_account_memberships[item].insert(account_id);
 
     auto key_members = get_key_members(a);
     for( auto item : key_members )
-       account_to_key_memberships[item].insert(obj.id);
+       account_to_key_memberships[item].insert(account_id);
 
     auto address_members = get_address_members(a);
     for( auto item : address_members )
-       account_to_address_memberships[item].insert(obj.id);
+       account_to_address_memberships[item].insert(account_id);
 }
 
 void account_member_index::object_removed(const object& obj)
 {
     assert( dynamic_cast<const account_object*>(&obj) ); // for debug only
     const account_object& a = static_cast<const account_object&>(obj);
+    const account_id_type account_id = a.get_id();
 
     auto key_members = get_key_members(a);
     for( auto item : key_members )
-       account_to_key_memberships[item].erase( obj.id );
+       account_to_key_memberships[item].erase( account_id );
 
     auto address_members = get_address_members(a);
     for( auto item : address_members )
-       account_to_address_memberships[item].erase( obj.id );
+       account_to_address_memberships[item].erase( account_id );
 
     auto account_members = get_account_members(a);
     for( auto item : account_members )
-       account_to_account_memberships[item].erase( obj.id );
+       account_to_account_memberships[item].erase( account_id );
 }
 
 void account_member_index::about_to_modify(const object& before)
@@ -193,80 +187,74 @@ void account_member_index::object_modified(const object& after)
 {
     assert( dynamic_cast<const account_object*>(&after) ); // for debug only
     const account_object& a = static_cast<const account_object&>(after);
+    const account_id_type account_id = a.get_id();
 
     {
        set<account_id_type> after_account_members = get_account_members(a);
-       vector<account_id_type> removed; removed.reserve(before_account_members.size());
+       vector<account_id_type> removed;
+       removed.reserve(before_account_members.size());
        std::set_difference(before_account_members.begin(), before_account_members.end(),
                            after_account_members.begin(), after_account_members.end(),
                            std::inserter(removed, removed.end()));
 
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
-          account_to_account_memberships[*itr].erase(after.id);
+          account_to_account_memberships[*itr].erase(account_id);
 
-       vector<object_id_type> added; added.reserve(after_account_members.size());
+       vector<account_id_type> added;
+       added.reserve(after_account_members.size());
        std::set_difference(after_account_members.begin(), after_account_members.end(),
                            before_account_members.begin(), before_account_members.end(),
                            std::inserter(added, added.end()));
 
        for( auto itr = added.begin(); itr != added.end(); ++itr )
-          account_to_account_memberships[*itr].insert(after.id);
+          account_to_account_memberships[*itr].insert(account_id);
     }
 
 
     {
        set<public_key_type, pubkey_comparator> after_key_members = get_key_members(a);
 
-       vector<public_key_type> removed; removed.reserve(before_key_members.size());
+       vector<public_key_type> removed;
+       removed.reserve(before_key_members.size());
        std::set_difference(before_key_members.begin(), before_key_members.end(),
                            after_key_members.begin(), after_key_members.end(),
                            std::inserter(removed, removed.end()));
 
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
-          account_to_key_memberships[*itr].erase(after.id);
+          account_to_key_memberships[*itr].erase(account_id);
 
-       vector<public_key_type> added; added.reserve(after_key_members.size());
+       vector<public_key_type> added;
+       added.reserve(after_key_members.size());
        std::set_difference(after_key_members.begin(), after_key_members.end(),
                            before_key_members.begin(), before_key_members.end(),
                            std::inserter(added, added.end()));
 
        for( auto itr = added.begin(); itr != added.end(); ++itr )
-          account_to_key_memberships[*itr].insert(after.id);
+          account_to_key_memberships[*itr].insert(account_id);
     }
 
     {
        set<address> after_address_members = get_address_members(a);
 
-       vector<address> removed; removed.reserve(before_address_members.size());
+       vector<address> removed;
+       removed.reserve(before_address_members.size());
        std::set_difference(before_address_members.begin(), before_address_members.end(),
                            after_address_members.begin(), after_address_members.end(),
                            std::inserter(removed, removed.end()));
 
        for( auto itr = removed.begin(); itr != removed.end(); ++itr )
-          account_to_address_memberships[*itr].erase(after.id);
+          account_to_address_memberships[*itr].erase(account_id);
 
-       vector<address> added; added.reserve(after_address_members.size());
+       vector<address> added;
+       added.reserve(after_address_members.size());
        std::set_difference(after_address_members.begin(), after_address_members.end(),
                            before_address_members.begin(), before_address_members.end(),
                            std::inserter(added, added.end()));
 
        for( auto itr = added.begin(); itr != added.end(); ++itr )
-          account_to_address_memberships[*itr].insert(after.id);
+          account_to_address_memberships[*itr].insert(account_id);
     }
 
-}
-
-void account_referrer_index::object_inserted( const object& obj )
-{
-}
-void account_referrer_index::object_removed( const object& obj )
-{
-}
-void account_referrer_index::about_to_modify( const object& before )
-{
-}
-void account_referrer_index::object_modified( const object& after  )
-{
 }
 
 const uint8_t  balances_by_account_index::bits = 20;
@@ -320,3 +308,43 @@ const account_balance_object* balances_by_account_index::get_account_balance( co
 }
 
 } } // graphene::chain
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
+                    (graphene::db::object),
+                    (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
+                    (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
+                    (name)(owner)(active)(options)(num_committee_voted)(statistics)
+                    (whitelisting_accounts)(blacklisting_accounts)
+                    (whitelisted_accounts)(blacklisted_accounts)
+                    (cashback_vb)
+                    (owner_special_authority)(active_special_authority)
+                    (top_n_control_flags)
+                    (allowed_assets)
+                    (creation_block_num)(creation_time)
+                    )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_balance_object,
+                    (graphene::db::object),
+                    (owner)(asset_type)(balance)(maintenance_flag) )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
+                    (graphene::chain::object),
+                    (owner)(name)
+                    (most_recent_op)
+                    (total_ops)(removed_ops)
+                    (total_core_in_orders)
+                    (total_core_inactive)(total_core_pob)(total_core_pol)
+                    (total_pob_value)(total_pol_value)
+                    (core_in_balance)
+                    (has_cashback_vb)
+                    (is_voting)
+                    (last_vote_time)
+                    (vp_all)(vp_active)(vp_committee)(vp_witness)(vp_worker)
+                    (vote_tally_time)
+                    (lifetime_fees_paid)
+                    (pending_fees)(pending_vested_fees)
+                  )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

@@ -28,6 +28,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <boost/range/algorithm.hpp>
 
 namespace graphene { namespace chain {
 
@@ -59,7 +60,7 @@ void database::adjust_balance(account_id_type account, asset delta )
    auto abo = index.get_account_balance( account, delta.asset_id );
    if( !abo )
    {
-      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
+      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
                  ("a",account(*this).name)
                  ("b",to_pretty_string(asset(0,delta.asset_id)))
                  ("r",to_pretty_string(-delta)));
@@ -81,9 +82,81 @@ void database::adjust_balance(account_id_type account, asset delta )
 
 } FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
 
+namespace detail {
+
+   /**
+    * Used as a key to search vesting_balance_object in the index
+   */
+   struct vbo_mfs_key
+   {
+      account_id_type   account_id;
+      asset_id_type     asset_id;
+
+      vbo_mfs_key(const account_id_type& account, const asset_id_type& asset):
+         account_id(account),
+         asset_id(asset)
+      {}
+
+      bool operator()(const vbo_mfs_key& k, const vesting_balance_object& vbo)const
+      {
+         return ( vbo.balance_type == vesting_balance_type::market_fee_sharing ) &&
+                  ( k.asset_id == vbo.balance.asset_id ) &&
+                  ( k.account_id == vbo.owner );
+      }
+
+      uint64_t operator()(const vbo_mfs_key& k)const
+      {
+         return vbo_mfs_hash(k.account_id, k.asset_id);
+      }
+   };
+} //detail
+
+asset database::get_market_fee_vesting_balance(const account_id_type &account_id, const asset_id_type &asset_id)
+{
+   auto& vesting_balances = get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
+   const auto& key = detail::vbo_mfs_key{account_id, asset_id};
+   auto vbo_it = vesting_balances.find(key, key, key);
+
+   if( vbo_it == vesting_balances.end() )
+   {
+      return asset(0, asset_id);
+   }
+   return vbo_it->balance;
+}
+
+void database::deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta)
+{ try {
+   FC_ASSERT( delta.amount >= 0, "Invalid negative value for balance");
+
+   if( delta.amount == 0 )
+      return;
+
+   auto& vesting_balances = get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
+   const auto& key = detail::vbo_mfs_key{account_id, delta.asset_id};
+   auto vbo_it = vesting_balances.find(key, key, key);
+
+   auto block_time = head_block_time();
+
+   if( vbo_it == vesting_balances.end() )
+   {
+      create<vesting_balance_object>([&account_id, &delta](vesting_balance_object &vbo) {
+         vbo.owner = account_id;
+         vbo.balance = delta;
+         vbo.balance_type = vesting_balance_type::market_fee_sharing;
+         vbo.policy = instant_vesting_policy{};
+      });
+   } else {
+      modify( *vbo_it, [&block_time, &delta]( vesting_balance_object& vbo )
+      {
+         vbo.deposit_vested(block_time, delta);
+      });
+   }
+} FC_CAPTURE_AND_RETHROW( (account_id)(delta) ) }
+
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    const optional< vesting_balance_id_type >& ovbid,
    share_type amount, uint32_t req_vesting_seconds,
+   vesting_balance_type balance_type,
    account_id_type req_owner,
    bool require_vesting )
 {
@@ -92,37 +165,34 @@ optional< vesting_balance_id_type > database::deposit_lazy_vesting(
 
    fc::time_point_sec now = head_block_time();
 
-   while( true )
+   if( ovbid.valid() )
    {
-      if( !ovbid.valid() )
-         break;
       const vesting_balance_object& vbo = (*ovbid)(*this);
-      if( vbo.owner != req_owner )
-         break;
-      if( vbo.policy.which() != vesting_policy::tag< cdd_vesting_policy >::value )
-         break;
-      if( vbo.policy.get< cdd_vesting_policy >().vesting_seconds != req_vesting_seconds )
-         break;
-      modify( vbo, [&]( vesting_balance_object& _vbo )
+      if( vbo.owner == req_owner && vbo.policy.is_type< cdd_vesting_policy >()
+            && vbo.policy.get< cdd_vesting_policy >().vesting_seconds == req_vesting_seconds )
       {
-         if( require_vesting )
-            _vbo.deposit(now, amount);
-         else
-            _vbo.deposit_vested(now, amount);
-      } );
-      return optional< vesting_balance_id_type >();
+         modify( vbo, [require_vesting, &now, &amount]( vesting_balance_object& _vbo )
+         {
+            if( require_vesting )
+               _vbo.deposit(now, amount);
+            else
+               _vbo.deposit_vested(now, amount);
+         } );
+         return optional< vesting_balance_id_type >();
+      }
    }
 
-   const vesting_balance_object& vbo = create< vesting_balance_object >( [&]( vesting_balance_object& _vbo )
+   cdd_vesting_policy policy;
+   policy.vesting_seconds = req_vesting_seconds;
+   policy.coin_seconds_earned = require_vesting ? 0 : amount.value * policy.vesting_seconds;
+   policy.coin_seconds_earned_last_update = now;
+
+   const vesting_balance_object& vbo = create< vesting_balance_object >(
+         [&req_owner, &amount, &balance_type, &policy ]( vesting_balance_object& _vbo )
    {
       _vbo.owner = req_owner;
       _vbo.balance = amount;
-
-      cdd_vesting_policy policy;
-      policy.vesting_seconds = req_vesting_seconds;
-      policy.coin_seconds_earned = require_vesting ? 0 : amount.value * policy.vesting_seconds;
-      policy.coin_seconds_earned_last_update = now;
-
+      _vbo.balance_type = balance_type;
       _vbo.policy = policy;
    } );
 
@@ -137,9 +207,14 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
    if( amount == 0 )
       return;
 
-   if( acct.get_id() == GRAPHENE_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_WITNESS_ACCOUNT ||
-       acct.get_id() == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT || acct.get_id() == GRAPHENE_NULL_ACCOUNT ||
-       acct.get_id() == GRAPHENE_TEMP_ACCOUNT )
+   account_id_type acct_id = acct.get_id();
+
+   // Note: missing 'PROXY_TO_SELF' here
+   bool is_reserved_account = ( acct_id == GRAPHENE_COMMITTEE_ACCOUNT || acct_id == GRAPHENE_WITNESS_ACCOUNT ||
+                                acct_id == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT );
+   is_reserved_account = ( is_reserved_account || acct_id == GRAPHENE_NULL_ACCOUNT ||
+                           acct_id == GRAPHENE_TEMP_ACCOUNT );
+   if( is_reserved_account )
    {
       // The blockchain's accounts do not get cashback; it simply goes to the reserve pool.
       modify( get_core_dynamic_data(), [amount](asset_dynamic_data_object& d) {
@@ -152,7 +227,8 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
       acct.cashback_vb,
       amount,
       get_global_properties().parameters.cashback_vesting_period_seconds,
-      acct.id,
+      vesting_balance_type::cashback,
+      acct_id,
       require_vesting );
 
    if( new_vbid.valid() )
@@ -179,6 +255,7 @@ void database::deposit_witness_pay(const witness_object& wit, share_type amount)
       wit.pay_vb,
       amount,
       get_global_properties().parameters.witness_pay_vesting_seconds,
+      vesting_balance_type::witness,
       wit.witness_account,
       true );
 

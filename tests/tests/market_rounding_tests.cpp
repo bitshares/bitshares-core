@@ -26,6 +26,7 @@
 
 #include <graphene/chain/hardfork.hpp>
 
+#include <graphene/protocol/market.hpp>
 #include <graphene/chain/market_object.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -48,9 +49,9 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       set_expiration( db, trx );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
       const account_object& core_seller = create_account( "seller1" );
       const account_object& core_buyer = create_account("buyer1");
 
@@ -104,9 +105,9 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
       set_expiration( db, trx );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
       const account_object& core_seller = create_account( "seller1" );
       const account_object& core_buyer = create_account("buyer1");
 
@@ -157,9 +158,9 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       ACTORS( (seller)(buyer) );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
 
       transfer( committee_account(db), seller, asset( 100000000 ) );
 
@@ -171,7 +172,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
 
       // seller sells 3 core for 31 test, price 10.33 test per core
-      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->id;
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->get_id();
 
       // buyer buys 2 core with 25 test, price 12.5 test per core
       // the order is filled immediately
@@ -188,11 +189,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       generate_block();
 
       // buyer buys 2 core with 25 test, price 12.5 test per core
-      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->id;
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->get_id();
 
       generate_block();
 
-      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK( !db.find( sell_id ) ); // sell order is filled
       BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold, 15 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
@@ -223,9 +224,9 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       ACTORS( (seller)(buyer) );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
 
       transfer( committee_account(db), seller, asset( 100000000 ) );
 
@@ -237,7 +238,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
 
       // seller sells 3 core for 31 test, price 10.33 test per core
-      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->id;
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->get_id();
 
       // buyer buys 2 core with 25 test, price 12.5 test per core
       // the order is filled immediately
@@ -254,11 +255,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       set_expiration( db, trx );
 
       // buyer buys 2 core with 25 test, price 12.5 test per core
-      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->id;
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->get_id();
 
       generate_block();
 
-      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK( !db.find( sell_id ) ); // sell order is filled
       BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold according to price 10.33, and 15 remaining
 
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 3); // buyer got 1 more core
@@ -286,9 +287,9 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
       ACTORS( (seller)(buyer) );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
 
       transfer( committee_account(db), seller, asset( 100000000 ) );
 
@@ -300,11 +301,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
       BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
 
       // buyer buys 17 core with 3 test, price 3/17 = 0.176 test per core
-      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->id;
+      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->get_id();
       // seller sells 33 core for 5 test, price 5/33 = 0.1515 test per core
-      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->get_id();
 
-      BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
+      BOOST_CHECK( !db.find( tmp_buy_id ) ); // buy order is filled
       BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
@@ -317,11 +318,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
 
       // buyer buys 15 core with 3 test, price 3/15 = 0.2 test per core
       // even 15 < 16, since it's taker, we'll check with maker's price, then turns out the buy order is bigger
-      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->id;
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->get_id();
 
       generate_block();
 
-      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK( !db.find( sell_id ) ); // sell order is filled
       BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967); // seller paid the 16 core which was remaining in the order
@@ -353,9 +354,9 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
       ACTORS( (seller)(buyer) );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
-      const asset_id_type test_id = test.id;
+      const asset_id_type test_id = test.get_id();
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
+      const asset_id_type core_id = core.get_id();
 
       transfer( committee_account(db), seller, asset( 100000000 ) );
 
@@ -367,11 +368,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
       BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
 
       // buyer buys 17 core with 3 test, price 3/17 = 0.176 test per core
-      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->id;
+      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->get_id();
       // seller sells 33 core for 5 test, price 5/33 = 0.1515 test per core
-      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->get_id();
 
-      BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
+      BOOST_CHECK( !db.find( tmp_buy_id ) ); // buy order is filled
       BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
@@ -384,11 +385,11 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
 
       // buyer buys 15 core with 3 test, price 3/15 = 0.2 test per core
       // even 15 < 16, since it's taker, we'll check with maker's price, then turns out the buy order is bigger
-      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->id;
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->get_id();
 
       generate_block();
 
-      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK( !db.find( sell_id ) ); // sell order is filled
       BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 31); // buyer got 14 more core according to price 0.1515
@@ -425,7 +426,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -434,7 +435,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500));
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
@@ -464,7 +465,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
    //   so the seller will pay 10 USD but get nothing.
    // The remaining 1 USD is too little to get any CORE, so the limit order will be cancelled
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(11), core.amount(1)) );
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 200000, get_balance(seller, bitusd) ); // the seller paid 10 USD
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) ); // the seller got nothing
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
@@ -500,7 +501,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -509,7 +510,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(10));
@@ -533,8 +534,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    // This would match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
    //   so the seller will pay 10 USD but get nothing.
    // The remaining USD will be left in the order on the market
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) ); // the seller got nothing
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -563,8 +564,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -573,7 +574,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -582,7 +583,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(10));
@@ -599,7 +600,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
 
    // create a limit order which will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
    BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -614,7 +615,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    // the limit order will match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
    //   so the seller will pay 10 USD but get nothing.
    // The remaining USD will be in the order on the market
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 0, get_balance(seller_id, core_id) ); // the seller got nothing
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -648,7 +649,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -657,7 +658,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500));
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
@@ -688,7 +689,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining 1 USD is too little to get any CORE, so the limit order will be cancelled
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(11), core.amount(1)) );
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 200000, get_balance(seller, bitusd) ); // the seller paid 10 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
@@ -724,7 +725,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -733,7 +734,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(10));
@@ -758,8 +759,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    //   but call only owes 10 USD,
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining USD will be left in the order on the market
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -789,8 +790,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -799,7 +800,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -808,7 +809,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(10), asset(1));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(10));
@@ -825,7 +826,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
 
    // create a limit order which will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
    BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -840,7 +841,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    // the limit order will match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining USD will be in the order on the market
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller_id, core_id) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -875,7 +876,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -884,7 +885,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -909,8 +910,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    //   so the seller will pay the whole 20 USD and get 1 CORE, since 20 USD doesn't worth 2 CORE according to price 33/3,
    //   effective price is 20/1 which is worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -946,7 +947,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -955,7 +956,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -981,8 +982,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
    //   so the seller will pay 20 USD and get 2 CORE, since 20 USD worths a little more than 1 CORE according to price 120/11,
    //   effective price is 20/2 which is not worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 2, get_balance(seller, core) ); // the seller got 2 CORE
    BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -1020,7 +1021,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1029,7 +1030,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -1054,7 +1055,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    //   so the seller will pay 15 USD and get 1 CORE,
    //   effective price is 15/1.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
-   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK( db.find( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 20-15, call.debt.value ); // call paid 15 USD
    BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
    BOOST_CHECK_EQUAL( 100020-15, get_balance(seller, bitusd) ); // the seller paid 15 USD
@@ -1092,7 +1093,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1101,7 +1102,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -1127,7 +1128,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    //     and the extra 4 USD will be returned but not overpaid,
    //     effective price is 11/1 which is close to 120/11.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
-   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK( db.find( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 20-11, call.debt.value ); // call paid 11 USD
    BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
    BOOST_CHECK_EQUAL( 100020-11, get_balance(seller, bitusd) ); // the seller paid 11 USD
@@ -1155,8 +1156,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -1165,7 +1166,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1174,7 +1175,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -1191,7 +1192,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
 
    // create a limit order which will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
    BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1207,7 +1208,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    //   so the seller will pay the whole 20 USD and get 1 CORE, since 20 USD doesn't worth 2 CORE according to price 33/3,
    //   effective price is 20/1 which is worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller_id, core_id) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -1235,8 +1236,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -1245,7 +1246,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1254,7 +1255,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(20));
@@ -1271,7 +1272,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
 
    // create a limit order which will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->get_id();
    BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1287,7 +1288,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    //   so the seller will pay 20 USD and get 2 CORE, since 20 USD worths a little more than 1 CORE according to price 33/3,
    //   effective price is 20/2 which is not worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK( !db.find( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 2, get_balance(seller_id, core_id) ); // the seller got 2 CORE
    BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
@@ -1314,8 +1315,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -1324,7 +1325,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1333,7 +1334,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(50), asset(5));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(50));
@@ -1351,14 +1352,14 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    BOOST_CHECK_EQUAL( init_balance-5, get_balance(borrower, core) );
 
    // create a buy order which will be matched
-   limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->id;
+   limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->get_id();
    BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
 
    // create a limit order to fill the buy order, and remaining amounts will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(31), core.amount(2))->id;
-   BOOST_CHECK( !db.find<limit_order_object>( buy_id ) ); // the buy order is filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(31), core.amount(2))->get_id();
+   BOOST_CHECK( !db.find( buy_id ) ); // the buy order is filled
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 10, get_balance(buyer, bitusd) ); // buyer got 10 usd
    BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.value ); // remaining amount of sell order is 21
@@ -1366,7 +1367,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // seller got 1 core
 
    // create another limit order which will be matched later
-   limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->id;
+   limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->get_id();
    BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
@@ -1384,9 +1385,9 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    //     effective price is 21/1 which is much bigger than 31/2;
    //   then, call will match with sell_id2, which has 14 USD remaining, with price 14 USD / 1 CORE,
    //     so the seller will pay 14 USD, get 1 CORE since 14 USD worths just 1 CORE according to price 14/1
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id ) ); // the sell order is filled
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id2 ) ); // the other sell order is filled
-   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK( !db.find( sell_id ) ); // the sell order is filled
+   BOOST_CHECK( !db.find( sell_id2 ) ); // the other sell order is filled
+   BOOST_CHECK( db.find( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 50-14-21, call_id(db).debt.value ); // call paid 14 USD and 21 USD
    BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.value ); // call got 1 CORE and 1 CORE
    BOOST_CHECK_EQUAL( 50-31, get_balance(seller_id, bitusd_id) ); // seller paid 31 USD in total
@@ -1417,8 +1418,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   const asset_id_type bitusd_id = bitusd.id;
-   const asset_id_type core_id = core.id;
+   const asset_id_type bitusd_id = bitusd.get_id();
+   const asset_id_type core_id = core.get_id();
 
    int64_t init_balance(1000000);
 
@@ -1427,7 +1428,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    transfer(committee_account, borrower4_id, asset(init_balance));
-   update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( bitusd, {feedproducer.get_id()} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1436,7 +1437,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    publish_feed( bitusd, feedproducer, current_feed );
    // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
    const call_order_object& call = *borrow( borrower, bitusd.amount(50), asset(5));
-   call_order_id_type call_id = call.id;
+   call_order_id_type call_id = call.get_id();
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
    transfer(borrower, seller, bitusd.amount(50));
@@ -1454,14 +1455,14 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    BOOST_CHECK_EQUAL( init_balance-5, get_balance(borrower, core) );
 
    // create a buy order which will be matched
-   limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->id;
+   limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->get_id();
    BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.value );
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
 
    // create a limit order to fill the buy order, and remaining amounts will be matched later
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(31), core.amount(2))->id;
-   BOOST_CHECK( !db.find<limit_order_object>( buy_id ) ); // the buy order is filled
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(31), core.amount(2))->get_id();
+   BOOST_CHECK( !db.find( buy_id ) ); // the buy order is filled
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 10, get_balance(buyer, bitusd) ); // buyer got 10 usd
    BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.value ); // remaining amount of sell order is 21
@@ -1469,7 +1470,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // seller got 1 core
 
    // create another limit order which will be matched later
-   limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->id;
+   limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->get_id();
    BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.value );
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
@@ -1489,9 +1490,9 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    //       effective price is 16/1 which is close to 31/2;
    //   secondly, call will match with sell_id2, which has 14 USD remaining, with price 14 USD / 1 CORE,
    //     so the seller will get 1 CORE and pay 14 USD since 14 USD just worths 1 CORE according to price 14/1
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id ) ); // the sell order is filled
-   BOOST_CHECK( !db.find<limit_order_object>( sell_id2 ) ); // the other sell order is filled
-   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK( !db.find( sell_id ) ); // the sell order is filled
+   BOOST_CHECK( !db.find( sell_id2 ) ); // the other sell order is filled
+   BOOST_CHECK( db.find( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 50-14-16, call_id(db).debt.value ); // call paid 14 USD and 16 USD
    BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.value ); // call got 1 CORE and 1 CORE
    BOOST_CHECK_EQUAL( 50-31+(21-16), get_balance(seller_id, bitusd_id) ); // seller paid 31 USD then get refunded 5 USD

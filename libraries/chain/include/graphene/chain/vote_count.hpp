@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <graphene/chain/protocol/authority.hpp>
+#include <graphene/protocol/authority.hpp>
 
 namespace graphene { namespace chain {
 
@@ -41,8 +41,8 @@ struct vote_counter
       assert( votes <= last_votes );
       last_votes = votes;
       if( bitshift == -1 )
-         bitshift = std::max(int(boost::multiprecision::detail::find_msb( votes )) - 15, 0);
-      uint64_t scaled_votes = std::max( votes >> bitshift, uint64_t(1) );
+         bitshift = std::max(int8_t(boost::multiprecision::detail::find_msb( votes )) - 15, 0);
+      uint64_t scaled_votes = std::max( votes >> (uint8_t)bitshift, uint64_t(1) );
       assert( scaled_votes <= std::numeric_limits<weight_type>::max() );
       total_votes += scaled_votes;
       assert( total_votes <= std::numeric_limits<uint32_t>::max() );

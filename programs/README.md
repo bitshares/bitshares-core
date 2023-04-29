@@ -11,9 +11,8 @@ Programs in here are part of the **bitshares-core** project and are maintained b
 
 Folder | Name  | Description | Category | Status | Help 
 ---|---|---|---|---|---
-[witness_node](witness_node) | Witness Node | Main software used to sign blocks or provide services. | Node | Active | `./witness_node --help`
+[witness_node](witness_node) | Witness Node | Main software used to sign blocks or provide services. | Node | Active | `./witness_node --help` - [Delayed node configuration](https://github.com/bitshares/bitshares-core/wiki/Delayed-Node)
 [cli_wallet](cli_wallet) | CLI Wallet | Software to interact with the blockchain by command line.  | Wallet | Active | `./cli_wallet --help` 
-[delayed_node](delayed_node) | Delayed Node | Runs a node with `delayed_node` plugin loaded. This is deprecated in favour of `./witness_node --plugins "delayed_node"`. | Node | Deprecated | `./delayed_node --help`
 [js_operation_serializer](js_operation_serializer) | Operation Serializer | Dump all blockchain operations and types. Used by the UI. | Tool | Old | `./js_operation_serializer`
 [size_checker](size_checker) | Size Checker | Return wire size average in bytes of all the operations.  | Tool | Old | `./size_checker`
 [cat-parts](build_helpers/cat-parts.cpp) | Cat parts | Used to create `hardfork.hpp` from individual files. | Tool | Active | `./cat-parts`

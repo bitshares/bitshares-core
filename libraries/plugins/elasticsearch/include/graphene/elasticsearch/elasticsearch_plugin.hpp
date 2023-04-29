@@ -26,6 +26,7 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace elasticsearch {
    using namespace chain;
@@ -49,90 +50,49 @@ namespace detail
     class elasticsearch_plugin_impl;
 }
 
+enum class mode { only_save = 0 , only_query = 1, all = 2 };
+
 class elasticsearch_plugin : public graphene::app::plugin
 {
    public:
-      elasticsearch_plugin();
-      virtual ~elasticsearch_plugin();
+      explicit elasticsearch_plugin(graphene::app::application& app);
+      ~elasticsearch_plugin() override;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;
-      virtual void plugin_set_program_options(
+      void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
-      virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
+      void plugin_initialize(const boost::program_options::variables_map& options) override;
+      void plugin_startup() override;
 
-      friend class detail::elasticsearch_plugin_impl;
+      operation_history_object get_operation_by_id(const operation_history_id_type& id) const;
+      vector<operation_history_object> get_account_history(
+            const account_id_type& account_id,
+            const operation_history_id_type& stop = operation_history_id_type(),
+            uint64_t limit = 100,
+            const operation_history_id_type& start = operation_history_id_type() ) const;
+      mode get_running_mode() const;
+
+   private:
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
 };
 
-struct operation_visitor
-{
-   typedef void result_type;
-
-   share_type fee_amount;
-   asset_id_type fee_asset;
-
-   asset_id_type transfer_asset_id;
-   share_type transfer_amount;
-   account_id_type transfer_from;
-   account_id_type transfer_to;
-
-   void operator()( const graphene::chain::transfer_operation& o )
-   {
-      fee_asset = o.fee.asset_id;
-      fee_amount = o.fee.amount;
-
-      transfer_asset_id = o.amount.asset_id;
-      transfer_amount = o.amount.amount;
-      transfer_from = o.from;
-      transfer_to = o.to;
-   }
-
-   object_id_type      fill_order_id;
-   account_id_type     fill_account_id;
-   asset_id_type       fill_pays_asset_id;
-   share_type          fill_pays_amount;
-   asset_id_type       fill_receives_asset_id;
-   share_type          fill_receives_amount;
-   double              fill_fill_price;
-   bool                fill_is_maker;
-
-   void operator()( const graphene::chain::fill_order_operation& o )
-   {
-      fee_asset = o.fee.asset_id;
-      fee_amount = o.fee.amount;
-
-      fill_order_id = o.order_id;
-      fill_account_id = o.account_id;
-      fill_pays_asset_id = o.pays.asset_id;
-      fill_pays_amount = o.pays.amount;
-      fill_receives_asset_id = o.receives.asset_id;
-      fill_receives_amount = o.receives.amount;
-      fill_fill_price = o.fill_price.to_real();
-      fill_is_maker = o.is_maker;
-   }
-
-   template<typename T>
-   void operator()( const T& o )
-   {
-      fee_asset = o.fee.asset_id;
-      fee_amount = o.fee.amount;
-   }
-};
 
 struct operation_history_struct {
-   int trx_in_block;
-   int op_in_trx;
-   std::string operation_result;
-   int virtual_op;
+   uint16_t trx_in_block;
+   uint16_t op_in_trx;
+   uint32_t virtual_op;
+   bool is_virtual;
+   account_id_type fee_payer;
    std::string op;
+   std::string operation_result;
    variant op_object;
+   variant operation_result_object;
 };
 
 struct block_struct {
-   int block_num;
+   uint32_t block_num;
    fc::time_point_sec block_time;
    std::string trx_id;
 };
@@ -176,129 +136,27 @@ struct visitor_struct {
 };
 
 struct bulk_struct {
-   account_transaction_history_object account_history;
+   account_history_object account_history;
    operation_history_struct operation_history;
-   int operation_type;
-   int operation_id_num;
+   int64_t  operation_type;
+   uint64_t operation_id_num;
    block_struct block_data;
    optional<visitor_struct> additional_data;
 };
 
-struct adaptor_struct {
-   variant adapt(const variant_object& op)
-   {
-      fc::mutable_variant_object o(op);
-      vector<string> keys_to_rename;
-      for (auto i = o.begin(); i != o.end(); ++i)
-      {
-         auto& element = (*i).value();
-         if (element.is_object())
-         {
-            const string& name = (*i).key();
-            auto& vo = element.get_object();
-            if (vo.contains(name.c_str()))
-               keys_to_rename.emplace_back(name);
-            element = adapt(vo);
-         }
-         else if (element.is_array())
-            adapt(element.get_array());
-      }
-      for (const auto& i : keys_to_rename)
-      {
-         string new_name = i + "_";
-         o[new_name] = variant(o[i]);
-         o.erase(i);
-      }
-
-      if (o.find("memo") != o.end())
-      {
-         auto& memo = o["memo"];
-         if (memo.is_string())
-         {
-            o["memo_"] = o["memo"];
-            o.erase("memo");
-         }
-         else if (memo.is_object())
-         {
-            fc::mutable_variant_object tmp(memo.get_object());
-            if (tmp.find("nonce") != tmp.end())
-            {
-               tmp["nonce"] = tmp["nonce"].as_string();
-               o["memo"] = tmp;
-            }
-         }
-      }
-      if (o.find("new_parameters") != o.end())
-      {
-         auto& tmp = o["new_parameters"];
-         if (tmp.is_object())
-         {
-            fc::mutable_variant_object tmp2(tmp.get_object());
-            if (tmp2.find("current_fees") != tmp2.end())
-            {
-               tmp2.erase("current_fees");
-               o["new_parameters"] = tmp2;
-            }
-         }
-      }
-      if (o.find("owner") != o.end() && o["owner"].is_string())
-      {
-         o["owner_"] = o["owner"].as_string();
-         o.erase("owner");
-      }
-      if (o.find("proposed_ops") != o.end())
-      {
-         o["proposed_ops"] = fc::json::to_string(o["proposed_ops"]);
-      }
-      if (o.find("initializer") != o.end())
-      {
-         o["initializer"] = fc::json::to_string(o["initializer"]);
-      }
-      if (o.find("policy") != o.end())
-      {
-         o["policy"] = fc::json::to_string(o["policy"]);
-      }
-      if (o.find("predicates") != o.end())
-      {
-         o["predicates"] = fc::json::to_string(o["predicates"]);
-      }
-      if (o.find("active_special_authority") != o.end())
-      {
-         o["active_special_authority"] = fc::json::to_string(o["active_special_authority"]);
-      }
-      if (o.find("owner_special_authority") != o.end())
-      {
-         o["owner_special_authority"] = fc::json::to_string(o["owner_special_authority"]);
-      }
-
-
-      variant v;
-      fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
-      return v;
-   }
-
-   void adapt(fc::variants& v)
-   {
-      for (auto& array_element : v)
-      {
-         if (array_element.is_object())
-            array_element = adapt(array_element.get_object());
-         else if (array_element.is_array())
-            adapt(array_element.get_array());
-         else
-            array_element = array_element.as_string();
-      }
-   }
-};
-
 } } //graphene::elasticsearch
 
-FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op)(op_object) )
+FC_REFLECT_ENUM( graphene::elasticsearch::mode, (only_save)(only_query)(all) )
+FC_REFLECT( graphene::elasticsearch::operation_history_struct,
+            (trx_in_block)(op_in_trx)(virtual_op)(is_virtual)(fee_payer)
+            (op)(operation_result)(op_object)(operation_result_object) )
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(asset_name)(amount)(amount_units) )
 FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(asset_name)(amount)(amount_units)(from)(to) )
-FC_REFLECT( graphene::elasticsearch::fill_struct, (order_id)(account_id)(pays_asset_id)(pays_asset_name)(pays_amount)(pays_amount_units)
-                                                  (receives_asset_id)(receives_asset_name)(receives_amount)(receives_amount_units)(fill_price)
-                                                  (fill_price_units)(is_maker))
+FC_REFLECT( graphene::elasticsearch::fill_struct,
+            (order_id)(account_id)(pays_asset_id)(pays_asset_name)(pays_amount)(pays_amount_units)
+            (receives_asset_id)(receives_asset_name)(receives_amount)(receives_amount_units)(fill_price)
+            (fill_price_units)(is_maker) )
 FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data)(fill_data) )
-FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(operation_id_num)(block_data)(additional_data) )
+FC_REFLECT( graphene::elasticsearch::bulk_struct,
+            (account_history)(operation_history)(operation_type)(operation_id_num)(block_data)(additional_data) )

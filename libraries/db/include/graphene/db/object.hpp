@@ -22,15 +22,14 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/db/object_id.hpp>
+#include <boost/multiprecision/integer.hpp>
+#include <graphene/protocol/object_id.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/crypto/city.hpp>
-#include <fc/uint128.hpp>
 
 #define MAX_NESTING (200)
 
 namespace graphene { namespace db {
-
    /**
     *  @brief base for all database objects
     *
@@ -62,60 +61,66 @@ namespace graphene { namespace db {
    class object
    {
       public:
-         object(){}
-         virtual ~object(){}
-
-         static const uint8_t space_id = 0;
-         static const uint8_t type_id  = 0;
-
+         object() = default;
+         object( uint8_t space_id, uint8_t type_id ) : id( space_id, type_id, 0 ) {}
+         virtual ~object() = default;
 
          // serialized
          object_id_type          id;
 
-         /// these methods are implemented for derived classes by inheriting abstract_object<DerivedClass>
-         virtual unique_ptr<object> clone()const = 0;
-         virtual void               move_from( object& obj ) = 0;
-         virtual variant            to_variant()const  = 0;
-         virtual vector<char>       pack()const = 0;
-         virtual fc::uint128        hash()const = 0;
+         /// these methods are implemented for derived classes by inheriting base_abstract_object<DerivedClass>
+         /// @{
+         virtual std::unique_ptr<object> clone()const = 0;
+         virtual void                    move_from( object& obj ) = 0;
+         virtual fc::variant             to_variant()const  = 0;
+         virtual std::vector<char>       pack()const = 0;
+         /// @}
    };
 
    /**
-    * @class abstract_object
+    * @class base_abstract_object
     * @brief   Use the Curiously Recurring Template Pattern to automatically add the ability to
     *  clone, serialize, and move objects polymorphically.
     *
     *  http://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
     */
    template<typename DerivedClass>
-   class abstract_object : public object
+   class base_abstract_object : public object
    {
       public:
-         virtual unique_ptr<object> clone()const
+         using object::object; // constructors
+         std::unique_ptr<object> clone()const override
          {
-            return unique_ptr<object>(new DerivedClass( *static_cast<const DerivedClass*>(this) ));
+            return std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) );
          }
 
-         virtual void    move_from( object& obj )
+         void    move_from( object& obj ) override
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
-         virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
-         virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
-         virtual fc::uint128  hash()const  {  
-             auto tmp = this->pack();
-             return fc::city_hash_crc_128( tmp.data(), tmp.size() );
-         }
+         fc::variant to_variant()const override
+         { return fc::variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
+         std::vector<char> pack()const override { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
    };
 
-   typedef flat_map<uint8_t, object_id_type> annotation_map;
+   template<typename DerivedClass, uint8_t SpaceID, uint8_t TypeID>
+   class abstract_object : public base_abstract_object<DerivedClass>
+   {
+   public:
+      static constexpr uint8_t space_id = SpaceID;
+      static constexpr uint8_t type_id = TypeID;
+      abstract_object() : base_abstract_object<DerivedClass>( space_id, type_id ) {}
+      object_id<SpaceID,TypeID> get_id() const { return object_id<SpaceID,TypeID>( this->id ); }
+   };
+
+   using annotation_map = fc::flat_map<uint8_t, object_id_type>;
 
    /**
     *  @class annotated_object
     *  @brief An object that is easily extended by providing pointers to other objects, one for each space.
     */
    template<typename DerivedClass>
-   class annotated_object : public abstract_object<DerivedClass>
+   class annotated_object : public base_abstract_object<DerivedClass>
    {
       public:
          /** return object_id_type() if no anotation is found for id_space */
@@ -139,6 +144,14 @@ namespace graphene { namespace db {
 
 } } // graphene::db
 
+// Without this, pack(object_id) tries to match the template for
+// pack(boost::multiprecision::uint128_t). No idea why. :-(
+namespace boost { namespace multiprecision { namespace detail {
+template<typename To>
+struct is_restricted_conversion<graphene::db::object,To> : public mpl::true_ {};
+}}}
+
 FC_REFLECT_TYPENAME( graphene::db::annotation_map )
 FC_REFLECT( graphene::db::object, (id) )
-FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object), (annotations) )
+FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object),
+                             (annotations) )

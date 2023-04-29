@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/operations.hpp>
+#include <graphene/protocol/operations.hpp>
 #include <graphene/chain/evaluator.hpp>
 
 namespace graphene { namespace chain {
@@ -56,6 +56,8 @@ namespace graphene { namespace chain {
          object_id_type do_apply( const proposal_create_operation& o );
 
          transaction _proposed_trx;
+         flat_set<account_id_type> _required_active_auths;
+         flat_set<account_id_type> _required_owner_auths;
 
          hardfork_visitor_1479 vtor_1479;
    };

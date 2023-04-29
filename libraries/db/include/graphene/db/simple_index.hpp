@@ -38,14 +38,14 @@ namespace graphene { namespace db {
    class simple_index : public index
    {
       public:
-         typedef T object_type;
+         using object_type = T;
 
          virtual const object&  create( const std::function<void(object&)>& constructor ) override
          {
              auto id = get_next_id();
              auto instance = id.instance();
              if( instance >= _objects.size() ) _objects.resize( instance + 1 );
-             _objects[instance].reset(new T);
+             _objects[instance] = std::make_unique<T>();
              _objects[instance]->id = id;
              constructor( *_objects[instance] );
              _objects[instance]->id = id; // just in case it changed
@@ -65,7 +65,7 @@ namespace graphene { namespace db {
             assert( nullptr != dynamic_cast<T*>(&obj) );
             if( _objects.size() <= instance ) _objects.resize( instance+1 );
             assert( !_objects[instance] );
-            _objects[instance].reset( new T( std::move( static_cast<T&>(obj) ) ) );
+            _objects[instance] = std::make_unique<T>( std::move( static_cast<T&>(obj) ) );
             return *_objects[instance];
          }
 
@@ -98,21 +98,14 @@ namespace graphene { namespace db {
                }
             } FC_CAPTURE_AND_RETHROW()
          }
-         virtual fc::uint128 hash()const override {
-            fc::uint128 result;
-            for( const auto& ptr : _objects )
-               result += ptr->hash();
-
-            return result;
-         }
 
          class const_iterator
          {
             public:
-               const_iterator( const vector<unique_ptr<object>>& objects ):_objects(objects) {}
+               explicit const_iterator( const std::vector<std::unique_ptr<object>>& objects ):_objects(objects) {}
                const_iterator(
-                  const vector<unique_ptr<object>>& objects,
-                  const vector<unique_ptr<object>>::const_iterator& a ):_itr(a),_objects(objects){}
+                  const std::vector<std::unique_ptr<object>>& objects,
+                  const std::vector<std::unique_ptr<object>>::const_iterator& a ):_itr(a),_objects(objects){}
                friend bool operator==( const const_iterator& a, const const_iterator& b ) { return a._itr == b._itr; }
                friend bool operator!=( const const_iterator& a, const const_iterator& b ) { return a._itr != b._itr; }
                const T& operator*()const { return static_cast<const T&>(*_itr->get()); }
@@ -129,21 +122,21 @@ namespace graphene { namespace db {
                      ++_itr;
                   return *this;
                }
-               typedef std::forward_iterator_tag iterator_category;
-               typedef vector<unique_ptr<object> >::value_type value_type;
-               typedef vector<unique_ptr<object> >::difference_type difference_type;
-               typedef vector<unique_ptr<object> >::pointer pointer;
-               typedef vector<unique_ptr<object> >::reference reference;
+               using iterator_category = std::forward_iterator_tag;
+               using value_type        = std::vector<std::unique_ptr<object> >::value_type;
+               using difference_type   = std::vector<std::unique_ptr<object> >::difference_type;
+               using pointer           = std::vector<std::unique_ptr<object> >::pointer;
+               using reference         = std::vector<std::unique_ptr<object> >::reference;
             private:
-               vector<unique_ptr<object>>::const_iterator _itr;
-               const vector<unique_ptr<object>>& _objects;
+               std::vector<std::unique_ptr<object>>::const_iterator _itr;
+               const std::vector<std::unique_ptr<object>>& _objects;
          };
          const_iterator begin()const { return const_iterator(_objects, _objects.begin()); }
          const_iterator end()const   { return const_iterator(_objects, _objects.end());   }
 
          size_t size()const { return _objects.size(); }
       private:
-         vector< unique_ptr<object> > _objects;
+         std::vector< std::unique_ptr<object> > _objects;
    };
 
 } } // graphene::db

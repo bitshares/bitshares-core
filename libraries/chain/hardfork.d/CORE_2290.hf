@@ -1,0 +1,5 @@
+// bitshares-core issue #2290 Revival of globally-settled assets should depend on ICR but not MCR
+#ifndef HARDFORK_CORE_2290_TIME
+#define HARDFORK_CORE_2290_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_2290_PASSED(next_maintenance_time) (next_maintenance_time > HARDFORK_CORE_2290_TIME)
+#endif

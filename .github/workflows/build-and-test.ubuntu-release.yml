@@ -1,0 +1,131 @@
+name: Ubuntu Release
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  test-release:
+    name: Build and test in Release mode
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04 ]
+    runs-on: ${{ matrix.os }}
+    services:
+      elasticsearch8:
+        image: elastic/elasticsearch:8.6.1
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
+      elasticsearch7:
+        image: elastic/elasticsearch:7.17.9
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9201:9200
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
+        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
+        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
+          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
+        sudo apt-get install -y \
+                     ccache \
+                     parallel \
+                     libboost-thread-dev \
+                     libboost-iostreams-dev \
+                     libboost-date-time-dev \
+                     libboost-system-dev \
+                     libboost-filesystem-dev \
+                     libboost-program-options-dev \
+                     libboost-chrono-dev \
+                     libboost-test-dev \
+                     libboost-context-dev \
+                     libboost-regex-dev \
+                     libboost-coroutine-dev \
+                     libcurl4-openssl-dev
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        df -h
+        free
+        mkdir -p _build
+        pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
+        cmake -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
+              -D CMAKE_C_COMPILER=gcc \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=g++ \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              ..
+        popd
+    - name: Load Cache
+      uses: actions/cache@v3
+      with:
+        path: ccache
+        key: ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-release-${{ matrix.os }}-${{ github.ref }}-
+          ccache-release-${{ matrix.os }}-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 2 -C _build
+        df -h
+    - name: Unit-Tests
+      timeout-minutes: 15
+      run: |
+        _build/tests/app_test -l test_suite
+        _build/tests/es_test -l test_suite
+        export GRAPHENE_TESTING_ES_URL=http://127.0.0.1:9201/
+        _build/tests/es_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
+        df -h
+    - name: Quick test for program arguments
+      run: |
+        _build/programs/witness_node/witness_node --version
+        _build/programs/witness_node/witness_node --help
+        if _build/programs/witness_node/witness_node --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        _build/programs/cli_wallet/cli_wallet --version
+        _build/programs/cli_wallet/cli_wallet --help
+        _build/programs/cli_wallet/cli_wallet --suggest-brain-key
+        if _build/programs/cli_wallet/cli_wallet --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+    - name: Node-Test
+      run: |
+        df -h
+        pushd _build
+        ../programs/build_helpers/run-node-test
+        df -h

@@ -24,8 +24,8 @@
 
 #include <random>
 #include <boost/test/unit_test.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
 
+#include <graphene/protocol/market.hpp>
 #include <graphene/chain/market_object.hpp>
 
 #include "../common/database_fixture.hpp"

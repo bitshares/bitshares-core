@@ -40,9 +40,15 @@ namespace graphene { namespace db {
    {
       public:
          object_database();
-         ~object_database();
+         virtual ~object_database() = default;
 
-         void reset_indexes() { _index.clear(); _index.resize(255); }
+         static constexpr uint8_t _index_size = 255;
+
+         void reset_indexes()
+         {
+            _index.clear();
+            _index.resize(_index_size);
+         }
 
          void open(const fc::path& data_dir );
 
@@ -64,23 +70,26 @@ namespace graphene { namespace db {
             } ));
          }
 
-         ///These methods are used to retrieve indexes on the object_database. All public index accessors are const-access only.
+         /// These methods are used to retrieve indexes on the object_database. All public index accessors are
+         /// const-access only.
          /// @{
          template<typename IndexType>
          const IndexType& get_index_type()const {
             static_assert( std::is_base_of<index,IndexType>::value, "Type must be an index type" );
-            return static_cast<const IndexType&>( get_index( IndexType::object_type::space_id, IndexType::object_type::type_id ) );
+            return static_cast<const IndexType&>( get_index( IndexType::object_type::space_id,
+                                                             IndexType::object_type::type_id ) );
          }
          template<typename T>
          const index&  get_index()const { return get_index(T::space_id,T::type_id); }
          const index&  get_index(uint8_t space_id, uint8_t type_id)const;
-         const index&  get_index(object_id_type id)const { return get_index(id.space(),id.type()); }
+         const index&  get_index(const object_id_type& id)const { return get_index(id.space(),id.type()); }
          /// @}
 
-         const object& get_object( object_id_type id )const;
-         const object* find_object( object_id_type id )const;
+         const object& get_object( const object_id_type& id )const;
+         const object* find_object( const object_id_type& id )const;
 
-         /// These methods are mutators of the object_database. You must use these methods to make changes to the object_database,
+         /// These methods are mutators of the object_database.
+         /// You must use these methods to make changes to the object_database,
          /// in order to maintain proper undo history.
          ///@{
 
@@ -107,42 +116,50 @@ namespace graphene { namespace db {
          }
 
          template<typename T>
-         const T& get( object_id_type id )const
+         const T& get( const object_id_type& id )const
          {
             const object& obj = get_object( id );
             assert( nullptr != dynamic_cast<const T*>(&obj) );
             return static_cast<const T&>(obj);
          }
          template<typename T>
-         const T* find( object_id_type id )const
+         const T* find( const object_id_type& id )const
          {
             const object* obj = find_object( id );
             assert(  !obj || nullptr != dynamic_cast<const T*>(obj) );
             return static_cast<const T*>(obj);
          }
 
-         template<uint8_t SpaceID, uint8_t TypeID, typename T>
-         const T* find( object_id<SpaceID,TypeID,T> id )const { return find<T>(id); }
+         template<uint8_t SpaceID, uint8_t TypeID>
+         auto find( const object_id<SpaceID,TypeID>& id )const -> const object_downcast_t<decltype(id)>* {
+             return find<object_downcast_t<decltype(id)>>(object_id_type(id));
+         }
 
-         template<uint8_t SpaceID, uint8_t TypeID, typename T>
-         const T& get( object_id<SpaceID,TypeID,T> id )const { return get<T>(id); }
+         template<uint8_t SpaceID, uint8_t TypeID>
+         auto get( const object_id<SpaceID,TypeID>& id )const -> const object_downcast_t<decltype(id)>& {
+             return get<object_downcast_t<decltype(id)>>(object_id_type(id));
+         }
 
          template<typename IndexType>
          IndexType* add_index()
          {
-            typedef typename IndexType::object_type ObjectType;
-            if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
-                _index[ObjectType::space_id].resize( 255 );
-            assert(!_index[ObjectType::space_id][ObjectType::type_id]);
-            unique_ptr<index> indexptr( new IndexType(*this) );
-            _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
-            return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
+            using ObjectType = typename IndexType::object_type;
+            const auto space_id = ObjectType::space_id;
+            const auto type_id = ObjectType::type_id;
+            FC_ASSERT( space_id < _index.size(), "Space ID ${s} overflow", ("s",space_id) );
+            if( _index[space_id].size() <= type_id )
+                _index[space_id].resize( _index_size );
+            FC_ASSERT( type_id < _index[space_id].size(), "Type ID ${t} overflow", ("t",type_id) );
+            FC_ASSERT( !_index[space_id][type_id], "Index ${s}.${t} already exists", ("s",space_id)("t",type_id) );
+            _index[space_id][type_id] = std::make_unique<IndexType>(*this);
+            return static_cast<IndexType*>(_index[space_id][type_id].get());
          }
 
          template<typename IndexType, typename SecondaryIndexType, typename... Args>
          SecondaryIndexType* add_secondary_index( Args... args )
          {
-            return get_mutable_index_type<IndexType>().template add_secondary_index<SecondaryIndexType, Args...>(args...);
+            return get_mutable_index_type<IndexType>().template
+                      add_secondary_index<SecondaryIndexType, Args...>(args...);
          }
 
          void pop_undo();
@@ -155,11 +172,12 @@ namespace graphene { namespace db {
          template<typename IndexType>
          IndexType&    get_mutable_index_type() {
             static_assert( std::is_base_of<index,IndexType>::value, "Type must be an index type" );
-            return static_cast<IndexType&>( get_mutable_index( IndexType::object_type::space_id, IndexType::object_type::type_id ) );
+            return static_cast<IndexType&>( get_mutable_index( IndexType::object_type::space_id,
+                                                               IndexType::object_type::type_id ) );
          }
          template<typename T>
-         index& get_mutable_index()                   { return get_mutable_index(T::space_id,T::type_id); }
-         index& get_mutable_index(object_id_type id)  { return get_mutable_index(id.space(),id.type());   }
+         index& get_mutable_index()                          { return get_mutable_index(T::space_id,T::type_id); }
+         index& get_mutable_index(const object_id_type& id)  { return get_mutable_index(id.space(),id.type());   }
          index& get_mutable_index(uint8_t space_id, uint8_t type_id);
 
      private:
@@ -171,7 +189,7 @@ namespace graphene { namespace db {
          void save_undo_remove( const object& obj );
 
          fc::path                                                  _data_dir;
-         vector< vector< unique_ptr<index> > >                     _index;
+         std::vector< std::vector< std::unique_ptr<index> > >      _index;
    };
 
 } } // graphene::db

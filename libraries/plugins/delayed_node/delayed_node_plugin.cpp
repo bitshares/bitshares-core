@@ -23,7 +23,7 @@
  */
 
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/app/api.hpp>
 
@@ -46,25 +46,43 @@ struct delayed_node_plugin_impl {
 };
 }
 
-delayed_node_plugin::delayed_node_plugin()
-   : my(nullptr)
-{}
+delayed_node_plugin::delayed_node_plugin(graphene::app::application& app) :
+   plugin(app)
+{
+   // Nothing else to do
+}
 
-delayed_node_plugin::~delayed_node_plugin()
-{}
+delayed_node_plugin::~delayed_node_plugin() = default;
 
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required for delayed_node)")
+         ("trusted-node", boost::program_options::value<std::string>(),
+          "RPC endpoint of a trusted validating node (required for delayed_node)")
          ;
    cfg.add(cli);
 }
 
 void delayed_node_plugin::connect()
 {
-   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(*my->client.connect(my->remote_endpoint), GRAPHENE_NET_MAX_NESTED_OBJECTS);
+   fc::http::websocket_connection_ptr con;
+   try
+   {
+      con = my->client.connect(my->remote_endpoint);
+   }
+   catch( const fc::exception& e )
+   {
+      wlog("Error while connecting: ${e}", ("e", e.to_detail_string()));
+      connection_failed();
+      return;
+   }
+   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(
+           con, GRAPHENE_NET_MAX_NESTED_OBJECTS );
    my->database_api = my->client_connection->get_remote_api<graphene::app::database_api>(0);
+   my->database_api->set_block_applied_callback([this]( const fc::variant& block_id )
+   {
+      fc::from_variant( block_id, my->last_received_remote_head, GRAPHENE_MAX_NESTED_OBJECTS );
+   } );
    my->client_connection_closed = my->client_connection->closed.connect([this] {
       connection_failed();
    });
@@ -73,7 +91,7 @@ void delayed_node_plugin::connect()
 void delayed_node_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    FC_ASSERT(options.count("trusted-node") > 0);
-   my = std::unique_ptr<detail::delayed_node_plugin_impl>{ new detail::delayed_node_plugin_impl() };
+   my = std::make_unique<detail::delayed_node_plugin_impl>();
    my->remote_endpoint = "ws://" + options.at("trusted-node").as<std::string>();
 }
 
@@ -139,24 +157,12 @@ void delayed_node_plugin::plugin_startup()
       mainloop();
    });
 
-   try
-   {
-      connect();
-      my->database_api->set_block_applied_callback([this]( const fc::variant& block_id )
-      {
-         fc::from_variant( block_id, my->last_received_remote_head, GRAPHENE_MAX_NESTED_OBJECTS );
-      } );
-      return;
-   }
-   catch (const fc::exception& e)
-   {
-      elog("Error during connection: ${e}", ("e", e.to_detail_string()));
-   }
-   fc::async([this]{connection_failed();});
+   connect();
 }
 
 void delayed_node_plugin::connection_failed()
 {
+   my->last_received_remote_head = my->last_processed_remote_head;
    elog("Connection to trusted node failed; retrying in 5 seconds...");
    fc::schedule([this]{connect();}, fc::time_point::now() + fc::seconds(5));
 }
