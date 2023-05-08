@@ -93,10 +93,7 @@ namespace graphene { namespace protocol {
        extensions_type extensions;
 
        account_id_type fee_payer() const { return seller; }
-       void validate() const;
-       share_type calculate_fee(const fee_params_t& k) const {
-           return k.fee;
-       }
+       void validate() const override;
    };
 
    /**

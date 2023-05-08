@@ -72,7 +72,7 @@ struct proposal_operation_hardfork_visitor
    // TODO review and cleanup code below after hard fork
    // hf_1604
    void operator()(const graphene::chain::limit_order_update_operation &) const {
-      FC_ASSERT(block_time >= HARDFORK_CORE_1604_TIME, "Operation is not enabled yet");
+      FC_ASSERT( HARDFORK_CORE_1604_PASSED(block_time), "Operation is not enabled yet" );
    }
 
    void operator()(const graphene::chain::asset_create_operation &v) const {
@@ -149,7 +149,7 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
-      if (block_time < HARDFORK_CORE_1604_TIME) {
+      if (!HARDFORK_CORE_1604_PASSED(block_time)) {
          FC_ASSERT(!op.new_parameters.current_fees->exists<limit_order_update_operation>(),
                    "Cannot set fees for limit_order_update_operation before its hardfork time");
       }

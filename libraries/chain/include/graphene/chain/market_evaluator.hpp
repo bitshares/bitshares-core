@@ -65,8 +65,9 @@ namespace graphene { namespace chain {
        using operation_type = limit_order_update_operation;
 
        void_result do_evaluate(const limit_order_update_operation& o);
-       void_result do_apply(const limit_order_update_operation& o);
+       void_result do_apply(const limit_order_update_operation& o) const;
 
+   private:
        const limit_order_object* _order = nullptr;
        bool should_match_orders = false;
    };

@@ -137,7 +137,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
 { try {
    const database& d = db();
-   FC_ASSERT(d.head_block_time() >= HARDFORK_CORE_1604_TIME, "Operation has not activated yet");
+   FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
    _order = &o.order(d);
 
    // Check this is my order
@@ -150,11 +150,15 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       FC_ASSERT(base_id == _order->sell_price.base.asset_id && quote_id == _order->sell_price.quote.asset_id,
                 "Cannot update limit order with incompatible price");
       const auto& order_index = d.get_index_type<limit_order_index>().indices().get<by_price>();
-      auto top_of_book = order_index.upper_bound(boost::make_tuple(price::max(base_id, quote_id)));
-      FC_ASSERT(top_of_book->sell_price.base.asset_id == base_id && top_of_book->sell_price.quote.asset_id == quote_id,
-                "Paradox: attempting to update an order in a market that has no orders? There's a logic error somewhere.");
+      auto top_of_book = order_index.lower_bound( price::max(base_id, quote_id) );
+      FC_ASSERT( top_of_book != order_index.end()
+                   && top_of_book->sell_price.base.asset_id == base_id
+                   && top_of_book->sell_price.quote.asset_id == quote_id,
+                 "Paradox: attempting to update an order in a market that has no orders? "
+                 "There's a logic error somewhere." );
 
-      // If the new price of our order is greater than the price of the order at the top of the book, we should match orders at the end.
+      // If the new price of our order is greater than the price of the order at the top of the book,
+      //   we should match orders at the end.
       // Otherwise, we can skip matching because there's no way this change could trigger orders to fill.
       should_match_orders = (*o.new_price > top_of_book->sell_price);
    }
@@ -165,7 +169,7 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
                 "Cannot update limit order with incompatible asset");
       if (delta.amount > 0)
-          FC_ASSERT(d.get_balance(o.seller, delta.asset_id) > delta,
+          FC_ASSERT(d.get_balance(o.seller, delta.asset_id) >= delta,
                     "Insufficient balance to increase order amount");
       else
           FC_ASSERT(_order->for_sale > -delta.amount,
@@ -180,29 +184,60 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
           new_amount += *o.delta_amount_to_sell;
       auto new_amount_to_receive = new_amount * new_price;
 
-      FC_ASSERT(new_amount_to_receive.amount > 0, "Cannot update limit order: order becomes too small; cancel order instead");
+      FC_ASSERT( new_amount_to_receive.amount > 0,
+                 "Cannot update limit order: order becomes too small; cancel order instead" );
    }
 
    // Check expiration is in the future
    if (o.new_expiration)
-      FC_ASSERT(*o.new_expiration > _order->expiration,
-                "Cannot update limit order to expire sooner; new expiration must be later than old one.");
+      FC_ASSERT( *o.new_expiration >= d.head_block_time(), "Cannot update limit order to expire in the past." );
+
+   // Check asset authorization
+   // TODO refactor to fix duplicate code (see limit_order_create)
+   const auto sell_asset_id = _order->sell_asset_id();
+   const auto receive_asset_id = _order->receive_asset_id();
+   const auto& sell_asset = sell_asset_id(d);
+   const auto& receive_asset = receive_asset_id(d);
+   const auto& seller = *this->fee_paying_account;
+
+   if( !sell_asset.options.whitelist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.whitelist_markets.find( receive_asset_id )
+                          != sell_asset.options.whitelist_markets.end(),
+                 "This market has not been whitelisted by the selling asset" );
+   }
+   if( !sell_asset.options.blacklist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.blacklist_markets.find( receive_asset_id )
+                          == sell_asset.options.blacklist_markets.end(),
+                 "This market has been blacklisted by the selling asset" );
+   }
+
+   FC_ASSERT( is_authorized_asset( d, seller, sell_asset ),
+              "The account is not allowed to transact the selling asset" );
+
+   FC_ASSERT( is_authorized_asset( d, seller, receive_asset ),
+              "The account is not allowed to transact the receiving asset" );
 
    return {};
 } FC_CAPTURE_AND_RETHROW((o)) }
 
-void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
+void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o) const
 { try {
    database& d = db();
 
    // Adjust account balance
-   const auto& seller_stats = o.seller(d).statistics(d);
-   if (o.delta_amount_to_sell && o.delta_amount_to_sell->asset_id == asset_id_type())
-       db().modify(seller_stats, [&o](account_statistics_object& bal) {
-           bal.total_core_in_orders += o.delta_amount_to_sell->amount;
-       });
-   if (o.delta_amount_to_sell)
-      d.adjust_balance(o.seller, -*o.delta_amount_to_sell);
+   if( o.delta_amount_to_sell )
+   {
+      d.adjust_balance( o.seller, -*o.delta_amount_to_sell );
+      if( o.delta_amount_to_sell->asset_id == asset_id_type() )
+      {
+         const auto& seller_stats = d.get_account_stats_by_owner( o.seller );
+         d.modify( seller_stats, [&o]( account_statistics_object& bal ) {
+            bal.total_core_in_orders += o.delta_amount_to_sell->amount;
+         });
+      }
+   }
 
    // Update order
    d.modify(*_order, [&o](limit_order_object& loo) {
