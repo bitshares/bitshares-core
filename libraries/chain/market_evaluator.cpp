@@ -164,12 +164,10 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       const auto& delta = *o.delta_amount_to_sell;
       FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
                 "Cannot update limit order with incompatible asset");
-      if (delta.amount > 0)
-          FC_ASSERT(d.get_balance(o.seller, delta.asset_id) >= delta,
-                    "Insufficient balance to increase order amount");
-      else
+      if (delta.amount < 0)
           FC_ASSERT(_order->for_sale > -delta.amount,
-                    "Cannot deduct more from order than order contains");
+                    "Cannot deduct all or more from order than order contains");
+      // Note: if the delta amount is positive, account balance will be checked when calling adjust_balance()
    }
 
    // Check dust
