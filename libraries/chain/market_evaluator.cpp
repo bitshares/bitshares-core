@@ -149,6 +149,14 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       auto quote_id = o.new_price->quote.asset_id;
       FC_ASSERT(base_id == _order->sell_price.base.asset_id && quote_id == _order->sell_price.quote.asset_id,
                 "Cannot update limit order with incompatible price");
+
+      // Do not allow inappropriate price manipulation
+      auto max_amount_for_sale = std::max( _order->for_sale, _order->sell_price.base.amount );
+      if( o.delta_amount_to_sell )
+         max_amount_for_sale += o.delta_amount_to_sell->amount;
+      FC_ASSERT( o.new_price->base.amount <= max_amount_for_sale,
+                 "The base amount in the new price cannot be greater than the estimated maximum amount for sale" );
+
       const auto& order_index = d.get_index_type<limit_order_index>().indices().get<by_price>();
       auto top_of_book = order_index.lower_bound( price::max(base_id, quote_id) );
       FC_ASSERT( top_of_book != order_index.end()
