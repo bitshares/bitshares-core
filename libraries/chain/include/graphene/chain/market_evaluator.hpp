@@ -69,7 +69,6 @@ namespace graphene { namespace chain {
 
    private:
        const limit_order_object* _order = nullptr;
-       bool should_match_orders = false;
    };
 
    class limit_order_cancel_evaluator : public evaluator<limit_order_cancel_evaluator>

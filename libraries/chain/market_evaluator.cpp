@@ -157,18 +157,6 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       FC_ASSERT( o.new_price->base.amount <= max_amount_for_sale,
                  "The base amount in the new price cannot be greater than the estimated maximum amount for sale" );
 
-      const auto& order_index = d.get_index_type<limit_order_index>().indices().get<by_price>();
-      auto top_of_book = order_index.lower_bound( price::max(base_id, quote_id) );
-      FC_ASSERT( top_of_book != order_index.end()
-                   && top_of_book->sell_price.base.asset_id == base_id
-                   && top_of_book->sell_price.quote.asset_id == quote_id,
-                 "Paradox: attempting to update an order in a market that has no orders? "
-                 "There's a logic error somewhere." );
-
-      // If the new price of our order is greater than the price of the order at the top of the book,
-      //   we should match orders at the end.
-      // Otherwise, we can skip matching because there's no way this change could trigger orders to fill.
-      should_match_orders = (*o.new_price > top_of_book->sell_price);
    }
 
    // Check delta asset is compatible
@@ -258,8 +246,7 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
    });
 
    // Perform order matching if necessary
-   if (should_match_orders)
-       d.apply_order(*_order);
+   d.apply_order(*_order);
 
    return {};
 } FC_CAPTURE_AND_RETHROW((o)) }
