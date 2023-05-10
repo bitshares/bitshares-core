@@ -112,10 +112,10 @@ BOOST_AUTO_TEST_CASE( limit_order_update_hardfork_time_test )
 BOOST_AUTO_TEST_CASE(limit_order_update_test)
 { try {
 
-      ACTORS((nathan)(dan));
-
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
+
+      ACTORS((nathan)(dan));
 
       const auto& bitusd = create_bitasset("USDBIT", nathan_id);
       const auto& munee = create_user_issued_asset("MUNEE");
@@ -230,10 +230,10 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
 BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
 { try {
 
-      ACTORS((nathan));
-
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
+
+      ACTORS((nathan));
 
       const auto& munee = create_user_issued_asset("MUNEE");
 
@@ -254,10 +254,10 @@ BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
 BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
 { try {
 
-      ACTORS((nathan));
-
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
+
+      ACTORS((nathan));
 
       const auto& munee = create_user_issued_asset("MUNEE");
 
@@ -277,10 +277,10 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
 BOOST_AUTO_TEST_CASE(limit_order_update_match_test_2)
 { try {
 
-      ACTORS((nathan));
-
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
+
+      ACTORS((nathan));
 
       const auto& munee = create_user_issued_asset("MUNEE");
 
