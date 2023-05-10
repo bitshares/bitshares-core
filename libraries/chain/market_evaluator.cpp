@@ -143,7 +143,7 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
    // Check this is my order
    FC_ASSERT(o.seller == _order->seller, "Cannot update someone else's order");
 
-   // Check new price is compatible, and determine whether it becomes the best offer on the market
+   // Check new price is compatible and appropriate
    if (o.new_price) {
       auto base_id = o.new_price->base.asset_id;
       auto quote_id = o.new_price->quote.asset_id;
@@ -184,7 +184,7 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
 
    // Check expiration is in the future
    if (o.new_expiration)
-      FC_ASSERT( *o.new_expiration >= d.head_block_time(), "Cannot update limit order to expire in the past." );
+      FC_ASSERT( *o.new_expiration >= d.head_block_time(), "Cannot update limit order to expire in the past" );
 
    // Check asset authorization
    // TODO refactor to fix duplicate code (see limit_order_create)
