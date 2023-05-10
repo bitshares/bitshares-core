@@ -135,7 +135,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
-{ try {
+{
    const database& d = db();
    FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
    _order = &o.order(d);
@@ -214,10 +214,10 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
               "The account is not allowed to transact the receiving asset" );
 
    return {};
-} FC_CAPTURE_AND_RETHROW((o)) }
+}
 
 void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o) const
-{ try {
+{
    database& d = db();
 
    // Adjust account balance
@@ -247,7 +247,7 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
    d.apply_order(*_order);
 
    return {};
-} FC_CAPTURE_AND_RETHROW((o)) }
+}
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)
 { try {
