@@ -225,6 +225,192 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       BOOST_REQUIRE_EQUAL(order_id(db).amount_for_sale().amount.value, 500);
       BOOST_REQUIRE_EQUAL(db.get_balance(nathan_id, core.get_id()).amount.value, 500);
 
+      generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( limit_order_update_asset_authorization_test )
+{ try {
+
+      generate_blocks(HARDFORK_CORE_1604_TIME + 10);
+      set_expiration( db, trx );
+
+      ACTORS((nathan)(dan)(whitey)(blacky));
+
+      const auto& munee = create_user_issued_asset("MUNEE", dan, white_list );
+      const auto& noomo = create_user_issued_asset("NOOMO", dan, white_list );
+
+      issue_uia(nathan, munee.amount(100));
+      issue_uia(nathan, noomo.amount(100));
+
+      auto expiration = db.head_block_time() + 1000;
+      auto sell_price = price( munee.amount(50), noomo.amount(60) );
+      limit_order_id_type order_id = create_sell_order(nathan, munee.amount(50), noomo.amount(60), expiration)
+                                     ->get_id();
+      BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 50);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+      // Can update order
+      update_limit_order(order_id, {}, munee.amount(-1));
+      BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 49);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = munee.id;
+         uop.issuer = dan_id;
+         uop.new_options = munee.options;
+         // The whitelist is managed by Whitey
+         uop.new_options.whitelist_authorities.insert(whitey_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Whitey so that he can manage the whitelist
+         upgrade_to_lifetime_member( whitey_id );
+
+         // Add Dan to the whitelist, but do not add others
+         account_whitelist_operation wop;
+         wop.authorizing_account = whitey_id;
+         wop.account_to_list = dan_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Cannot update order
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 49);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+         // Add Nathan to the whitelist
+         wop.account_to_list = nathan_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Can update order
+         update_limit_order(order_id, {}, munee.amount(-1));
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 48);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      }
+
+      // Make a blacklist
+      {
+         BOOST_TEST_MESSAGE( "Setting up blacklisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = noomo.id;
+         uop.issuer = dan_id;
+         uop.new_options = noomo.options;
+         // The blacklist is managed by Blacky
+         uop.new_options.blacklist_authorities.insert(blacky_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Blacky so that he can manage the blacklist
+         upgrade_to_lifetime_member( blacky_id );
+
+         // Add Nathan to the blacklist, but do not add others
+         account_whitelist_operation wop;
+         wop.authorizing_account = blacky_id;
+         wop.account_to_list = nathan_id;
+         wop.new_listing = account_whitelist_operation::black_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Cannot update order
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 48);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+         // Clear blacklist
+         wop.new_listing = account_whitelist_operation::no_listing;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Can update order
+         update_limit_order(order_id, {}, munee.amount(-1));
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 47);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      }
+
+      // Make a market whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up market whitelisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = munee.id;
+         uop.issuer = dan_id;
+         uop.new_options = munee.options;
+         uop.new_options.whitelist_markets.insert( asset_id_type() );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Cannot update order
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 47);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+         // Add Noomo to the whitelist
+         uop.new_options.whitelist_markets.insert( noomo.get_id() );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Can update order
+         update_limit_order(order_id, {}, munee.amount(-1));
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 46);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      }
+
+      // Make a market blacklist
+      {
+         BOOST_TEST_MESSAGE( "Setting up market blacklisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = munee.id;
+         uop.issuer = dan_id;
+         uop.new_options = munee.options;
+         uop.new_options.whitelist_markets.clear();
+         uop.new_options.blacklist_markets.insert( noomo.get_id() );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Cannot update order
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 46);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+         // Remove Noomo from the blacklist
+         uop.new_options.blacklist_markets.erase( noomo.get_id() );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Can update order
+         update_limit_order(order_id, {}, munee.amount(-1));
+         BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 45);
+         BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+         BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      }
+
+      generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
@@ -249,6 +435,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2000), munee.amount(100)), asset(-985)),
                              fc::assert_exception);
 
+      generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
@@ -272,6 +460,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
       BOOST_REQUIRE( !db.find(order_id_1) );
       BOOST_REQUIRE_EQUAL(db.find(order_id_2)->amount_for_sale().amount.value, 1);
 
+      generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE(limit_order_update_match_test_2)
@@ -294,6 +484,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test_2)
       update_limit_order(order_id_2, price(munee.amount(100), asset(999)));
       BOOST_REQUIRE( !db.find(order_id_1) );
       BOOST_REQUIRE( !db.find(order_id_2) );
+
+      generate_block();
 
 } FC_LOG_AND_RETHROW() }
 
