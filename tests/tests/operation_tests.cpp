@@ -134,6 +134,11 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
 
       // Try changing price
       sell_price.base = asset(501);
+      // Cannot update base amount in the new price to be more than the amount for sale
+      GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, sell_price), fc::assert_exception );
+      sell_price.base = asset(500);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      sell_price.base = asset(499);
       update_limit_order(order_id, sell_price);
       BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
       sell_price.base = asset(500);
@@ -214,7 +219,7 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
       limit_order_id_type order_id_1 = create_sell_order(nathan, asset(999), munee.amount(100), expiration)->get_id();
       limit_order_id_type order_id_2 = create_sell_order(nathan, munee.amount(100),asset(1001), expiration)->get_id();
 
-      update_limit_order(order_id_1, price(asset(1001), munee.amount(100)), asset(1));
+      update_limit_order(order_id_1, price(asset(1000), munee.amount(99)), asset(1));
       BOOST_REQUIRE( !db.find(order_id_1) );
       BOOST_REQUIRE_EQUAL(db.find(order_id_2)->amount_for_sale().amount.value, 1);
 
