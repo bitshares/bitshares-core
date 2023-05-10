@@ -1194,6 +1194,22 @@ const limit_order_object* database_fixture_base::create_sell_order( const accoun
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
 
+limit_order_update_operation database_fixture_base::make_limit_order_update_op(
+                           account_id_type seller_id,
+                           limit_order_id_type order_id,
+                           fc::optional<price> new_price,
+                           fc::optional<asset> delta_amount,
+                           fc::optional<time_point_sec> new_expiration )const
+{
+   limit_order_update_operation update_order;
+   update_order.seller = seller_id;
+   update_order.order = order_id;
+   update_order.new_price = new_price;
+   update_order.delta_amount_to_sell = delta_amount;
+   update_order.new_expiration = new_expiration;
+   return update_order;
+}
+
 void database_fixture_base::update_limit_order(const limit_order_object& order,
                                           fc::optional<price> new_price,
                                           fc::optional<asset> delta_amount,

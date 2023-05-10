@@ -33,6 +33,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -76,10 +77,42 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( limit_order_update_hardfork_time_test )
+{ try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_2362_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((nathan));
+
+      const auto& munee = create_user_issued_asset("MUNEE");
+
+      transfer(committee_account, nathan_id, asset(1500));
+
+      auto expiration = db.head_block_time() + 1000;
+      auto sell_price = price(asset(500), munee.amount(1000));
+      limit_order_id_type order_id = create_sell_order(nathan, asset(500), munee.amount(1000), expiration)->get_id();
+
+      BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 500);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+      // Cannot update order yet
+      sell_price.base = asset(499);
+      GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, sell_price), fc::assert_exception );
+
+      // Cannot propose
+      limit_order_update_operation louop = make_limit_order_update_op( nathan_id, order_id, sell_price );
+      BOOST_CHECK_THROW( propose( louop ), fc::exception );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(limit_order_update_test)
 { try {
 
-      ACTORS((nathan));
+      ACTORS((nathan)(dan));
 
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
@@ -120,6 +153,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2), munee.amount(1))), fc::assert_exception);
       // Cannot update order to expire in the past
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 10), fc::assert_exception);
+      // Cannot update order with a zero delta
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset()), fc::assert_exception);
       // Cannot update order to add more funds than seller has
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(501)), fc::assert_exception);
       // Cannot update order to remove more funds than order has
@@ -131,6 +166,20 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(-50)), fc::assert_exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(50)), fc::assert_exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(-50)), fc::assert_exception);
+
+      // Cannot update someone else's order
+      limit_order_update_operation louop = make_limit_order_update_op( dan_id, order_id, {}, asset(-1) );
+      trx.operations.clear();
+      trx.operations.push_back( louop );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::assert_exception );
+      // Can propose
+      propose( louop );
+
+      // Cannot update an order which does not exist
+      louop = make_limit_order_update_op( nathan_id, order_id + 1, {}, asset(-1) );
+      trx.operations.clear();
+      trx.operations.push_back( louop );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::assert_exception );
 
       // Try changing price
       sell_price.base = asset(501);
