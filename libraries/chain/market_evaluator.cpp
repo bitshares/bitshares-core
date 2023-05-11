@@ -156,10 +156,19 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
 {
    const database& d = db();
    FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
-   _order = &o.order(d);
+
+   _order = d.find( o.order );
+
+   GRAPHENE_ASSERT( _order != nullptr,
+                    limit_order_update_nonexist_order,
+                    "Limit order ${oid} does not exist, cannot update",
+                    ("oid", o.order) );
 
    // Check this is my order
-   FC_ASSERT(o.seller == _order->seller, "Cannot update someone else's order");
+   GRAPHENE_ASSERT( o.seller == _order->seller,
+                    limit_order_update_owner_mismatch,
+                    "Limit order ${oid} is owned by someone else, cannot update",
+                    ("oid", o.order) );
 
    // Check new price is compatible and appropriate
    if (o.new_price) {

@@ -138,6 +138,10 @@ namespace graphene { namespace chain {
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( receiving_asset_unauthorized, limit_order_create, 5 )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( insufficient_balance, limit_order_create, 6 )
 
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_update );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( nonexist_order, limit_order_update, 1 )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, limit_order_update, 2 )
+
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( nonexist_order, limit_order_cancel, 1 )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, limit_order_cancel, 2 )

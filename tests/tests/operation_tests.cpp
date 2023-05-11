@@ -139,39 +139,39 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
 
       // Cannot update order without changing anything
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id), fc::exception);
       // Cannot update order to use inverted price assets
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), asset(1))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), asset(1))), fc::exception);
       // Cannot update order to use negative price
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(-1), bitusd.amount(2))), fc::assert_exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1), bitusd.amount(-2))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(-1), bitusd.amount(2))), fc::exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1), bitusd.amount(-2))), fc::exception);
       // Cannot update order to use different assets
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), munee.amount(1))),
-                             fc::assert_exception);
+                             fc::exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(munee.amount(2), bitusd.amount(1))),
-                             fc::assert_exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2), munee.amount(1))), fc::assert_exception);
+                             fc::exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2), munee.amount(1))), fc::exception);
       // Cannot update order to expire in the past
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 10), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 10), fc::exception);
       // Cannot update order with a zero delta
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset()), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset()), fc::exception);
       // Cannot update order to add more funds than seller has
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(501)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(501)), fc::exception);
       // Cannot update order to remove more funds than order has
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-501)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-501)), fc::exception);
       // Cannot update order to remove all funds in order
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-500)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-500)), fc::exception);
       // Cannot update order to add or remove different kind of funds
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(50)), fc::assert_exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(-50)), fc::assert_exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(50)), fc::assert_exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(-50)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(50)), fc::exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(-50)), fc::exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(50)), fc::exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(-50)), fc::exception);
 
       // Cannot update someone else's order
       limit_order_update_operation louop = make_limit_order_update_op( dan_id, order_id, {}, asset(-1) );
       trx.operations.clear();
       trx.operations.push_back( louop );
-      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // Can propose
       propose( louop );
 
@@ -179,12 +179,12 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       louop = make_limit_order_update_op( nathan_id, order_id + 1, {}, asset(-1) );
       trx.operations.clear();
       trx.operations.push_back( louop );
-      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
       // Try changing price
       sell_price.base = asset(501);
       // Cannot update base amount in the new price to be more than the amount for sale
-      GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, sell_price), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, sell_price), fc::exception );
       sell_price.base = asset(500);
       BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
       sell_price.base = asset(499);
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       update_limit_order(order_id, {}, {}, expiration);
       BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
       // Cannot change expiration to a time in the past
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 1 ), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 1 ), fc::exception);
 
       // Try adding funds
       update_limit_order(order_id, {}, asset(50));
@@ -283,7 +283,7 @@ BOOST_AUTO_TEST_CASE( limit_order_update_asset_authorization_test )
          PUSH_TX( db, trx, ~0 );
 
          // Cannot update order
-         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::exception );
          BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 49);
          BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
          BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
@@ -328,7 +328,7 @@ BOOST_AUTO_TEST_CASE( limit_order_update_asset_authorization_test )
          PUSH_TX( db, trx, ~0 );
 
          // Cannot update order
-         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::exception );
          BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 48);
          BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
          BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
@@ -359,7 +359,7 @@ BOOST_AUTO_TEST_CASE( limit_order_update_asset_authorization_test )
          PUSH_TX( db, trx, ~0 );
 
          // Cannot update order
-         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::exception );
          BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 47);
          BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
          BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
@@ -391,7 +391,7 @@ BOOST_AUTO_TEST_CASE( limit_order_update_asset_authorization_test )
          PUSH_TX( db, trx, ~0 );
 
          // Cannot update order
-         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::assert_exception );
+         GRAPHENE_REQUIRE_THROW( update_limit_order(order_id, {}, munee.amount(-1)), fc::exception );
          BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 46);
          BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
          BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
@@ -429,11 +429,11 @@ BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
       auto expiration = db.head_block_time() + 1000;
       limit_order_id_type order_id = create_sell_order(nathan, asset(1000), munee.amount(100), expiration)->get_id();
 
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-995)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-995)), fc::exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1000000), munee.amount(100))),
-                             fc::assert_exception);
+                             fc::exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2000), munee.amount(100)), asset(-985)),
-                             fc::assert_exception);
+                             fc::exception);
 
       generate_block();
 
