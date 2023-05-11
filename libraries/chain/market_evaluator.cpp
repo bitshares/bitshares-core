@@ -33,6 +33,7 @@
 #include <graphene/chain/is_authorized_asset.hpp>
 
 #include <graphene/protocol/market.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace chain {
 void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_operation& op)
@@ -134,6 +135,23 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
    return order_id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void limit_order_update_evaluator::convert_fee()
+{
+   if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   {
+      db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& addo) {
+         addo.fee_pool -= core_fee_paid;
+      });
+   }
+}
+
+void limit_order_update_evaluator::pay_fee()
+{
+   _deferred_fee = core_fee_paid;
+   if( fee_asset->get_id() != asset_id_type() )
+      _deferred_paid_fee = fee_from_account;
+}
+
 void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
 {
    const database& d = db();
@@ -220,27 +238,109 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
 {
    database& d = db();
 
+   const account_statistics_object* seller_acc_stats = nullptr;
+
    // Adjust account balance
    if( o.delta_amount_to_sell )
    {
       d.adjust_balance( o.seller, -*o.delta_amount_to_sell );
       if( o.delta_amount_to_sell->asset_id == asset_id_type() )
       {
-         const auto& seller_stats = d.get_account_stats_by_owner( o.seller );
-         d.modify( seller_stats, [&o]( account_statistics_object& bal ) {
+         seller_acc_stats = &d.get_account_stats_by_owner( o.seller );
+         d.modify( *seller_acc_stats, [&o]( account_statistics_object& bal ) {
             bal.total_core_in_orders += o.delta_amount_to_sell->amount;
          });
       }
    }
 
+   // Process deferred fee in the order.
+   // Attempt to deduct a possibly discounted order cancellation fee, and refund the remainder.
+   // Only deduct fee if there is any fee deferred.
+   // TODO fix duplicate code (see database::cancel_limit_order())
+   if( _order->deferred_fee > 0 )
+   {
+      share_type deferred_fee = _order->deferred_fee;
+      asset deferred_paid_fee = _order->deferred_paid_fee;
+      const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+      const auto& current_fees = d.current_fee_schedule();
+      asset core_cancel_fee = current_fees.calculate_fee( limit_order_cancel_operation() );
+      if( core_cancel_fee.amount > 0 )
+      {
+         // maybe-discounted cancel_fee = limit_order_cancel_fee * limit_order_update_fee / limit_order_create_fee
+         asset core_create_fee = current_fees.calculate_fee( limit_order_create_operation() );
+         fc::uint128_t fee128( core_cancel_fee.amount.value );
+         if( core_create_fee.amount > 0 )
+         {
+            asset core_update_fee = current_fees.calculate_fee( limit_order_update_operation() );
+            fee128 *= core_update_fee.amount.value;
+            fee128 /= core_create_fee.amount.value;
+         }
+         // cap the fee
+         if( fee128 > static_cast<uint64_t>( deferred_fee.value ) )
+            fee128 = deferred_fee.value;
+         core_cancel_fee.amount = static_cast<int64_t>( fee128 );
+      }
+      // if there is any CORE fee to deduct, redirect it to referral program
+      if( core_cancel_fee.amount > 0 )
+      {
+         if( !seller_acc_stats )
+            seller_acc_stats = &d.get_account_stats_by_owner( o.seller );
+         d.modify( *seller_acc_stats, [&core_cancel_fee, &d]( account_statistics_object& obj ) {
+            obj.pay_fee( core_cancel_fee.amount, d.get_global_properties().parameters.cashback_vesting_threshold );
+         } );
+         deferred_fee -= core_cancel_fee.amount;
+         // handle originally paid fee if any:
+         //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
+         if( deferred_paid_fee.amount > 0 )
+         {
+            fc::uint128_t fee128( deferred_paid_fee.amount.value );
+            fee128 *= core_cancel_fee.amount.value;
+            // to round up
+            fee128 += _order->deferred_fee.value;
+            fee128 -= 1;
+            fee128 /= _order->deferred_fee.value;
+            share_type cancel_fee_amount = static_cast<int64_t>(fee128);
+            // cancel_fee should be positive, pay it to asset's accumulated_fees
+            fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+            d.modify( *fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+               addo.accumulated_fees += cancel_fee_amount;
+            });
+            // cancel_fee should be no more than deferred_paid_fee
+            deferred_paid_fee.amount -= cancel_fee_amount;
+         }
+      }
+
+      // refund fee
+      if( 0 == _order->deferred_paid_fee.amount )
+      {
+         // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
+         // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
+         //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
+         d.adjust_balance( _order->seller, deferred_fee );
+      }
+      else // need to refund fee in originally paid asset
+      {
+         d.adjust_balance( _order->seller, deferred_paid_fee );
+         // be here, must have: fee_asset != CORE
+         if( !fee_asset_dyn_data )
+            fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+         d.modify( *fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+            addo.fee_pool += deferred_fee;
+         });
+      }
+
+   }
+
    // Update order
-   d.modify(*_order, [&o](limit_order_object& loo) {
+   d.modify(*_order, [&o,this](limit_order_object& loo) {
       if (o.new_price)
          loo.sell_price = *o.new_price;
       if (o.delta_amount_to_sell)
          loo.for_sale += o.delta_amount_to_sell->amount;
       if (o.new_expiration)
          loo.expiration = *o.new_expiration;
+      loo.deferred_fee = _deferred_fee;
+      loo.deferred_paid_fee = _deferred_paid_fee;
    });
 
    // Perform order matching if necessary
