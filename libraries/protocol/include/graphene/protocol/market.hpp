@@ -80,7 +80,7 @@ namespace graphene { namespace protocol {
    struct limit_order_update_operation : public base_operation
    {
        struct fee_params_t {
-           uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION / 2;
+           uint64_t fee = ( GRAPHENE_BLOCKCHAIN_PRECISION * 3 ) / 8;
        };
 
        asset fee;
