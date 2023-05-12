@@ -65,7 +65,7 @@ namespace graphene { namespace chain {
        using operation_type = limit_order_update_operation;
 
        void_result do_evaluate(const limit_order_update_operation& o);
-       void_result do_apply(const limit_order_update_operation& o) const;
+       void_result do_apply(const limit_order_update_operation& o);
 
        /** override the default behavior defined by generic_evaluator
         */
@@ -77,9 +77,12 @@ namespace graphene { namespace chain {
        void pay_fee() override;
 
    private:
+       void process_deferred_fee();
+
        share_type                _deferred_fee;
        asset                     _deferred_paid_fee;
        const limit_order_object* _order = nullptr;
+       const account_statistics_object* _seller_acc_stats = nullptr;
    };
 
    class limit_order_cancel_evaluator : public evaluator<limit_order_cancel_evaluator>
