@@ -1213,7 +1213,9 @@ limit_order_update_operation database_fixture_base::make_limit_order_update_op(
 void database_fixture_base::update_limit_order(const limit_order_object& order,
                                           fc::optional<price> new_price,
                                           fc::optional<asset> delta_amount,
-                                          fc::optional<time_point_sec> new_expiration) {
+                                          fc::optional<time_point_sec> new_expiration,
+                                          const price& fee_core_exchange_rate )
+{
    limit_order_update_operation update_order;
    update_order.seller = order.seller;
    update_order.order = order.id;
@@ -1221,7 +1223,7 @@ void database_fixture_base::update_limit_order(const limit_order_object& order,
    update_order.delta_amount_to_sell = delta_amount;
    update_order.new_expiration = new_expiration;
    trx.operations = {update_order};
-   for(auto& op : trx.operations) db.current_fee_schedule().set_fee(op);
+   for(auto& op : trx.operations) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
    auto processed = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
@@ -1231,8 +1233,10 @@ void database_fixture_base::update_limit_order(const limit_order_object& order,
 void database_fixture_base::update_limit_order(limit_order_id_type order_id,
                                           fc::optional<price> new_price,
                                           fc::optional<asset> delta_amount,
-                                          fc::optional<time_point_sec> new_expiration) {
-    update_limit_order(order_id(db), new_price, delta_amount, new_expiration);
+                                          fc::optional<time_point_sec> new_expiration,
+                                          const price& fee_core_exchange_rate )
+{
+    update_limit_order(order_id(db), new_price, delta_amount, new_expiration, fee_core_exchange_rate);
 }
 
 asset database_fixture_base::cancel_limit_order( const limit_order_object& order )

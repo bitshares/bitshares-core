@@ -426,11 +426,13 @@ struct database_fixture_base {
    void update_limit_order(const limit_order_object& order,
                            fc::optional<price> new_price = {},
                            fc::optional<asset> delta_amount = {},
-                           fc::optional<time_point_sec> new_expiration = {});
+                           fc::optional<time_point_sec> new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price() );
    void update_limit_order(limit_order_id_type order_id,
                            fc::optional<price> new_price = {},
                            fc::optional<asset> delta_amount = {},
-                           fc::optional<time_point_sec> new_expiration = {});
+                           fc::optional<time_point_sec> new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price() );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
