@@ -733,6 +733,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
       int64_t order_create_fee = 537;
+      int64_t order_update_fee = 437;
       int64_t order_cancel_fee = 129;
 
       uint32_t skip = database::skip_witness_signature
@@ -745,13 +746,19 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
 
       generate_block( skip );
 
-      for( int i=0; i<2; i++ )
+      for( int i=0; i<5; i++ )
       {
          if( i == 1 )
          {
             generate_blocks( HARDFORK_445_TIME, true, skip );
             generate_block( skip );
          }
+         else if( i == 2 )
+         {
+            generate_blocks( HARDFORK_CORE_1604_TIME, true, skip );
+            generate_block( skip );
+         }
+
 
          // enable_fees() and change_fees() modifies DB directly, and results will be overwritten by block generation
          // so we have to do it every time we stop generating/popping blocks and start doing tx's
@@ -770,6 +777,11 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
                limit_order_create_operation::fee_params_t create_fee_params;
                create_fee_params.fee = order_create_fee;
                new_fees.insert( create_fee_params );
+            }
+            {
+               limit_order_update_operation::fee_params_t update_fee_params;
+               update_fee_params.fee = order_update_fee;
+               new_fees.insert( update_fee_params );
             }
             {
                limit_order_cancel_operation::fee_params_t cancel_fee_params;
@@ -795,6 +807,21 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - order_create_fee );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 - 500 );
 
+         int64_t update_net_fee = order_cancel_fee * order_update_fee / order_create_fee ;
+         int64_t bob_update_fees = 0;
+         if( i == 2 )
+         {
+            // Bob updates order
+            update_limit_order( bo1_id, {}, asset(100, usd_id) );
+
+            bob_update_fees += update_net_fee;
+
+            BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - 1000 - order_create_fee );
+            BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
+            BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - bob_update_fees - order_update_fee );
+            BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 - 600 );
+         }
+
          // Bob cancels order
          cancel_limit_order( bo1_id(db) );
 
@@ -806,7 +833,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
 
          BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - 1000 - order_create_fee );
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - cancel_net_fee );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - bob_update_fees - cancel_net_fee );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 );
 
          // Alice cancels order
@@ -814,27 +841,62 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
 
          BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee );
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - cancel_net_fee );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - bob_update_fees - cancel_net_fee );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 );
 
          // Check partial fill
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id) );
+
+         BOOST_REQUIRE( ao2 != nullptr );
+
+         int64_t alice_update_fees = order_create_fee;
+         int64_t alice_update_amounts = 0;
+         if( i == 3 )
+         {
+            // Alice updates order
+            update_limit_order( *ao2, {}, asset(100) );
+
+            alice_update_fees = update_net_fee + order_update_fee;
+            alice_update_amounts = 100;
+
+            BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - alice_update_fees
+                                                                          - 1000 - alice_update_amounts );
+            BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
+         }
+
          const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
 
-         BOOST_CHECK( ao2 != nullptr );
          BOOST_CHECK( bo2 == nullptr );
 
-         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - order_create_fee - 1000 );
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - alice_update_fees
+                                                                       - 1000 - alice_update_amounts );
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 + 100 );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - cancel_net_fee - order_create_fee + 500 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - bob_update_fees - cancel_net_fee
+                                                                       - order_create_fee + 500 );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ),   bob_b0 - 100 );
+
+         if( i == 4 )
+         {
+            // Alice updates order
+            update_limit_order( *ao2, {}, asset(100) );
+
+            BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - alice_update_fees
+                                                                          - 1000 - alice_update_amounts
+                                                                          - order_update_fee - 100 );
+            BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 + 100 );
+            BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - bob_update_fees - cancel_net_fee
+                                                                          - order_create_fee + 500 );
+            BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ),   bob_b0 - 100 );
+         }
 
          // cancel Alice order, show that entire deferred_fee was consumed by partial match
          cancel_limit_order( *ao2 );
 
-         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - order_create_fee - 500 - order_cancel_fee );
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - alice_update_fees - 500
+                                                                       - order_cancel_fee );
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 + 100 );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - cancel_net_fee - order_create_fee + 500 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - bob_update_fees - cancel_net_fee
+                                                                       - order_create_fee + 500 );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ),   bob_b0 - 100 );
 
          // TODO: Check multiple fill
