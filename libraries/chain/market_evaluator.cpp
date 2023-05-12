@@ -275,7 +275,8 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
       asset core_cancel_fee = current_fees.calculate_fee( limit_order_cancel_operation() );
       if( core_cancel_fee.amount > 0 )
       {
-         // maybe-discounted cancel_fee = limit_order_cancel_fee * limit_order_update_fee / limit_order_create_fee
+         // maybe-discounted cancel_fee calculation:
+         //   limit_order_cancel_fee * limit_order_update_fee / limit_order_create_fee
          asset core_create_fee = current_fees.calculate_fee( limit_order_create_operation() );
          fc::uint128_t fee128( core_cancel_fee.amount.value );
          if( core_create_fee.amount > 0 )
