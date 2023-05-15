@@ -310,7 +310,7 @@ void limit_order_update_evaluator::process_deferred_fee()
    if( 0 == _order->deferred_paid_fee.amount )
    {
       // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
-      // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
+      // if order was created before hard fork 604,
       //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
       d.adjust_balance( _order->seller, deferred_fee );
    }
