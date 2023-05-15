@@ -35,6 +35,17 @@ void limit_order_create_operation::validate()const
    FC_ASSERT( min_to_receive.amount > 0 );
 }
 
+void limit_order_update_operation::validate() const
+{
+   FC_ASSERT(fee.amount >= 0, "Fee must not be negative");
+   FC_ASSERT(new_price || delta_amount_to_sell || new_expiration,
+             "Cannot update limit order if nothing is specified to update");
+   if (new_price)
+      new_price->validate();
+   if (delta_amount_to_sell)
+      FC_ASSERT(delta_amount_to_sell->amount != 0, "Cannot change limit order amount by zero");
+}
+
 void limit_order_cancel_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
@@ -60,10 +71,12 @@ void bid_collateral_operation::validate()const
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::options_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation )

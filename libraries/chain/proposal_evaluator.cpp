@@ -69,6 +69,12 @@ struct proposal_operation_hardfork_visitor
    template<typename T>
    void operator()(const T &v) const {}
 
+   // TODO review and cleanup code below after hard fork
+   // hf_1604
+   void operator()(const graphene::chain::limit_order_update_operation &) const {
+      FC_ASSERT( HARDFORK_CORE_1604_PASSED(block_time), "Operation is not enabled yet" );
+   }
+
    void operator()(const graphene::chain::asset_create_operation &v) const {
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.common_options);
@@ -142,6 +148,10 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_create_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
+      }
+      if (!HARDFORK_CORE_1604_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<limit_order_update_operation>(),
+                   "Cannot set fees for limit_order_update_operation before its hardfork time");
       }
       if (!HARDFORK_BSIP_40_PASSED(block_time)) {
          FC_ASSERT(!op.new_parameters.extensions.value.custom_authority_options.valid(),

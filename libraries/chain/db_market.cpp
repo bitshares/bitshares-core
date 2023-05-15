@@ -537,7 +537,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    // 1. due to expiration: always deduct a fee if there is any fee deferred
    // 2. due to cull_small: deduct a fee after hard fork 604, but not before (will set skip_cancel_fee)
    const account_statistics_object* seller_acc_stats = nullptr;
-   const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+   const asset_dynamic_data_object* deferred_fee_asset_dyn_data = nullptr;
    limit_order_cancel_operation vop;
    share_type deferred_fee = order.deferred_fee;
    asset deferred_paid_fee = order.deferred_paid_fee;
@@ -576,8 +576,8 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
                fee128 /= order.deferred_fee.value;
                share_type cancel_fee_amount = static_cast<int64_t>(fee128);
                // cancel_fee should be positive, pay it to asset's accumulated_fees
-               fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-               modify( *fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+               deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+               modify( *deferred_fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
                   addo.accumulated_fees += cancel_fee_amount;
                });
                // cancel_fee should be no more than deferred_paid_fee
@@ -613,9 +613,9 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    {
       adjust_balance(order.seller, deferred_paid_fee);
       // be here, must have: fee_asset != CORE
-      if( !fee_asset_dyn_data )
-         fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+      if( !deferred_fee_asset_dyn_data )
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+      modify( *deferred_fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
          addo.fee_pool += deferred_fee;
       });
    }

@@ -3630,6 +3630,8 @@ namespace graphene { namespace net { namespace detail {
           case graphene::chain::limit_order_create_selling_asset_unauthorized::code_enum::code_value :
           case graphene::chain::limit_order_create_receiving_asset_unauthorized::code_enum::code_value :
           case graphene::chain::limit_order_create_insufficient_balance::code_enum::code_value :
+          case graphene::chain::limit_order_update_nonexist_order::code_enum::code_value :
+          case graphene::chain::limit_order_update_owner_mismatch::code_enum::code_value :
           case graphene::chain::limit_order_cancel_nonexist_order::code_enum::code_value :
           case graphene::chain::limit_order_cancel_owner_mismatch::code_enum::code_value :
           case graphene::chain::liquidity_pool_exchange_unfillable_price::code_enum::code_value :

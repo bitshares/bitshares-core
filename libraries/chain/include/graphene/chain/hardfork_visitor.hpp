@@ -47,6 +47,7 @@ struct hardfork_visitor {
    using BSIP_40_ops = fc::typelist::list< protocol::custom_authority_create_operation,
                                            protocol::custom_authority_update_operation,
                                            protocol::custom_authority_delete_operation>;
+   using hf1604_ops = fc::typelist::list< protocol::limit_order_update_operation>;
    using hf2103_ops = fc::typelist::list< protocol::ticket_create_operation,
                                           protocol::ticket_update_operation>;
    using liquidity_pool_ops = fc::typelist::list< protocol::liquidity_pool_create_operation,
@@ -81,6 +82,9 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<BSIP_40_ops, Op>(), bool>
    visit() { return HARDFORK_BSIP_40_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<hf1604_ops, Op>(), bool>
+   visit() { return HARDFORK_CORE_1604_PASSED(now); }
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<hf2103_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2103_PASSED(now); }

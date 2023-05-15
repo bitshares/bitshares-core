@@ -74,6 +74,29 @@ namespace graphene { namespace protocol {
    };
 
    /**
+    * @ingroup operations
+    * Used to update an existing limit order.
+    */
+   struct limit_order_update_operation : public base_operation
+   {
+       struct fee_params_t {
+           uint64_t fee = ( GRAPHENE_BLOCKCHAIN_PRECISION * 3 ) / 8;
+       };
+
+       asset fee;
+       account_id_type seller;
+       limit_order_id_type order;
+       optional<price> new_price;
+       optional<asset> delta_amount_to_sell;
+       optional<time_point_sec> new_expiration;
+
+       extensions_type extensions;
+
+       account_id_type fee_payer() const { return seller; }
+       void validate() const override;
+   };
+
+   /**
     *  @ingroup operations
     *  Used to cancel an existing limit order. Both fee_pay_account and the
     *  account to receive the proceeds must be the same as order->seller.
@@ -219,6 +242,7 @@ namespace graphene { namespace protocol {
 } } // graphene::protocol
 
 FC_REFLECT( graphene::protocol::limit_order_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::limit_order_update_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::limit_order_cancel_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::call_order_update_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::bid_collateral_operation::fee_params_t, (fee) )
@@ -229,6 +253,8 @@ FC_REFLECT( graphene::protocol::call_order_update_operation::options_type, (targ
 
 FC_REFLECT( graphene::protocol::limit_order_create_operation,
             (fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
+FC_REFLECT( graphene::protocol::limit_order_update_operation,
+            (fee)(seller)(order)(new_price)(delta_amount_to_sell)(new_expiration)(extensions))
 FC_REFLECT( graphene::protocol::limit_order_cancel_operation,
             (fee)(fee_paying_account)(order)(extensions) )
 FC_REFLECT( graphene::protocol::call_order_update_operation,
@@ -242,10 +268,12 @@ FC_REFLECT( graphene::protocol::execute_bid_operation,
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation )

@@ -33,6 +33,7 @@
 #include <graphene/chain/is_authorized_asset.hpp>
 
 #include <graphene/protocol/market.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace chain {
 void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_operation& op)
@@ -133,6 +134,236 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 
    return order_id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
+
+void limit_order_update_evaluator::convert_fee()
+{
+   if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   {
+      db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& addo) {
+         addo.fee_pool -= core_fee_paid;
+      });
+   }
+}
+
+void limit_order_update_evaluator::pay_fee()
+{
+   _deferred_fee = core_fee_paid;
+   if( fee_asset->get_id() != asset_id_type() )
+      _deferred_paid_fee = fee_from_account;
+}
+
+void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
+{
+   const database& d = db();
+   FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
+
+   _order = d.find( o.order );
+
+   GRAPHENE_ASSERT( _order != nullptr,
+                    limit_order_update_nonexist_order,
+                    "Limit order ${oid} does not exist, cannot update",
+                    ("oid", o.order) );
+
+   // Check this is my order
+   GRAPHENE_ASSERT( o.seller == _order->seller,
+                    limit_order_update_owner_mismatch,
+                    "Limit order ${oid} is owned by someone else, cannot update",
+                    ("oid", o.order) );
+
+   // Check new price is compatible and appropriate
+   if (o.new_price) {
+      auto base_id = o.new_price->base.asset_id;
+      auto quote_id = o.new_price->quote.asset_id;
+      FC_ASSERT(base_id == _order->sell_price.base.asset_id && quote_id == _order->sell_price.quote.asset_id,
+                "Cannot update limit order with incompatible price");
+
+      // Do not allow inappropriate price manipulation
+      auto max_amount_for_sale = std::max( _order->for_sale, _order->sell_price.base.amount );
+      if( o.delta_amount_to_sell )
+         max_amount_for_sale += o.delta_amount_to_sell->amount;
+      FC_ASSERT( o.new_price->base.amount <= max_amount_for_sale,
+                 "The base amount in the new price cannot be greater than the estimated maximum amount for sale" );
+
+   }
+
+   // Check delta asset is compatible
+   if (o.delta_amount_to_sell) {
+      const auto& delta = *o.delta_amount_to_sell;
+      FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
+                "Cannot update limit order with incompatible asset");
+      if (delta.amount < 0)
+          FC_ASSERT(_order->for_sale > -delta.amount,
+                    "Cannot deduct all or more from order than order contains");
+      // Note: if the delta amount is positive, account balance will be checked when calling adjust_balance()
+   }
+
+   // Check dust
+   if (o.new_price || (o.delta_amount_to_sell && o.delta_amount_to_sell->amount < 0)) {
+      auto new_price = o.new_price? *o.new_price : _order->sell_price;
+      auto new_amount = _order->amount_for_sale();
+      if (o.delta_amount_to_sell)
+          new_amount += *o.delta_amount_to_sell;
+      auto new_amount_to_receive = new_amount * new_price;
+
+      FC_ASSERT( new_amount_to_receive.amount > 0,
+                 "Cannot update limit order: order becomes too small; cancel order instead" );
+   }
+
+   // Check expiration is in the future
+   if (o.new_expiration)
+      FC_ASSERT( *o.new_expiration >= d.head_block_time(), "Cannot update limit order to expire in the past" );
+
+   // Check asset authorization
+   // TODO refactor to fix duplicate code (see limit_order_create)
+   const auto sell_asset_id = _order->sell_asset_id();
+   const auto receive_asset_id = _order->receive_asset_id();
+   const auto& sell_asset = sell_asset_id(d);
+   const auto& receive_asset = receive_asset_id(d);
+   const auto& seller = *this->fee_paying_account;
+
+   if( !sell_asset.options.whitelist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.whitelist_markets.find( receive_asset_id )
+                          != sell_asset.options.whitelist_markets.end(),
+                 "This market has not been whitelisted by the selling asset" );
+   }
+   if( !sell_asset.options.blacklist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.blacklist_markets.find( receive_asset_id )
+                          == sell_asset.options.blacklist_markets.end(),
+                 "This market has been blacklisted by the selling asset" );
+   }
+
+   FC_ASSERT( is_authorized_asset( d, seller, sell_asset ),
+              "The account is not allowed to transact the selling asset" );
+
+   FC_ASSERT( is_authorized_asset( d, seller, receive_asset ),
+              "The account is not allowed to transact the receiving asset" );
+
+   return {};
+}
+
+void limit_order_update_evaluator::process_deferred_fee()
+{
+   // Attempt to deduct a possibly discounted order cancellation fee, and refund the remainder.
+   // Only deduct fee if there is any fee deferred.
+   // TODO fix duplicate code (see database::cancel_limit_order())
+   if( _order->deferred_fee <= 0 )
+      return;
+
+   database& d = db();
+
+   share_type deferred_fee = _order->deferred_fee;
+   asset deferred_paid_fee = _order->deferred_paid_fee;
+   const asset_dynamic_data_object* deferred_fee_asset_dyn_data = nullptr;
+   const auto& current_fees = d.current_fee_schedule();
+   asset core_cancel_fee = current_fees.calculate_fee( limit_order_cancel_operation() );
+   if( core_cancel_fee.amount > 0 )
+   {
+      // maybe-discounted cancel_fee calculation:
+      //   limit_order_cancel_fee * limit_order_update_fee / limit_order_create_fee
+      asset core_create_fee = current_fees.calculate_fee( limit_order_create_operation() );
+      fc::uint128_t fee128( core_cancel_fee.amount.value );
+      if( core_create_fee.amount > 0 )
+      {
+         asset core_update_fee = current_fees.calculate_fee( limit_order_update_operation() );
+         fee128 *= core_update_fee.amount.value;
+         fee128 /= core_create_fee.amount.value;
+      }
+      // cap the fee
+      if( fee128 > static_cast<uint64_t>( deferred_fee.value ) )
+         fee128 = deferred_fee.value;
+      core_cancel_fee.amount = static_cast<int64_t>( fee128 );
+   }
+
+   // if there is any CORE fee to deduct, redirect it to referral program
+   if( core_cancel_fee.amount > 0 )
+   {
+      if( !_seller_acc_stats )
+         _seller_acc_stats = &d.get_account_stats_by_owner( _order->seller );
+      d.modify( *_seller_acc_stats, [&core_cancel_fee, &d]( account_statistics_object& obj ) {
+         obj.pay_fee( core_cancel_fee.amount, d.get_global_properties().parameters.cashback_vesting_threshold );
+      } );
+      deferred_fee -= core_cancel_fee.amount;
+      // handle originally paid fee if any:
+      //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
+      if( deferred_paid_fee.amount > 0 )
+      {
+         fc::uint128_t fee128( deferred_paid_fee.amount.value );
+         fee128 *= core_cancel_fee.amount.value;
+         // to round up
+         fee128 += _order->deferred_fee.value;
+         fee128 -= 1;
+         fee128 /= _order->deferred_fee.value;
+         share_type cancel_fee_amount = static_cast<int64_t>(fee128);
+         // cancel_fee should be positive, pay it to asset's accumulated_fees
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+         d.modify( *deferred_fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+            addo.accumulated_fees += cancel_fee_amount;
+         });
+         // cancel_fee should be no more than deferred_paid_fee
+         deferred_paid_fee.amount -= cancel_fee_amount;
+      }
+   }
+
+   // refund fee
+   if( 0 == _order->deferred_paid_fee.amount )
+   {
+      // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
+      // if order was created before hard fork 604,
+      //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
+      d.adjust_balance( _order->seller, deferred_fee );
+   }
+   else // need to refund fee in originally paid asset
+   {
+      d.adjust_balance( _order->seller, deferred_paid_fee );
+      // be here, must have: fee_asset != CORE
+      if( !deferred_fee_asset_dyn_data )
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+      d.modify( *deferred_fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+         addo.fee_pool += deferred_fee;
+      });
+   }
+
+}
+
+void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
+{
+   database& d = db();
+
+   // Adjust account balance
+   if( o.delta_amount_to_sell )
+   {
+      d.adjust_balance( o.seller, -*o.delta_amount_to_sell );
+      if( o.delta_amount_to_sell->asset_id == asset_id_type() )
+      {
+         _seller_acc_stats = &d.get_account_stats_by_owner( o.seller );
+         d.modify( *_seller_acc_stats, [&o]( account_statistics_object& bal ) {
+            bal.total_core_in_orders += o.delta_amount_to_sell->amount;
+         });
+      }
+   }
+
+   // Process deferred fee in the order.
+   process_deferred_fee();
+
+   // Update order
+   d.modify(*_order, [&o,this](limit_order_object& loo) {
+      if (o.new_price)
+         loo.sell_price = *o.new_price;
+      if (o.delta_amount_to_sell)
+         loo.for_sale += o.delta_amount_to_sell->amount;
+      if (o.new_expiration)
+         loo.expiration = *o.new_expiration;
+      loo.deferred_fee = _deferred_fee;
+      loo.deferred_paid_fee = _deferred_paid_fee;
+   });
+
+   // Perform order matching if necessary
+   d.apply_order(*_order);
+
+   return {};
+}
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)
 { try {
