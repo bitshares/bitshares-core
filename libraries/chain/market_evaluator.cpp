@@ -255,7 +255,7 @@ void limit_order_update_evaluator::process_deferred_fee()
 
    share_type deferred_fee = _order->deferred_fee;
    asset deferred_paid_fee = _order->deferred_paid_fee;
-   const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+   const asset_dynamic_data_object* deferred_fee_asset_dyn_data = nullptr;
    const auto& current_fees = d.current_fee_schedule();
    asset core_cancel_fee = current_fees.calculate_fee( limit_order_cancel_operation() );
    if( core_cancel_fee.amount > 0 )
@@ -297,8 +297,8 @@ void limit_order_update_evaluator::process_deferred_fee()
          fee128 /= _order->deferred_fee.value;
          share_type cancel_fee_amount = static_cast<int64_t>(fee128);
          // cancel_fee should be positive, pay it to asset's accumulated_fees
-         fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
-         d.modify( *fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+         d.modify( *deferred_fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
             addo.accumulated_fees += cancel_fee_amount;
          });
          // cancel_fee should be no more than deferred_paid_fee
@@ -318,9 +318,9 @@ void limit_order_update_evaluator::process_deferred_fee()
    {
       d.adjust_balance( _order->seller, deferred_paid_fee );
       // be here, must have: fee_asset != CORE
-      if( !fee_asset_dyn_data )
-         fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
-      d.modify( *fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+      if( !deferred_fee_asset_dyn_data )
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+      d.modify( *deferred_fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
          addo.fee_pool += deferred_fee;
       });
    }
