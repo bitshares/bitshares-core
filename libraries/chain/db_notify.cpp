@@ -656,6 +656,6 @@ void database::notify_changed_objects()
 } catch( const graphene::chain::plugin_exception& e ) {
    elog( "Caught plugin exception: ${e}", ("e", e.to_detail_string() ) );
    throw;
-} FC_CAPTURE_AND_LOG( (0) ) }
+} FC_CAPTURE_AND_LOG( (0) ) } // GCOVR_EXCL_LINE
 
 } } // namespace graphene::chain

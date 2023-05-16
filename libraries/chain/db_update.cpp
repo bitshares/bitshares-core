@@ -150,7 +150,7 @@ void database::clear_expired_transactions()
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
    while( (!dedupe_index.empty()) && (head_block_time() > dedupe_index.begin()->trx.expiration) )
       transaction_idx.remove(*dedupe_index.begin());
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::clear_expired_proposals()
 {
@@ -344,7 +344,7 @@ void database::clear_expired_orders()
                check_call_orders( quote_asset( *this ) );
             }
          }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::clear_expired_force_settlements()
 { try {
@@ -526,7 +526,7 @@ void database::clear_expired_force_settlements()
          });
       }
    }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::update_expired_feeds()
 {

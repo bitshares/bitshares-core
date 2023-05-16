@@ -431,7 +431,7 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
    _proposed_trx.validate();
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 object_id_type proposal_create_evaluator::do_apply( const proposal_create_operation& o )
 { try {
@@ -466,7 +466,7 @@ object_id_type proposal_create_evaluator::do_apply( const proposal_create_operat
    });
 
    return proposal.id;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_update_evaluator::do_evaluate( const proposal_update_operation& o )
 { try {
@@ -490,7 +490,7 @@ void_result proposal_update_evaluator::do_evaluate( const proposal_update_operat
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_update_evaluator::do_apply(const proposal_update_operation& o)
 { try {
@@ -527,14 +527,15 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
          d.modify(*_proposal, [&e](proposal_object& p) {
             p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
          });
-         wlog("Proposed transaction ${id} failed to apply once approved with exception:\n----\n${reason}\n----\nWill try again when it expires.",
+         wlog("Proposed transaction ${id} failed to apply once approved with exception:\n"
+              "----\n${reason}\n----\nWill try again when it expires.",
               ("id", o.proposal)("reason", e.to_detail_string()));
          _proposal_failed = true;
       }
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
 { try {
@@ -549,14 +550,14 @@ void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operati
               ("provided", o.fee_paying_account)("required", *required_approvals));
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation& o)
 { try {
    db().remove(*_proposal);
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 } } // graphene::chain

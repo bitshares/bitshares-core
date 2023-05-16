@@ -451,7 +451,7 @@ namespace graphene { namespace net { namespace detail {
           ilog( "p2p_network_connect_loop canceled" );
           throw;
         }
-        FC_CAPTURE_AND_LOG( (0) )
+        FC_CAPTURE_AND_LOG( (0) ) // GCOVR_EXCL_LINE
       }// while !canceled
     }
 
@@ -482,7 +482,7 @@ namespace graphene { namespace net { namespace detail {
          ilog( "update_seed_nodes_task canceled" );
          throw;
       }
-      FC_CAPTURE_AND_LOG( (_seed_nodes) )
+      FC_CAPTURE_AND_LOG( (_seed_nodes) ) // GCOVR_EXCL_LINE
 
       schedule_next_update_seed_nodes_task();
    }
@@ -4047,7 +4047,7 @@ namespace graphene { namespace net { namespace detail {
 
           // limit the rate at which we accept connections to mitigate DOS attacks
           fc::usleep( fc::milliseconds(10) );
-        } FC_CAPTURE_AND_LOG( (0) )
+        } FC_CAPTURE_AND_LOG( (0) ) // GCOVR_EXCL_LINE
       }
     } // accept_loop()
 
@@ -4476,7 +4476,7 @@ namespace graphene { namespace net { namespace detail {
             FC_THROW("Bad port: ${port}", ("port", port_string));
          }
       }
-      FC_CAPTURE_AND_RETHROW((in))
+      FC_CAPTURE_AND_RETHROW((in)) // GCOVR_EXCL_LINE
    }
 
    void node_impl::resolve_seed_node_and_add(const std::string& endpoint_string)
