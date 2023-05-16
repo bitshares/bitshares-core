@@ -3928,6 +3928,14 @@ BOOST_AUTO_TEST_CASE( defaults_test )
     asset fee = schedule.calculate_fee( limit_order_create_operation() );
     BOOST_CHECK_EQUAL( (int64_t)default_order_fee.fee, fee.amount.value );
 
+    // fill_order fee is zero
+    fee = schedule.calculate_fee( fill_order_operation() );
+    BOOST_CHECK_EQUAL( (int64_t)0, fee.amount.value );
+
+    // execute_bid fee is zero
+    fee = schedule.calculate_fee( execute_bid_operation() );
+    BOOST_CHECK_EQUAL( (int64_t)0, fee.amount.value );
+
     limit_order_create_operation::fee_params_t new_order_fee; new_order_fee.fee = 123;
     // set fee + check
     schedule.parameters.insert( new_order_fee );
@@ -3951,6 +3959,15 @@ BOOST_AUTO_TEST_CASE( defaults_test )
     schedule.parameters.insert( new_bid_fee );
     fee = schedule.calculate_fee( bid_collateral_operation() );
     BOOST_CHECK_EQUAL( (int64_t)new_bid_fee.fee, fee.amount.value );
+
+    // fill_order fee is still zero
+    fee = schedule.calculate_fee( fill_order_operation() );
+    BOOST_CHECK_EQUAL( (int64_t)0, fee.amount.value );
+
+    // execute_bid fee is still zero
+    fee = schedule.calculate_fee( execute_bid_operation() );
+    BOOST_CHECK_EQUAL( (int64_t)0, fee.amount.value );
+
   }
   catch( const fc::exception& e )
   {
