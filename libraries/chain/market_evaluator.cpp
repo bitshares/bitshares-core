@@ -75,7 +75,7 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
                     ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void limit_order_create_evaluator::convert_fee()
 {
@@ -133,7 +133,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
                     ("op",op) );
 
    return order_id;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void limit_order_update_evaluator::convert_fee()
 {
@@ -153,7 +153,7 @@ void limit_order_update_evaluator::pay_fee()
 }
 
 void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
-{
+{ try {
    const database& d = db();
    FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
 
@@ -241,7 +241,7 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
               "The account is not allowed to transact the receiving asset" );
 
    return {};
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void limit_order_update_evaluator::process_deferred_fee()
 {
@@ -328,7 +328,7 @@ void limit_order_update_evaluator::process_deferred_fee()
 }
 
 void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
-{
+{ try {
    database& d = db();
 
    // Adjust account balance
@@ -363,7 +363,7 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
    d.apply_order(*_order);
 
    return {};
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)
 { try {
@@ -382,7 +382,7 @@ void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_o
                     ("oid", o.order) );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation& o) const
 { try {
@@ -404,7 +404,7 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    }
 
    return refunded;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result call_order_update_evaluator::do_evaluate(const call_order_update_operation& o)
 { try {
@@ -488,7 +488,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 object_id_type call_order_update_evaluator::do_apply(const call_order_update_operation& o)
@@ -696,7 +696,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
    }
 
    return call_order_id;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)
 { try {
@@ -758,7 +758,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o) const
@@ -780,6 +780,6 @@ void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 } } // graphene::chain

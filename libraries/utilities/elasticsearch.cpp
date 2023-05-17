@@ -211,7 +211,7 @@ std::string es_client::get_version() const
 
    fc::variant content = fc::json::from_string( response.content );
    return content["version"]["number"].as_string();
-} FC_CAPTURE_LOG_AND_RETHROW( (base_url) ) }
+} FC_CAPTURE_LOG_AND_RETHROW( (base_url) ) } // GCOVR_EXCL_LINE
 
 void es_client::check_version_7_or_above( bool& result ) const noexcept
 {

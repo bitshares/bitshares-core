@@ -63,7 +63,7 @@ bool database::is_known_transaction( const transaction_id_type& id )const
 block_id_type  database::get_block_id_for_num( uint32_t block_num )const
 { try {
    return _block_id_to_block.fetch_block_id( block_num );
-} FC_CAPTURE_AND_RETHROW( (block_num) ) }
+} FC_CAPTURE_AND_RETHROW( (block_num) ) } // GCOVR_EXCL_LINE
 
 optional<signed_block> database::fetch_block_by_id( const block_id_type& id )const
 {
@@ -92,7 +92,8 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
 
 std::vector<block_id_type> database::get_block_ids_on_fork(block_id_type head_of_fork) const
 {
-  pair<fork_database::branch_type, fork_database::branch_type> branches = _fork_db.fetch_branch_from(head_block_id(), head_of_fork);
+  pair<fork_database::branch_type, fork_database::branch_type> branches
+        = _fork_db.fetch_branch_from(head_block_id(), head_of_fork);
   if( !((branches.first.back()->previous_id() == branches.second.back()->previous_id())) )
   {
      edump( (head_of_fork)
@@ -180,7 +181,8 @@ bool database::_push_block(const signed_block& new_block)
                   // remove the rest of branches.first from the fork_db, those blocks are invalid
                   while( ritr != branches.first.rend() )
                   {
-                     ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+                     ilog( "removing block from fork_db #${n} ${id}",
+                           ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
                      _fork_db.remove( (*ritr)->id );
                      ++ritr;
                   }
@@ -225,7 +227,7 @@ bool database::_push_block(const signed_block& new_block)
    }
 
    return false;
-} FC_CAPTURE_AND_RETHROW( (new_block) ) }
+} FC_CAPTURE_AND_RETHROW( (new_block) ) } // GCOVR_EXCL_LINE
 
 void database::verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const
 {
@@ -275,7 +277,7 @@ processed_transaction database::push_transaction( const precomputable_transactio
       result = _push_transaction( trx );
    } );
    return result;
-} FC_CAPTURE_AND_RETHROW( (trx) ) }
+} FC_CAPTURE_AND_RETHROW( (trx) ) } // GCOVR_EXCL_LINE
 
 processed_transaction database::_push_transaction( const precomputable_transaction& trx )
 {
@@ -313,7 +315,8 @@ public:
    push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
       : orig_value(nesting_counter), counter(nesting_counter)
    {
-      FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2, "Max proposal nesting depth exceeded!" );
+      FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2,
+                 "Max proposal nesting depth exceeded!" );
       counter++;
    }
    ~push_proposal_nesting_guard()
@@ -370,7 +373,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
 
    ptrx.operation_results = std::move(eval_state.operation_results);
    return ptrx;
-} FC_CAPTURE_AND_RETHROW( (proposal) ) }
+} FC_CAPTURE_AND_RETHROW( (proposal) ) } // GCOVR_EXCL_LINE
 
 signed_block database::generate_block(
    fc::time_point_sec when,
@@ -385,7 +388,7 @@ signed_block database::generate_block(
       result = _generate_block( when, witness_id, block_signing_private_key );
    } );
    return result;
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 signed_block database::_generate_block(
    fc::time_point_sec when,
@@ -426,9 +429,10 @@ signed_block database::_generate_block(
       FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
    }
 
-   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
-                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
-                                                       + 3; // max space to store size of transactions (out of block header),
+   static const size_t max_partial_block_header_size = ( fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) ) // witness_id
+                                                       + 3; // max space to store size of transactions
+                                                            // (out of block header),
                                                             // +3 means 3*7=21 bits so it's practically safe
    const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
    auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
@@ -502,10 +506,11 @@ signed_block database::_generate_block(
    if( 0 == (skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
-   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
+   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing
+                                                                    // self-generated blocks
 
    return pending_block;
-} FC_CAPTURE_AND_RETHROW( (witness_id) ) }
+} FC_CAPTURE_AND_RETHROW( (witness_id) ) } // GCOVR_EXCL_LINE
 
 /**
  * Removes the most recent block from the database and
@@ -524,15 +529,17 @@ void database::pop_block()
       FC_ASSERT( fork_db_head, "Trying to pop() block that's not in fork database!?" );
    }
    pop_undo();
-   _popped_tx.insert( _popped_tx.begin(), fork_db_head->data.transactions.begin(), fork_db_head->data.transactions.end() );
-} FC_CAPTURE_AND_RETHROW() }
+   _popped_tx.insert( _popped_tx.begin(),
+                      fork_db_head->data.transactions.begin(),
+                      fork_db_head->data.transactions.end() );
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::clear_pending()
 { try {
    assert( (_pending_tx.size() == 0) || _pending_tx_session.valid() );
    _pending_tx.clear();
    _pending_tx_session.reset();
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 uint32_t database::push_applied_operation( const operation& op, bool is_virtual /* = true */ )
 {
@@ -667,7 +674,7 @@ void database::_apply_block( const signed_block& next_block )
    _applied_ops.clear();
 
    notify_changed_objects();
-} FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
+} FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  } // GCOVR_EXCL_LINE
 
 /**
  * @note if a @c processed_transaction is passed in, it is cast into @c signed_transaction here.
@@ -768,7 +775,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
               "Unpaid SameT Fund debt detected" );
 
    return ptrx;
-} FC_CAPTURE_AND_RETHROW( (trx) ) }
+} FC_CAPTURE_AND_RETHROW( (trx) ) } // GCOVR_EXCL_LINE
 
 operation_result database::apply_operation( transaction_evaluation_state& eval_state, const operation& op,
                                             bool is_virtual /* = true */ )
@@ -783,7 +790,7 @@ operation_result database::apply_operation( transaction_evaluation_state& eval_s
    auto result = eval->evaluate( eval_state, op, true );
    set_applied_operation_result( op_id, result );
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 operation_result database::try_push_virtual_operation( transaction_evaluation_state& eval_state, const operation& op )
 {
@@ -886,7 +893,8 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
          for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
             workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
                _precompute_parallel( &block.transactions[base],
-                                     base + chunk_size < block.transactions.size() ? chunk_size : block.transactions.size() - base,
+                                     ( ( base + chunk_size ) < block.transactions.size() ) ? chunk_size
+                                                 : ( block.transactions.size() - base ),
                                      skip );
             }) );
       }

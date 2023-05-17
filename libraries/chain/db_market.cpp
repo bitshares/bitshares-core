@@ -335,7 +335,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
       obj.settlement_fund  = collateral_gathered.amount;
    });
 
-} FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
+} FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) } // GCOVR_EXCL_LINE
 
 void database::individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& order )
 {
@@ -448,7 +448,7 @@ void database::revive_bitasset( const asset_object& bitasset, const asset_bitass
       FC_ASSERT( bad.settlement_fund == 0 );
 
    _cancel_bids_and_revive_mpa( bitasset, bad );
-} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) } // GCOVR_EXCL_LINE
 
 void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
@@ -472,7 +472,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
               obj.settlement_price = price();
               obj.settlement_fund = 0;
            });
-} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) } // GCOVR_EXCL_LINE
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
 {
@@ -1619,7 +1619,8 @@ asset database::match_impl( const force_settlement_object& settle,
       cancel_settle_order( settle );
 
    return call_receives;
-} FC_CAPTURE_AND_RETHROW( (p_match_price)(max_settlement)(p_fill_price)(is_margin_call)(settle_is_taker) ) }
+} FC_CAPTURE_AND_RETHROW( (p_match_price)(max_settlement)(p_fill_price) // GCOVR_EXCL_LINE
+                          (is_margin_call)(settle_is_taker) ) } // GCOVR_EXCL_LINE
 
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives,
                                  bool cull_if_small, const price& fill_price, const bool is_maker)
@@ -1725,7 +1726,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
          return maybe_cull_small_order( *this, order );
       return false;
    }
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /***
  * @brief fill a call order in the specified amounts
@@ -1808,7 +1809,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
       remove( order );
 
    return collateral_freed.valid();
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /***
  * @brief fullfill a settle order in the specified amounts
@@ -1881,7 +1882,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 
    return filled;
 
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /**
  *  Starting with the least collateralized orders, fill them if their
@@ -2254,7 +2255,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
    } // while there exists a call order
    check_settled_debt_order( bitasset );
    return margin_called;
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 bool database::match_force_settlements( const asset_bitasset_data_object& bitasset )
 {
