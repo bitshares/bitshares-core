@@ -292,7 +292,7 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
       os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array(),
                                          _options.max_mapping_depth - current_depth );
    }
-} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
+} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) } // GCOVR_EXCL_LINE
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const
 {
