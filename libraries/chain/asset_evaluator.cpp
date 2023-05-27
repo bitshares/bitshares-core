@@ -791,7 +791,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
       using bsrm_type = bitasset_options::black_swan_response_type;
       if( bsrm_type::individual_settlement_to_fund == old_bsrm )
          FC_ASSERT( !current_bitasset_data.is_individually_settled_to_fund(),
-                 "Unable to update BSRM when the individual settlement pool is not empty" );
+                 "Unable to update BSRM when the individual settlement pool (for force-settlements) is not empty" );
       else if( bsrm_type::individual_settlement_to_order == old_bsrm )
          FC_ASSERT( !d.find_settled_debt_order( op.asset_to_update ),
                  "Unable to update BSRM when there exists an individual settlement order" );
@@ -1153,7 +1153,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.is_globally_settled()
                  || bitasset.is_individually_settled_to_fund(),
               "Either the asset need to have the force_settle flag enabled, or it need to be globally settled, "
-              "or the individual settlement pool is not empty" );
+              "or the individual settlement pool (for force-settlements) is not empty" );
 
    if( bitasset.is_prediction_market )
    {
@@ -1173,7 +1173,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
       {
          FC_THROW_EXCEPTION( insufficient_feeds,
                              "Cannot force settle with no price feed if the asset is not globally settled and the "
-                             "individual settlement pool is not empty" );
+                             "individual settlement pool (for force-settlements) is not empty" );
       }
    }
 
