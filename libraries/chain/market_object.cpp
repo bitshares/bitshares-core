@@ -309,7 +309,7 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
                     (graphene::db::object),
                     (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
-                    (is_settled_debt)(settled_debt_amount)(settled_collateral_amount)
+                    (is_settled_debt)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::db::object),

@@ -238,11 +238,11 @@ static void update_settled_debt_order( database& db, const asset_bitasset_data_o
 
    // Note: bitasset.get_margin_call_order_price() is in debt/collateral
    price sell_price = ~bitasset.get_margin_call_order_price();
-   asset settled_debt( limit_ptr->settled_debt_amount, limit_ptr->receive_asset_id() );
+   asset settled_debt( bitasset.individual_settlement_debt, limit_ptr->receive_asset_id() );
    try
    {
       for_sale = settled_debt.multiply_and_round_up( sell_price ).amount; // may overflow
-      if( for_sale <= limit_ptr->settled_collateral_amount ) // "=" is for the consistency of order matching logic
+      if( for_sale <= bitasset.individual_settlement_fund ) // "=" is for the consistency of order matching logic
          sell_all = false;
    }
    catch( const fc::exception& e ) // catch the overflow
@@ -252,13 +252,12 @@ static void update_settled_debt_order( database& db, const asset_bitasset_data_o
    }
 
    // TODO Potential optimization: to avoid unnecessary database update, check before update
-   db.modify( *limit_ptr, [sell_all, &sell_price, &for_sale]( limit_order_object& obj )
+   db.modify( *limit_ptr, [sell_all, &sell_price, &for_sale, &bitasset]( limit_order_object& obj )
    {
       if( sell_all )
       {
-         obj.for_sale = obj.settled_collateral_amount;
-         obj.sell_price.base.amount = obj.settled_collateral_amount;
-         obj.sell_price.quote.amount = obj.settled_debt_amount;
+         obj.for_sale = bitasset.individual_settlement_fund;
+         obj.sell_price = ~bitasset.get_individual_settlement_price();
       }
       else
       {

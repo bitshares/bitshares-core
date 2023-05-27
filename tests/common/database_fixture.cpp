@@ -579,10 +579,9 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
       if( o.is_settled_debt )
       {
-         total_balances[for_sale.asset_id] += o.settled_collateral_amount;
-         total_debts[o.receive_asset_id()] += o.settled_debt_amount;
-         BOOST_CHECK_LE( o.for_sale.value, o.settled_collateral_amount.value );
-         auto settled_debt = asset( o.settled_debt_amount.value, o.receive_asset_id() );
+         const auto& bitasset = o.receive_asset_id()(db).bitasset_data(db);
+         BOOST_CHECK_LE( o.for_sale.value, bitasset.individual_settlement_fund.value );
+         auto settled_debt = asset( bitasset.individual_settlement_debt, o.receive_asset_id() );
          BOOST_CHECK_EQUAL( settled_debt.multiply_and_round_up( o.sell_price ).amount.value, o.for_sale.value );
       }
       else

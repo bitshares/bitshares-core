@@ -315,13 +315,10 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                  "Internal error: unable to close margin call ${o}", ("o", order) );
    }
 
-   // Move the individual settlement order to the GS fund
+   // Remove the individual settlement order
    const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
    if( limit_ptr )
-   {
-      collateral_gathered.amount += limit_ptr->settled_collateral_amount;
       remove( *limit_ptr );
-   }
 
    // Move individual settlement fund to the GS fund
    collateral_gathered.amount += bitasset.individual_settlement_fund;
@@ -355,14 +352,12 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
    auto margin_call_fee = order_collateral - fund_receives;
 
-   if( bsrm_type::individual_settlement_to_fund == bsrm ) // settle to fund
-   {
-      modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
-         obj.individual_settlement_debt += order.debt;
-         obj.individual_settlement_fund += fund_receives.amount;
-      });
-   }
-   else // settle to order
+   modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt += order.debt;
+      obj.individual_settlement_fund += fund_receives.amount;
+   });
+
+   if( bsrm_type::individual_settlement_to_order == bsrm ) // settle to order
    {
       const auto& head_time = head_block_time();
       bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
@@ -370,19 +365,18 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
       const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
       if( limit_ptr )
       {
-         modify( *limit_ptr, [&order,&fund_receives,after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
-            obj.settled_debt_amount += order.debt;
-            obj.settled_collateral_amount += fund_receives.amount;
+         modify( *limit_ptr, [after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
             // TODO fix duplicate code
             bool sell_all = true;
             if( after_core_hardfork_2591 )
             {
                obj.sell_price = ~bitasset.get_margin_call_order_price();
-               asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+               asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
                try
                {
                   obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount; // may overflow
-                  if( obj.for_sale <= obj.settled_collateral_amount ) // "=" for consistency of order matching logic
+                  // Note: the "=" below is for the consistency of order matching logic
+                  if( obj.for_sale <= bitasset.individual_settlement_fund )
                      sell_all = false;
                }
                catch( fc::exception& e ) // catch the overflow
@@ -393,9 +387,8 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
             }
             if( sell_all )
             {
-               obj.for_sale = obj.settled_collateral_amount;
-               obj.sell_price.base.amount = obj.settled_collateral_amount;
-               obj.sell_price.quote.amount = obj.settled_debt_amount;
+               obj.for_sale = bitasset.individual_settlement_fund;
+               obj.sell_price = ~bitasset.get_individual_settlement_price();
             }
          } );
       }
@@ -407,8 +400,6 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
             obj.for_sale = fund_receives.amount;
             obj.sell_price = fund_receives / order_debt;
             obj.is_settled_debt = true;
-            obj.settled_debt_amount = order_debt.amount;
-            obj.settled_collateral_amount = fund_receives.amount;
          } );
       }
       // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
@@ -1115,14 +1106,17 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    bool cull_taker = false;
    bool maker_filled = false;
 
+   const auto& mia = maker.receive_asset_id()(*this);
+   const auto& bitasset = mia.bitasset_data(*this);
+
    auto usd_for_sale = taker.amount_for_sale();
-   auto usd_to_buy = asset( maker.settled_debt_amount, maker.receive_asset_id() );
+   auto usd_to_buy = asset( bitasset.individual_settlement_debt, maker.receive_asset_id() );
 
    asset call_receives;
    asset order_receives;
    if( usd_to_buy > usd_for_sale )
    {  // fill taker limit order
-      order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
+      order_receives  = usd_for_sale * match_price; // round down here, in favor of "call order"
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
@@ -1151,13 +1145,9 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
 
    asset call_pays = order_receives;
    if( maker_filled ) // Regardless of hf core-2591
-      call_pays.amount = maker.settled_collateral_amount;
-   else if( maker.for_sale != maker.settled_collateral_amount ) // implies hf core-2591
-   {
-      price settle_price = asset( maker.settled_collateral_amount, maker.sell_asset_id() )
-                         / asset( maker.settled_debt_amount, maker.receive_asset_id() );
-      call_pays = call_receives * settle_price; // round down here, in favor of call order
-   }
+      call_pays.amount = bitasset.individual_settlement_fund;
+   else if( maker.for_sale != bitasset.individual_settlement_fund ) // implies hf core-2591
+      call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
    if( call_pays < order_receives ) // be defensive, maybe unnecessary
    {
       wlog( "Unexpected scene: call_pays < order_receives" );
@@ -1166,7 +1156,7 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    asset collateral_fee = call_pays - order_receives;
 
    // Reduce current supply, and accumulate collateral fees
-   const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
    modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
       ao.current_supply -= call_receives.amount;
       ao.accumulated_collateral_fees += collateral_fee.amount;
@@ -1177,33 +1167,35 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    push_applied_operation( fill_order_operation( maker.id, maker.seller, call_pays, call_receives,
                                                  collateral_fee, match_price, true ) );
 
+   // Update bitasset data
+   modify( bitasset, [&call_receives,&call_pays]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= call_receives.amount;
+      obj.individual_settlement_fund -= call_pays.amount;
+   });
+
    // Update the maker order
    // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
    if( maker_filled )
       remove( maker );
    else
    {
-      modify( maker, [after_core_hardfork_2591,&call_pays,&call_receives]( limit_order_object& obj ) {
-         obj.settled_debt_amount -= call_receives.amount;
-         obj.settled_collateral_amount -= call_pays.amount;
+      modify( maker, [after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
          if( after_core_hardfork_2591 )
          {
             // Note: for simplicity, only update price when necessary
-            asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+            asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
             obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
-            if( obj.for_sale > obj.settled_collateral_amount ) // be defensive, maybe unnecessary
+            if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
             {
-               wlog( "Unexpected scene: obj.for_sale > obj.settled_collateral_amount" );
-               obj.for_sale = obj.settled_collateral_amount;
-               obj.sell_price.base.amount = obj.settled_collateral_amount;
-               obj.sell_price.quote.amount = obj.settled_debt_amount;
+               wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
+               obj.for_sale = bitasset.individual_settlement_fund;
+               obj.sell_price = ~bitasset.get_individual_settlement_price();
             }
          }
          else
          {
-            obj.for_sale = obj.settled_collateral_amount;
-            obj.sell_price.base.amount = obj.settled_collateral_amount;
-            obj.sell_price.quote.amount = obj.settled_debt_amount;
+            obj.for_sale = bitasset.individual_settlement_fund;
+            obj.sell_price = ~bitasset.get_individual_settlement_price();
          }
       });
       // Note:
@@ -1225,8 +1217,11 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
 
    bool taker_filled = false;
 
+   const auto& mia = taker.receive_asset_id()(*this);
+   const auto& bitasset = mia.bitasset_data(*this);
+
    auto usd_for_sale = maker.amount_for_sale();
-   auto usd_to_buy = asset( taker.settled_debt_amount, taker.receive_asset_id() );
+   auto usd_to_buy = asset( bitasset.individual_settlement_debt, taker.receive_asset_id() );
 
    asset call_receives;
    asset order_receives;
@@ -1248,13 +1243,9 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
 
    asset call_pays = order_receives;
    if( taker_filled )
-      call_pays.amount = taker.settled_collateral_amount;
-   else if( taker.for_sale != taker.settled_collateral_amount )
-   {
-      price settle_price = asset( taker.settled_collateral_amount, taker.sell_asset_id() )
-                         / asset( taker.settled_debt_amount, taker.receive_asset_id() );
-      call_pays = call_receives * settle_price; // round down here, in favor of call order
-   }
+      call_pays.amount = bitasset.individual_settlement_fund;
+   else if( taker.for_sale != bitasset.individual_settlement_fund )
+      call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
    if( call_pays < order_receives ) // be defensive, maybe unnecessary
    {
       wlog( "Unexpected scene: call_pays < order_receives" );
@@ -1263,7 +1254,7 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
    asset collateral_fee = call_pays - order_receives;
 
    // Reduce current supply, and accumulate collateral fees
-   const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
    modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
       ao.current_supply -= call_receives.amount;
       ao.accumulated_collateral_fees += collateral_fee.amount;
@@ -1274,24 +1265,27 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
    push_applied_operation( fill_order_operation( taker.id, taker.seller, call_pays, call_receives,
                                                  collateral_fee, match_price, false ) );
 
+   // Update bitasset data
+   modify( bitasset, [&call_receives,&call_pays]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= call_receives.amount;
+      obj.individual_settlement_fund -= call_pays.amount;
+   });
+
    // Update the taker order
    // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
    if( taker_filled )
       remove( taker );
    else
    {
-      modify( taker, [&call_pays,&call_receives]( limit_order_object& obj ) {
-         obj.settled_debt_amount -= call_receives.amount;
-         obj.settled_collateral_amount -= call_pays.amount;
+      modify( taker, [&bitasset]( limit_order_object& obj ) {
          // Note: for simplicity, only update price when necessary
-         asset settled_debt( obj.settled_debt_amount, obj.receive_asset_id() );
+         asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
          obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
-         if( obj.for_sale > obj.settled_collateral_amount ) // be defensive, maybe unnecessary
+         if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
          {
-            wlog( "Unexpected scene: obj.for_sale > obj.settled_collateral_amount" );
-            obj.for_sale = obj.settled_collateral_amount;
-            obj.sell_price.base.amount = obj.settled_collateral_amount;
-            obj.sell_price.quote.amount = obj.settled_debt_amount;
+            wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
+            obj.for_sale = bitasset.individual_settlement_fund;
+            obj.sell_price = ~bitasset.get_individual_settlement_price();
          }
       });
    }

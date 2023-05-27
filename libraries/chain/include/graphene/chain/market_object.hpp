@@ -51,8 +51,6 @@ class limit_order_object : public abstract_object<limit_order_object, protocol_i
       share_type       deferred_fee; ///< fee converted to CORE
       asset            deferred_paid_fee; ///< originally paid fee
       bool             is_settled_debt = false; ///< Whether this order is an individual settlement fund
-      share_type       settled_debt_amount; ///< Debt amount if this order is an individual settlement fund
-      share_type       settled_collateral_amount; ///< Collateral amount if the order is an individual settlement fund
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
