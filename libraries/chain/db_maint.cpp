@@ -984,7 +984,7 @@ void database::process_bitassets()
    for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
    {
       modify( d, update_bitasset );
-      if( d.has_settlement() )
+      if( d.is_globally_settled() )
          process_bids(d);
    }
 }

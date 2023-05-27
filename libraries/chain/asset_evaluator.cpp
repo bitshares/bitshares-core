@@ -743,7 +743,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
    if( !HARDFORK_CORE_2282_PASSED( next_maint_time ) )
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Cannot update a bitasset after a global settlement has executed" );
 
    if( current_bitasset_data.is_prediction_market )
@@ -784,13 +784,13 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    if( old_bsrm != new_bsrm )
    {
       FC_ASSERT( asset_obj.can_owner_update_bsrm(), "No permission to update BSRM" );
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Unable to update BSRM when the asset has been globally settled" );
 
       // Note: it is probably OK to allow BSRM update, be conservative here so far
       using bsrm_type = bitasset_options::black_swan_response_type;
       if( bsrm_type::individual_settlement_to_fund == old_bsrm )
-         FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
+         FC_ASSERT( !current_bitasset_data.is_individually_settled_to_fund(),
                  "Unable to update BSRM when the individual settlement pool is not empty" );
       else if( bsrm_type::individual_settlement_to_order == old_bsrm )
          FC_ASSERT( !d.find_settled_debt_order( op.asset_to_update ),
@@ -808,7 +808,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Cannot change backing asset after a global settlement has executed" );
 
       const asset_dynamic_data_object& dyn = asset_obj.dynamic_asset_data_id(d);
@@ -1119,7 +1119,7 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
-   FC_ASSERT( !_bitasset_data.has_settlement(),
+   FC_ASSERT( !_bitasset_data.is_globally_settled(),
               "This asset has been globally settled, cannot globally settle again" );
 
    // Note: after core-2467 hard fork, there can be no debt position due to individual settlements, so we check here
@@ -1150,14 +1150,14 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
               "Can only force settle a predition market or a market issued asset" );
 
    const auto& bitasset = asset_to_settle->bitasset_data(d);
-   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.has_settlement()
-                 || bitasset.has_individual_settlement(),
+   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.is_globally_settled()
+                 || bitasset.is_individually_settled_to_fund(),
               "Either the asset need to have the force_settle flag enabled, or it need to be globally settled, "
               "or the individual settlement pool is not empty" );
 
    if( bitasset.is_prediction_market )
    {
-      FC_ASSERT( bitasset.has_settlement(),
+      FC_ASSERT( bitasset.is_globally_settled(),
                  "Global settlement must occur before force settling a prediction market" );
    }
    else if( bitasset.current_feed.settlement_price.is_null() )
@@ -1169,7 +1169,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
                              "Before the core-216 hard fork, unable to force settle when there is no sufficient "
                              " price feeds, no matter if the asset has been globally settled" );
       }
-      if( !bitasset.has_settlement() && !bitasset.has_individual_settlement() )
+      if( !bitasset.is_globally_settled() && !bitasset.is_individually_settled_to_fund() )
       {
          FC_THROW_EXCEPTION( insufficient_feeds,
                              "Cannot force settle with no price feed if the asset is not globally settled and the "
@@ -1363,18 +1363,18 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& bitasset = *bitasset_ptr;
 
    // Process global settlement fund
-   if( bitasset.has_settlement() )
+   if( bitasset.is_globally_settled() )
       return pay_settle_from_gs_fund( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
    // Process individual settlement pool
    extendable_operation_result result;
    asset to_settle = op.amount;
-   if( bitasset.has_individual_settlement() )
+   if( bitasset.is_individually_settled_to_fund() )
    {
       result = pay_settle_from_individual_pool( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
       // If the amount to settle is too small, or force settlement is disabled, we return
-      if( bitasset.has_individual_settlement() || !asset_to_settle->can_force_settle() )
+      if( bitasset.is_individually_settled_to_fund() || !asset_to_settle->can_force_settle() )
          return result;
 
       to_settle -= result.value.paid->front();
@@ -1426,7 +1426,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    if( bitasset.is_prediction_market || now <= HARDFORK_CORE_216_TIME )
    {
-      FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+      FC_ASSERT( !bitasset.is_globally_settled(), "No further feeds may be published after a settlement event" );
    }
 
    // the settlement price must be quoted in terms of the backing asset
@@ -1500,7 +1500,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       return void_result();
 
    // Feed changed, check whether need to revive the asset and proceed if need
-   if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
+   if( bad.is_globally_settled() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
        && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
    {
       bool should_revive = false;

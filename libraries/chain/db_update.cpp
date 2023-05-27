@@ -406,7 +406,7 @@ void database::clear_expired_force_settlements()
       const asset_object& mia_object = *mia_object_ptr;
       const asset_bitasset_data_object& mia = *mia_ptr;
 
-      if( mia.has_settlement() )
+      if( mia.is_globally_settled() )
       {
          ilog( "Canceling a force settlement because of black swan" );
          cancel_settle_order( settle_order );

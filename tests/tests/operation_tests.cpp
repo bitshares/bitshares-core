@@ -1074,7 +1074,7 @@ BOOST_AUTO_TEST_CASE( bid_collateral_operation_asset_auth_test )
       BOOST_TEST_MESSAGE( "Trigger a black swan event" );
       current_feed.settlement_price = bitusd.amount( 10 ) / backasset.amount( 100 );
       publish_feed( bitusd, sam, current_feed );
-      BOOST_REQUIRE( bitusd.bitasset_data(db).has_settlement() );
+      BOOST_REQUIRE( bitusd.bitasset_data(db).is_globally_settled() );
 
       // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to bid collateral
       BOOST_TEST_MESSAGE( "Dan and Sam attempting to bid collateral" );

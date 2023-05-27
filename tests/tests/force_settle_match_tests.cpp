@@ -1203,7 +1203,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    share_type settle4_refund = 5;
 
    // blackswan event occurs
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    BOOST_CHECK( db.find( call_id ) == nullptr );
    BOOST_CHECK( db.find( call2_id ) == nullptr );
    BOOST_CHECK( db.find( call3_id ) == nullptr );
@@ -1453,7 +1453,7 @@ BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
       BOOST_CHECK_EQUAL( 40000, call3_id(db).collateral.value );
 
       // blackswan event did not occur
-      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
 
       // check balances
       BOOST_CHECK_EQUAL( 0, get_balance(seller_id, usd_id) );

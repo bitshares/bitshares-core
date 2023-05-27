@@ -1965,8 +1965,8 @@ BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -1993,8 +1993,8 @@ BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // fund receives 1600
@@ -2040,8 +2040,8 @@ BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
             BOOST_REQUIRE( op_result.fees.valid() && 2U == op_result.fees->size() );
             BOOST_CHECK( *op_result.fees->begin() == asset( 204 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 692 );
 
             BOOST_CHECK( mpa_id(db).dynamic_data(db).accumulated_collateral_fees == 604 ); // 400 + 204
@@ -2062,8 +2062,8 @@ BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
             BOOST_REQUIRE( op_result.fees.valid() && 1U == op_result.fees->size() );
             BOOST_CHECK( *op_result.fees->begin() == asset( 0 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 692 );
 
             BOOST_CHECK( mpa_id(db).dynamic_data(db).accumulated_collateral_fees == 400 );
@@ -2167,8 +2167,8 @@ BOOST_AUTO_TEST_CASE( pm_instant_settlement_price_test )
 
       auto check_result = [&]
       {
-         BOOST_CHECK( !pm_id(db).bitasset_data(db).has_individual_settlement() );
-         BOOST_CHECK( pm_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !pm_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+         BOOST_CHECK( pm_id(db).bitasset_data(db).is_globally_settled() );
          BOOST_CHECK_EQUAL( pm_id(db).bitasset_data(db).settlement_fund.value, 700 );
 
          BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).accumulated_collateral_fees.value, 0 );
@@ -2384,7 +2384,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
 
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       // generate a block
       generate_block();
@@ -2402,7 +2402,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       publish_feed( mpa_id, feeder_id, f );
 
       // check
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       BOOST_REQUIRE( db.find(settle_id) );
 
@@ -2415,7 +2415,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       generate_block();
 
       // check
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       // the settle order is cancelled
       BOOST_REQUIRE( !db.find(settle_id) );

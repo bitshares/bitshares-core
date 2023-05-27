@@ -296,7 +296,7 @@ namespace graphene { namespace chain {
          share_type max_force_settlement_volume(share_type current_supply)const;
 
          /// @return true if the bitasset has been globally settled, false otherwise
-         bool has_settlement()const { return !settlement_price.is_null(); }
+         bool is_globally_settled()const { return !settlement_price.is_null(); }
 
          /**
           *  In the event of global settlement, all margin positions
@@ -321,7 +321,7 @@ namespace graphene { namespace chain {
          ///@}
 
          /// @return true if the individual settlement pool is not empty, false otherwise
-         bool has_individual_settlement()const { return ( individual_settlement_debt != 0 ); }
+         bool is_individually_settled_to_fund()const { return ( individual_settlement_debt != 0 ); }
 
          /// Get the price of the individual settlement pool
          price get_individual_settlement_price() const

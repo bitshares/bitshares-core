@@ -129,8 +129,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -359,8 +359,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
             BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
             BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             const limit_order_object* settled_debt = db.find_settled_debt_order(mpa_id);
             BOOST_REQUIRE( settled_debt );
 
@@ -452,9 +452,9 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
 
             // check
             BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
-            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 24885 );
@@ -645,8 +645,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -683,8 +683,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // call: margin call fee deducted = round_down(2000*11/1250) = 17,
@@ -708,8 +708,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price.is_null() );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
 
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1983 );
@@ -738,8 +738,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
       BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1785 );
       BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 90015 );
 
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       if( 0 == i )
@@ -783,8 +783,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
          if( 0 == i )
@@ -898,8 +898,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -933,8 +933,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // call: margin call fee deducted = round_down(2000*11/1250) = 17,
@@ -958,8 +958,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price.is_null() );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
 
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1983 );
@@ -998,8 +998,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price.is_null() );
@@ -1108,8 +1108,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -1161,8 +1161,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // call: margin call fee deducted = round_down(2000*11/1250) = 17,
@@ -1264,8 +1264,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
 
          // check
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
          BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
@@ -1430,8 +1430,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -1483,8 +1483,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // call: margin call fee deducted = round_down(2000*11/1250) = 17,
@@ -1565,8 +1565,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
 
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1983 );
@@ -1611,7 +1611,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
             BOOST_CHECK( *op_result.received->begin() == asset( 1784 ) );
 
-            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 199 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 10035 );
 
@@ -1641,7 +1641,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
             BOOST_CHECK( *op_result.received->begin() == asset( 1983 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
@@ -1673,7 +1673,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
             BOOST_CHECK( *op_result.received->begin() == asset( 1983 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
@@ -1725,7 +1725,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.fees.valid() && 2U == op_result.fees->size() );
             BOOST_CHECK( *op_result.fees->begin() == asset( 167 ) );
 
-            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 199 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 10035 );
 
@@ -1763,7 +1763,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.fees.valid() && 2U == op_result.fees->size() );
             BOOST_CHECK( *op_result.fees->begin() == asset( 186 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
@@ -1803,7 +1803,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_price_test )
             BOOST_REQUIRE( op_result.fees.valid() && 2U == op_result.fees->size() );
             BOOST_CHECK( *op_result.fees->begin() == asset( 186 ) );
 
-            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
 
@@ -1935,8 +1935,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
 
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -1987,8 +1987,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       const limit_order_object* settled_debt = db.find_settled_debt_order(mpa_id);
       BOOST_REQUIRE( settled_debt );
 
@@ -2053,8 +2053,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
 
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
 
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_CHECK( !db.find( call2_id ) );
@@ -2254,8 +2254,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_maker_test 
       {
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
 
          if( 0 == i )
          {
@@ -2456,8 +2456,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_taker_test 
 
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -2484,8 +2484,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_taker_test 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       const limit_order_object* settled_debt = db.find_settled_debt_order(mpa_id);
       BOOST_REQUIRE( settled_debt );
 
@@ -2682,8 +2682,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_matching_as_taker_test 
       {
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
 
          // the settled-debt order was:
          // settled_debt_amount = 90015
@@ -2936,8 +2936,8 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
 
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_individually_settled_to_fund() );
       BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // borrowers borrow some
@@ -2973,8 +2973,8 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       const limit_order_object* settled_debt = db.find_settled_debt_order(mpa_id);
       BOOST_REQUIRE( settled_debt );
 
@@ -3011,8 +3011,8 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_debt_position )
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
       settled_debt = db.find_settled_debt_order(mpa_id);
       BOOST_REQUIRE( settled_debt );
 

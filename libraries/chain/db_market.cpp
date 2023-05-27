@@ -53,7 +53,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( !mia.is_market_issued() ) return false;
 
     const asset_bitasset_data_object& bitasset = bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this);
-    if( bitasset.has_settlement() ) return true; // already force settled
+    if( bitasset.is_globally_settled() ) return true; // already globally settled
     auto settle_price = bitasset.current_feed.settlement_price;
     if( settle_price.is_null() ) return false; // no feed
 
@@ -246,7 +246,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                                            bool check_margin_calls )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
-   FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
+   FC_ASSERT( !bitasset.is_globally_settled(), "black swan already occurred, it should not happen again" );
 
    asset collateral_gathered( 0, bitasset.options.short_backing_asset );
 
@@ -429,7 +429,7 @@ void database::revive_bitasset( const asset_object& bitasset, const asset_bitass
 { try {
    FC_ASSERT( bitasset.is_market_issued() );
    FC_ASSERT( bitasset.id == bad.asset_id );
-   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
 
@@ -453,7 +453,7 @@ void database::revive_bitasset( const asset_object& bitasset, const asset_bitass
 void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
    FC_ASSERT( bitasset.is_market_issued() );
-   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
 
    // cancel remaining bids
@@ -791,7 +791,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
       sell_abd = &sell_asset.bitasset_data( *this );
       if( sell_abd->options.short_backing_asset == recv_asset_id
           && !sell_abd->is_prediction_market
-          && !sell_abd->has_settlement()
+          && !sell_abd->is_globally_settled()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
          if( before_core_hardfork_1270 ) {
@@ -935,7 +935,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( new_settlement.balance.asset_id == bitasset.asset_id, "Internal error: asset type mismatch" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
-   FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
+   FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
 
    auto head_time = head_block_time();
@@ -2015,7 +2015,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     {
       // check for blackswan first // TODO perhaps improve performance by passing in iterators
       bool settled_some = check_for_blackswan( mia, enable_black_swan, &bitasset );
-      if( bitasset.has_settlement() )
+      if( bitasset.is_globally_settled() )
          return margin_called;
 
       if( settled_some ) // which implies that BSRM is individual settlement to fund or to order
@@ -2263,7 +2263,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
-   FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
+   FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
 
    auto head_time = head_block_time();

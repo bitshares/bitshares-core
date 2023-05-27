@@ -437,7 +437,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    /// if there is a settlement for this asset, then no further margin positions may be taken and
    /// all existing margin positions should have been closed va database::globally_settle_asset
-   FC_ASSERT( !_bitasset_data->has_settlement(),
+   FC_ASSERT( !_bitasset_data->is_globally_settled(),
               "Cannot update debt position when the asset has been globally settled" );
 
    FC_ASSERT( o.delta_collateral.asset_id == _bitasset_data->options.short_backing_asset,
@@ -718,7 +718,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
-   FC_ASSERT( _bitasset_data->has_settlement(), "Cannot bid since the asset is not globally settled" );
+   FC_ASSERT( _bitasset_data->is_globally_settled(), "Cannot bid since the asset is not globally settled" );
 
    FC_ASSERT( o.additional_collateral.asset_id == _bitasset_data->options.short_backing_asset );
 
