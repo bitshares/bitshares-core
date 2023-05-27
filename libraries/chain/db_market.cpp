@@ -246,7 +246,10 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                                            bool check_margin_calls )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
+   // GCOVR_EXCL_START
+   // Defensive code, normally it should not fail
    FC_ASSERT( !bitasset.is_globally_settled(), "black swan already occurred, it should not happen again" );
+   // GCOVR_EXCL_STOP
 
    asset collateral_gathered( 0, bitasset.options.short_backing_asset );
 
@@ -418,11 +421,14 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
 void database::revive_bitasset( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( bitasset.is_market_issued() );
    FC_ASSERT( bitasset.id == bad.asset_id );
    FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
+   // GCOVR_EXCL_STOP
 
    const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
    if( bdd.current_supply > 0 )
@@ -443,9 +449,12 @@ void database::revive_bitasset( const asset_object& bitasset, const asset_bitass
 
 void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( bitasset.is_market_issued() );
    FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
+   // GCOVR_EXCL_STOP
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
@@ -923,11 +932,14 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( new_settlement.balance.asset_id == bitasset.asset_id, "Internal error: asset type mismatch" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
    FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
+   // GCOVR_EXCL_STOP
 
    auto head_time = head_block_time();
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
@@ -1013,9 +1025,12 @@ static database::match_result_type get_match_result( bool taker_filled, bool mak
 database::match_result_type database::match( const limit_order_object& taker, const limit_order_object& maker,
                                              const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( taker.sell_price.quote.asset_id == maker.sell_price.base.asset_id );
    FC_ASSERT( taker.sell_price.base.asset_id  == maker.sell_price.quote.asset_id );
    FC_ASSERT( taker.for_sale > 0 && maker.for_sale > 0 );
+   // GCOVR_EXCL_STOP
 
    return maker.is_settled_debt ? match_limit_settled_debt( taker, maker, match_price )
                                 : match_limit_normal_limit( taker, maker, match_price );
@@ -1025,8 +1040,11 @@ database::match_result_type database::match( const limit_order_object& taker, co
 database::match_result_type database::match_limit_normal_limit( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
    FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
+   // GCOVR_EXCL_STOP
 
    auto taker_for_sale = taker.amount_for_sale();
    auto maker_for_sale = maker.amount_for_sale();
@@ -1100,8 +1118,11 @@ database::match_result_type database::match_limit_normal_limit( const limit_orde
 database::match_result_type database::match_limit_settled_debt( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( maker.is_settled_debt, "Internal error: maker is not settled debt" );
    FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
+   // GCOVR_EXCL_STOP
 
    bool cull_taker = false;
    bool maker_filled = false;
@@ -1149,10 +1170,10 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    else if( maker.for_sale != bitasset.individual_settlement_fund ) // implies hf core-2591
       call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
    if( call_pays < order_receives ) // be defensive, maybe unnecessary
-   {
+   { // GCOVR_EXCL_START
       wlog( "Unexpected scene: call_pays < order_receives" );
       call_pays = order_receives;
-   }
+   } // GCOVR_EXCL_STOP
    asset collateral_fee = call_pays - order_receives;
 
    // Reduce current supply, and accumulate collateral fees
@@ -1186,11 +1207,11 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
             asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
             obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
             if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
-            {
+            { // GCOVR_EXCL_START
                wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
                obj.for_sale = bitasset.individual_settlement_fund;
                obj.sell_price = ~bitasset.get_individual_settlement_price();
-            }
+            } // GCOVR_EXEL_STOP
          }
          else
          {
@@ -1212,8 +1233,11 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
 database::match_result_type database::match_settled_debt_limit( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
    FC_ASSERT( taker.is_settled_debt, "Internal error: taker is not settled debt" );
+   // GCOVR_EXCL_STOP
 
    bool taker_filled = false;
 
@@ -1247,10 +1271,10 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
    else if( taker.for_sale != bitasset.individual_settlement_fund )
       call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
    if( call_pays < order_receives ) // be defensive, maybe unnecessary
-   {
+   { // GCOVR_EXCL_START
       wlog( "Unexpected scene: call_pays < order_receives" );
       call_pays = order_receives;
-   }
+   } // GCOVR_EXCL_STOP
    asset collateral_fee = call_pays - order_receives;
 
    // Reduce current supply, and accumulate collateral fees
@@ -1282,11 +1306,11 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
          asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
          obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
          if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
-         {
+         { // GCOVR_EXCL_START
             wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
             obj.for_sale = bitasset.individual_settlement_fund;
             obj.sell_price = ~bitasset.get_individual_settlement_price();
-         }
+         } // GCOVR_EXCL_STOP
       });
    }
 
@@ -2255,10 +2279,13 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
    FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
+   // GCOVR_EXCL_STOP
 
    auto head_time = head_block_time();
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
