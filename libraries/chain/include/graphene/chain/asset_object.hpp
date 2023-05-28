@@ -316,12 +316,14 @@ namespace graphene { namespace chain {
          /// The individual settlement pool.
          /// In the event of individual settlements (to fund or to order), debt and collateral of the margin positions
          /// which got settled are moved here.
-         /// * For individual settlement to fund, assets in the pool can only be retrieved through forced settlements.
-         /// * For individual settlement to order, assets in the pool can only be retrieved through limit orders.
+         /// * For individual settlement to fund, collateral assets in the pool can only be retrieved through
+         ///     forced settlements.
+         /// * For individual settlement to order, collateral assets in the pool can only be retrieved through
+         ///     limit orders.
          ///@{
          /// Amount of debt due to individual settlements
          share_type individual_settlement_debt;
-         /// Amount of collateral which is available for force settlement due to individual settlements
+         /// Amount of collateral due to individual settlements
          share_type individual_settlement_fund;
          ///@}
 
