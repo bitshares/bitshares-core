@@ -75,6 +75,14 @@ struct proposal_operation_hardfork_visitor
       FC_ASSERT( HARDFORK_CORE_1604_PASSED(block_time), "Operation is not enabled yet" );
    }
 
+   // hf_2535
+   void operator()(const graphene::chain::limit_order_create_operation& op) const {
+      if( !HARDFORK_CORE_2535_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.on_fill.valid(),
+                    "The on_fill extension is not allowed until the core-2535 hardfork");
+      }
+   }
+
    void operator()(const graphene::chain::asset_create_operation &v) const {
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.common_options);

@@ -78,6 +78,8 @@ namespace graphene { namespace chain {
 
    private:
        void process_deferred_fee();
+       /// Check if the linked take profit order is still compatible with the current order after update
+       bool is_linked_tp_order_compatible( const limit_order_update_operation& o ) const;
 
        share_type                _deferred_fee;
        asset                     _deferred_paid_fee;

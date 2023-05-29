@@ -310,19 +310,23 @@ processed_transaction database::validate_transaction( const signed_transaction& 
    return _apply_transaction( trx );
 }
 
-class push_proposal_nesting_guard {
+class undo_session_nesting_guard {
 public:
-   push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
+   undo_session_nesting_guard( uint32_t& nesting_counter, const database& db )
       : orig_value(nesting_counter), counter(nesting_counter)
    {
       FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2,
-                 "Max proposal nesting depth exceeded!" );
-      counter++;
+                 "Max undo session nesting depth exceeded!" );
+      ++counter;
    }
-   ~push_proposal_nesting_guard()
+   ~undo_session_nesting_guard()
    {
-      if( --counter != orig_value )
-         elog( "Unexpected proposal nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+      --counter;
+      // GCOVR_EXCL_START
+      // Defensive code, should not happen
+      if( counter != orig_value )
+         elog( "Unexpected undo session nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+      // GCOVR_EXCL_STOP
    }
 private:
     const uint32_t  orig_value;
@@ -341,7 +345,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    auto old_vop = _current_virtual_op;
 
    try {
-      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
+      undo_session_nesting_guard guard( _undo_session_nesting_depth, *this );
       if( _undo_db.size() >= _undo_db.max_size() )
          _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
@@ -802,7 +806,10 @@ operation_result database::try_push_virtual_operation( transaction_evaluation_st
 
    try
    {
-      auto temp_session = _undo_db.start_undo_session();
+      undo_session_nesting_guard guard( _undo_session_nesting_depth, *this );
+      if( _undo_db.size() >= _undo_db.max_size() )
+         _undo_db.set_max_size( _undo_db.size() + 1 );
+      auto temp_session = _undo_db.start_undo_session(true);
       auto result = apply_operation( eval_state, op ); // This is a virtual operation
       temp_session.merge();
       return result;
