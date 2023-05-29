@@ -579,10 +579,9 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
       if( o.is_settled_debt )
       {
-         total_balances[for_sale.asset_id] += o.settled_collateral_amount;
-         total_debts[o.receive_asset_id()] += o.settled_debt_amount;
-         BOOST_CHECK_LE( o.for_sale.value, o.settled_collateral_amount.value );
-         auto settled_debt = asset( o.settled_debt_amount.value, o.receive_asset_id() );
+         const auto& bitasset = o.receive_asset_id()(db).bitasset_data(db);
+         BOOST_CHECK_LE( o.for_sale.value, bitasset.individual_settlement_fund.value );
+         auto settled_debt = asset( bitasset.individual_settlement_debt, o.receive_asset_id() );
          BOOST_CHECK_EQUAL( settled_debt.multiply_and_round_up( o.sell_price ).amount.value, o.for_sale.value );
       }
       else
@@ -606,7 +605,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
          total_balances[bad.options.short_backing_asset] += bad.individual_settlement_fund;
          total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
-         if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
+         if( !bad.is_globally_settled() ) // Note: if asset has been globally settled, do not check total debt
             total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
       total_balances[asset_obj.get_id()] += dasset_obj.confidential_supply.value;
