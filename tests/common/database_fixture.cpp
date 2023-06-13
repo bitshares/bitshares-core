@@ -1163,27 +1163,31 @@ digest_type database_fixture_base::digest( const transaction& tx )
    return tx.digest();
 }
 
-const limit_order_object* database_fixture_base::create_sell_order(account_id_type user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration,
-                                                const price& fee_core_exchange_rate )
+limit_order_create_operation database_fixture_base::make_limit_order_create_op(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const optional< vector< limit_order_auto_action > >& on_fill ) const
 {
-   auto r =  create_sell_order( user(db), amount, recv, order_expiration, fee_core_exchange_rate );
-   verify_asset_supplies(db);
-   return r;
+   limit_order_create_operation buy_order;
+   buy_order.seller = user;
+   buy_order.amount_to_sell = amount;
+   buy_order.min_to_receive = recv;
+   buy_order.expiration = order_expiration;
+   buy_order.extensions.value.on_fill = on_fill;
+   return buy_order;
 }
 
-const limit_order_object* database_fixture_base::create_sell_order( const account_object& user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration,
-                                                const price& fee_core_exchange_rate )
+const limit_order_object* database_fixture_base::create_sell_order(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const price& fee_core_exchange_rate,
+                                                const optional< vector< limit_order_auto_action > >& on_fill )
 {
    set_expiration( db, trx );
    trx.operations.clear();
 
-   limit_order_create_operation buy_order;
-   buy_order.seller = user.id;
-   buy_order.amount_to_sell = amount;
-   buy_order.min_to_receive = recv;
-   buy_order.expiration = order_expiration;
+   limit_order_create_operation buy_order = make_limit_order_create_op( user, amount, recv, order_expiration,
+                                                                        on_fill );
    trx.operations = {buy_order};
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
@@ -1193,12 +1197,22 @@ const limit_order_object* database_fixture_base::create_sell_order( const accoun
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
 
+const limit_order_object* database_fixture_base::create_sell_order(
+                                                const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const price& fee_core_exchange_rate,
+                                                const optional< vector< limit_order_auto_action > >& on_fill )
+{
+   return create_sell_order( user.get_id(), amount, recv, order_expiration, fee_core_exchange_rate );
+}
+
 limit_order_update_operation database_fixture_base::make_limit_order_update_op(
-                           account_id_type seller_id,
-                           limit_order_id_type order_id,
-                           fc::optional<price> new_price,
-                           fc::optional<asset> delta_amount,
-                           fc::optional<time_point_sec> new_expiration )const
+                           const account_id_type& seller_id,
+                           const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price,
+                           const fc::optional<asset>& delta_amount,
+                           const fc::optional<time_point_sec>& new_expiration,
+                           const optional< vector< limit_order_auto_action > >& on_fill )const
 {
    limit_order_update_operation update_order;
    update_order.seller = seller_id;
@@ -1206,21 +1220,19 @@ limit_order_update_operation database_fixture_base::make_limit_order_update_op(
    update_order.new_price = new_price;
    update_order.delta_amount_to_sell = delta_amount;
    update_order.new_expiration = new_expiration;
+   update_order.on_fill = on_fill;
    return update_order;
 }
 
 void database_fixture_base::update_limit_order(const limit_order_object& order,
-                                          fc::optional<price> new_price,
-                                          fc::optional<asset> delta_amount,
-                                          fc::optional<time_point_sec> new_expiration,
-                                          const price& fee_core_exchange_rate )
+                                          const fc::optional<price>& new_price,
+                                          const fc::optional<asset>& delta_amount,
+                                          const fc::optional<time_point_sec>& new_expiration,
+                                          const price& fee_core_exchange_rate,
+                                          const optional< vector< limit_order_auto_action > >& on_fill )
 {
-   limit_order_update_operation update_order;
-   update_order.seller = order.seller;
-   update_order.order = order.id;
-   update_order.new_price = new_price;
-   update_order.delta_amount_to_sell = delta_amount;
-   update_order.new_expiration = new_expiration;
+   limit_order_update_operation update_order = make_limit_order_update_op( order.seller, order.get_id(), new_price,
+                                                                           delta_amount, new_expiration, on_fill );
    trx.operations = {update_order};
    for(auto& op : trx.operations) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
@@ -1229,13 +1241,14 @@ void database_fixture_base::update_limit_order(const limit_order_object& order,
    verify_asset_supplies(db);
 }
 
-void database_fixture_base::update_limit_order(limit_order_id_type order_id,
-                                          fc::optional<price> new_price,
-                                          fc::optional<asset> delta_amount,
-                                          fc::optional<time_point_sec> new_expiration,
-                                          const price& fee_core_exchange_rate )
+void database_fixture_base::update_limit_order(const limit_order_id_type& order_id,
+                                          const fc::optional<price>& new_price,
+                                          const fc::optional<asset>& delta_amount,
+                                          const fc::optional<time_point_sec>& new_expiration,
+                                          const price& fee_core_exchange_rate,
+                                          const optional< vector< limit_order_auto_action > >& on_fill )
 {
-    update_limit_order(order_id(db), new_price, delta_amount, new_expiration, fee_core_exchange_rate);
+   update_limit_order( order_id(db), new_price, delta_amount, new_expiration, fee_core_exchange_rate, on_fill );
 }
 
 asset database_fixture_base::cancel_limit_order( const limit_order_object& order )
