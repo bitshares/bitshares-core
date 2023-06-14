@@ -91,7 +91,7 @@ void limit_order_create_evaluator::convert_fee()
 {
    if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
       generic_evaluator::convert_fee();
-   else if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   else if( fee_asset->get_id() != asset_id_type() )
    {
       db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
          d.fee_pool -= core_fee_paid;
@@ -149,7 +149,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 
 void limit_order_update_evaluator::convert_fee()
 {
-   if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   if( fee_asset->get_id() != asset_id_type() )
    {
       db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& addo) {
          addo.fee_pool -= core_fee_paid;
