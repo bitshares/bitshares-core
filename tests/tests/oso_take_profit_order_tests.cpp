@@ -817,6 +817,123 @@ BOOST_AUTO_TEST_CASE( oso_take_profit_order_trigger_and_cancel_test )
 
 } FC_LOG_AND_RETHROW() }
 
+/// Tests a scenario where a take profit order fails to be sent due to extreme order price
+BOOST_AUTO_TEST_CASE( oso_take_profit_order_fail_test_1 )
+{ try {
+
+      // Proceeds to the hard fork
+      generate_blocks( HARDFORK_CORE_2535_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      const asset_object& usd = create_user_issued_asset( "MYUSD" );
+      asset_id_type usd_id = usd.get_id();
+      asset_id_type core_id;
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      issue_uia( ted, asset(GRAPHENE_MAX_SHARE_SUPPLY, usd_id) );
+
+      int64_t expected_balance_sam_core = init_amount;
+      int64_t expected_balance_ted_core = init_amount;
+      int64_t expected_balance_sam_usd = 0;
+      int64_t expected_balance_ted_usd = GRAPHENE_MAX_SHARE_SUPPLY;
+
+      const auto& check_balances = [&]() {
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, expected_balance_sam_core );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, core_id ).amount.value, expected_balance_ted_core );
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, expected_balance_sam_usd );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, usd_id ).amount.value, expected_balance_ted_usd );
+      };
+
+      check_balances();
+
+      // Ted buys CORE with USD with on_fill
+      //                                   fee_asset, spread,  size,   expiration, repeat
+      create_take_profit_order_action tpa1 { core_id,    500, 10000,         3600, false };
+      vector<limit_order_auto_action> on_fill_1 { tpa1 };
+
+      const limit_order_object* sell_order1 = create_sell_order( ted_id, asset(GRAPHENE_MAX_SHARE_SUPPLY, usd_id),
+                                                                 asset(100), time_point_sec::maximum(),
+                                                                 price::unit_price(), on_fill_1 );
+      BOOST_REQUIRE( sell_order1 );
+      limit_order_id_type sell_order1_id = sell_order1->get_id();
+
+      limit_order_id_type last_order_id = sell_order1_id;
+
+      BOOST_CHECK( !sell_order1_id(db).take_profit_order_id );
+
+      BOOST_REQUIRE_EQUAL( sell_order1_id(db).on_fill.size(), 1U );
+      BOOST_REQUIRE( sell_order1_id(db).on_fill.front().is_type<create_take_profit_order_action>() );
+      const auto& action_s1 = sell_order1_id(db).on_fill.front().get<create_take_profit_order_action>();
+      BOOST_CHECK( action_s1.fee_asset_id == tpa1.fee_asset_id );
+      BOOST_CHECK( action_s1.spread_percent == tpa1.spread_percent );
+      BOOST_CHECK( action_s1.size_percent == tpa1.size_percent );
+      BOOST_CHECK( action_s1.expiration_seconds == tpa1.expiration_seconds );
+      BOOST_CHECK( action_s1.repeat == tpa1.repeat );
+
+      expected_balance_ted_usd -= GRAPHENE_MAX_SHARE_SUPPLY;
+      check_balances();
+
+      // Sam sells CORE for USD without on_fill, fully fills Ted's order
+      const limit_order_object* buy_order1 = create_sell_order( sam_id, asset(100),
+                                                                asset(GRAPHENE_MAX_SHARE_SUPPLY, usd_id) );
+      last_order_id = last_order_id + 1;
+
+      // The buy order gets fully filled
+      BOOST_CHECK( !buy_order1 );
+
+      expected_balance_sam_core -= 100;
+      expected_balance_sam_usd += GRAPHENE_MAX_SHARE_SUPPLY;
+
+      expected_balance_ted_core += 100;
+
+      const auto& check_result_1 = [&]()
+      {
+         // The sell order is fully filled
+         BOOST_CHECK( !db.find(sell_order1_id) );
+
+         // The take profit order is not created due to an exception
+         BOOST_CHECK( !db.find(last_order_id+1) );
+
+         check_balances();
+      };
+
+      check_result_1();
+
+      generate_block();
+
+      check_result_1();
+
+      // Sam sells more CORE for USD without on_fill
+      const limit_order_object* sell_order2 = create_sell_order( sam_id, asset(10000), asset(13000, usd_id) );
+      last_order_id = last_order_id + 1;
+
+      BOOST_REQUIRE( sell_order2 );
+      limit_order_id_type sell_order2_id = sell_order2->get_id();
+
+      expected_balance_sam_core -= 10000;
+
+      const auto check_result_2 = [&]()
+      {
+         // Check that the failed OSO operation does not increase the internal next value of limit_order_id
+         BOOST_CHECK( last_order_id == sell_order2_id );
+
+         check_balances();
+      };
+
+      check_result_2();
+
+      generate_block();
+
+      check_result_2();
+
+} FC_LOG_AND_RETHROW() }
+
 /// Tests OSO-related order updates: basic operation validation and evaluation
 BOOST_AUTO_TEST_CASE( oso_take_profit_order_update_basic_test )
 { try {
