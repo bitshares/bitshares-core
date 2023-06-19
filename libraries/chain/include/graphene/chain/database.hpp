@@ -326,6 +326,12 @@ namespace graphene { namespace chain {
                            share_type collateral_from_fund, const price_feed& current_feed );
 
       private:
+         /// Clean up for a limit order and then remove it from database
+         void cleanup_and_remove_limit_order( const limit_order_object& order );
+         /// Process on_fill for a limit order
+         /// @return the ID of the newly created take profit order (in that case), otherwise null
+         optional<limit_order_id_type> process_limit_order_on_fill( const limit_order_object& order,
+                                                                    const asset& order_receives );
          void _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
@@ -820,8 +826,8 @@ namespace graphene { namespace chain {
           */
          bool                              _opened = false;
 
-         // Counts nested proposal updates
-         uint32_t                          _push_proposal_nesting_depth = 0;
+         /// Counts nested undo sessions due to (for example) proposal updates or order-sends-order executions
+         uint32_t                          _undo_session_nesting_depth = 0;
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;

@@ -28,6 +28,30 @@
 namespace graphene { namespace protocol {
 
    /**
+    * Creates a take profit limit order
+    */
+   struct create_take_profit_order_action
+   {
+      /// Asset ID that will be used to pay operation fee for placing the take profit order
+      asset_id_type   fee_asset_id;
+      /// A percentage indicating how far the price of the take profit order differs from the original order
+      uint16_t        spread_percent = 0;
+      /// A percentage indicating how much amount to sell in the take profit order
+      uint16_t        size_percent = GRAPHENE_100_PERCENT;
+      /// How long the take profit order to be kept on the market
+      uint32_t        expiration_seconds = 0;
+      /// Whether to create another take profit order for this take profit order if this take profit order is matched
+      bool            repeat = false;
+
+      extensions_type extensions;  ///< Unused. Reserved for future use.
+
+      void            validate()const;
+   };
+
+   /// Automatic actions for limit orders
+   using limit_order_auto_action = static_variant< create_take_profit_order_action >;
+
+   /**
     *  @class limit_order_create_operation
     *  @brief instructs the blockchain to attempt to sell one asset for another
     *  @ingroup operations
@@ -47,6 +71,17 @@ namespace graphene { namespace protocol {
     */
    struct limit_order_create_operation : public base_operation
    {
+      /**
+       * Options to be used in @ref limit_order_create_operation
+       *
+       * @note this struct can be expanded by adding more options in the end.
+       */
+      struct options_type
+      {
+         /// Automatic actions when the limit order is filled or partially filled
+         optional< vector< limit_order_auto_action > > on_fill;
+      };
+
       struct fee_params_t { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
@@ -60,6 +95,8 @@ namespace graphene { namespace protocol {
 
       /// If this flag is set the entire order must be filled or the operation is rejected
       bool fill_or_kill = false;
+
+      using extensions_type = extension<options_type>; // note: will be jsonified to {...} but not [...]
       extensions_type   extensions;
 
       pair<asset_id_type,asset_id_type> get_market()const
@@ -89,6 +126,8 @@ namespace graphene { namespace protocol {
        optional<price> new_price;
        optional<asset> delta_amount_to_sell;
        optional<time_point_sec> new_expiration;
+       /// Automatic actions when the limit order is filled or partially filled
+       optional< vector< limit_order_auto_action > > on_fill;
 
        extensions_type extensions;
 
@@ -150,7 +189,7 @@ namespace graphene { namespace protocol {
       asset               delta_collateral; ///< the amount of collateral to add to the margin position
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
 
-      typedef extension<options_type> extensions_type; // note: this will be jsonified to {...} but no longer [...]
+      using extensions_type = extension<options_type>; // note: this will be jsonified to {...} but no longer [...]
       extensions_type     extensions;
 
       account_id_type fee_payer()const { return funding_account; }
@@ -241,6 +280,9 @@ namespace graphene { namespace protocol {
    };
 } } // graphene::protocol
 
+FC_REFLECT( graphene::protocol::create_take_profit_order_action,
+            (fee_asset_id)(spread_percent)(size_percent)(expiration_seconds)(repeat)(extensions) )
+
 FC_REFLECT( graphene::protocol::limit_order_create_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::limit_order_update_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::limit_order_cancel_operation::fee_params_t, (fee) )
@@ -249,6 +291,7 @@ FC_REFLECT( graphene::protocol::bid_collateral_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::fill_order_operation::fee_params_t,  ) // VIRTUAL
 FC_REFLECT( graphene::protocol::execute_bid_operation::fee_params_t,  ) // VIRTUAL
 
+FC_REFLECT( graphene::protocol::limit_order_create_operation::options_type, (on_fill) )
 FC_REFLECT( graphene::protocol::call_order_update_operation::options_type, (target_collateral_ratio) )
 
 FC_REFLECT( graphene::protocol::limit_order_create_operation,
@@ -266,12 +309,17 @@ FC_REFLECT( graphene::protocol::bid_collateral_operation,
 FC_REFLECT( graphene::protocol::execute_bid_operation,
             (fee)(bidder)(debt)(collateral) )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::create_take_profit_order_action)
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::options_type )
+
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::call_order_update_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bid_collateral_operation::fee_params_t )
+
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::limit_order_cancel_operation )

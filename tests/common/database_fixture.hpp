@@ -411,28 +411,37 @@ struct database_fixture_base {
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
-   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
+   limit_order_create_operation make_limit_order_create_op(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} ) const;
+   const limit_order_object* create_sell_order( const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} );
    limit_order_update_operation make_limit_order_update_op(
-                           account_id_type seller_id,
-                           limit_order_id_type order_id,
-                           fc::optional<price> new_price = {},
-                           fc::optional<asset> delta_amount = {},
-                           fc::optional<time_point_sec> new_expiration = {} )const;
+                           const account_id_type& seller_id,
+                           const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} )const;
    void update_limit_order(const limit_order_object& order,
-                           fc::optional<price> new_price = {},
-                           fc::optional<asset> delta_amount = {},
-                           fc::optional<time_point_sec> new_expiration = {},
-                           const price& fee_core_exchange_rate = price::unit_price() );
-   void update_limit_order(limit_order_id_type order_id,
-                           fc::optional<price> new_price = {},
-                           fc::optional<asset> delta_amount = {},
-                           fc::optional<time_point_sec> new_expiration = {},
-                           const price& fee_core_exchange_rate = price::unit_price() );
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price(),
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} );
+   void update_limit_order(const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price(),
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
