@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_update_test )
       BOOST_CHECK( lpo1.withdrawal_fee_percent == 0 );
       BOOST_CHECK( lpo1.virtual_value == 200 );
 
-      // Sam is able to update lpo2 if to update its withdrawal fee to 0
+      // Ted is able to update lpo2 if to update its withdrawal fee to 0
       update_liquidity_pool( ted_id, lpo2.get_id(), 2, 0 );
 
       BOOST_CHECK( lpo2.asset_a == core.id );
