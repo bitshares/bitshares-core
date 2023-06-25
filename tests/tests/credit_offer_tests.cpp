@@ -179,9 +179,9 @@ BOOST_AUTO_TEST_CASE( credit_deal_auto_repay_hardfork_time_test )
 
       // Before the hard fork, unable to update a credit deal
       // or update with proposals
-      BOOST_CHECK_THROW( update_credit_deal( sam_id, cd11_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( update_credit_deal( ray_id, cd11_id, 1 ), fc::exception );
 
-      credit_deal_update_operation updop = make_credit_deal_update_op( sam_id, cd11_id, 1 );
+      credit_deal_update_operation updop = make_credit_deal_update_op( ray_id, cd11_id, 1 );
       BOOST_CHECK_THROW( propose( updop ), fc::exception );
 
 } FC_LOG_AND_RETHROW() }
