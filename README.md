@@ -48,7 +48,7 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
     git clone https://github.com/bitshares/bitshares-core.git
     cd bitshares-core
     git checkout master # may substitute "master" with current release tag
-    git submodule update --init --recursive
+    git submodule update --qinit --recursive
     mkdir build
     cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
