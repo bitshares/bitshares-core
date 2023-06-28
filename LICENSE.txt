@@ -1,4 +1,4 @@
-Copyright (c) 2023 Maxim Samsonov
+Copyright (c) 2023 Maxim [maxirmx] Samsonov  https://sw.consulting
 
 Copyright (c) 2015-2022 Cryptonomex Inc. <contact@cryptonomex.com> and
 contributors (see CONTRIBUTORS.txt)

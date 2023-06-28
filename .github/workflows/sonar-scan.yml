@@ -1,5 +1,8 @@
 name: Scan with SonarScanner
-on: [ push, pull_request ]
+#  push:
+#    branches: [ main ]
+#  pull_request:
+  workflow_dispatch:
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros

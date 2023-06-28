@@ -1,5 +1,33 @@
+#
+# Copyright 2023 Maxim [maxirmx] Samsonov (https://sw.consulting)
+#
+# The MIT License
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+
 name: Ubuntu Release
-on: [ push, pull_request ]
+on:
+  push:
+#    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
@@ -8,7 +36,7 @@ jobs:
     name: Build and test in Release mode
     strategy:
       matrix:
-        os: [ ubuntu-18.04, ubuntu-20.04 ]
+        os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
@@ -45,8 +73,6 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
-        mkdir -p _build
-        pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Release \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
@@ -54,8 +80,7 @@ jobs:
               -D CMAKE_C_COMPILER_LAUNCHER=ccache \
               -D CMAKE_CXX_COMPILER=g++ \
               -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-              ..
-        popd
+              -B build
     - name: Load Cache
       uses: actions/cache@v3
       with:
@@ -68,41 +93,41 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 1 -C _build
+        make -j 1 -C build
         df -h
     - name: Unit-Tests
       run: |
-        _build/tests/app_test -l test_suite
+        build/tests/app_test -l test_suite
         curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
           -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
         echo
-        _build/tests/es_test -l test_suite
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
-        _build/tests/cli_test -l test_suite
+        build/tests/es_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh build/tests/chain_test -l test_suite
+        build/tests/cli_test -l test_suite
         df -h
     - name: Quick test for program arguments
       run: |
-        _build/programs/witness_node/witness_node --version
-        _build/programs/witness_node/witness_node --help
-        if _build/programs/witness_node/witness_node --bad-arg ; then \
+        build/programs/witness_node/witness_node --version
+        build/programs/witness_node/witness_node --help
+        if build/programs/witness_node/witness_node --bad-arg ; then \
           echo "Fail: did not get expected error."; false; \
         else \
           echo "Pass: got expected error."; \
         fi
-        if _build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
+        if build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
           echo "Fail: did not get expected error."; false; \
         else \
           echo "Pass: got expected error."; \
         fi
-        if _build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
+        if build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
           echo "Fail: did not get expected error."; false; \
         else \
           echo "Pass: got expected error."; \
         fi
-        _build/programs/cli_wallet/cli_wallet --version
-        _build/programs/cli_wallet/cli_wallet --help
-        _build/programs/cli_wallet/cli_wallet --suggest-brain-key
-        if _build/programs/cli_wallet/cli_wallet --bad-arg ; then \
+        build/programs/cli_wallet/cli_wallet --version
+        build/programs/cli_wallet/cli_wallet --help
+        build/programs/cli_wallet/cli_wallet --suggest-brain-key
+        if build/programs/cli_wallet/cli_wallet --bad-arg ; then \
           echo "Fail: did not get expected error."; false; \
         else \
           echo "Pass: got expected error."; \
@@ -110,6 +135,6 @@ jobs:
     - name: Node-Test
       run: |
         df -h
-        pushd _build
+        pushd build
         ../programs/build_helpers/run-node-test
         df -h
