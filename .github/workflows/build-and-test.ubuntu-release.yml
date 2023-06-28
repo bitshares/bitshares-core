@@ -75,7 +75,6 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
-        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Release \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \

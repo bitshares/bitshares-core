@@ -67,3 +67,4 @@ object_database/*
 *.pyo
 
 build
+ccache
