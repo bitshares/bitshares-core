@@ -1,4 +1,5 @@
-Contributors to this repository, in descending order by number of commits. Update with
+THis file is included due to licensing requirements and is not mainained for ledex-core project
+Contributors to the original repository in descending order by number of commits. Update with
   head -5 CONTRIBUTORS.txt >contrib.tmp && git shortlog -s -e -n | cut -f 2 >>contrib.tmp && mv contrib.tmp CONTRIBUTORS.txt
 
 ==============================================================================

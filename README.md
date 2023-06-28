@@ -1,28 +1,27 @@
-BitShares Core
+RecEx Core
 ==============
 
-[BitShares Core](https://github.com/bitshares/bitshares-core) is the BitShares blockchain node software and command-line wallet software.
-For UI reference wallet software (browser-based wallet and desktop wallet) visit [BitShares UI](https://github.com/bitshares/bitshares-ui).
+[ReCex Core](https://github.com/recex/recex-core) is the ReCex blockchain node software and command-line wallet software.
+ReCex Core was created as a fork of BitShares Core.  Visit [BitShares.github.io](https://bitshares.github.io/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
-Visit [BitShares.github.io](https://bitshares.github.io/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
+Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more related resources and links E.G. chat groups, client libraries and extended APIs.
 
-Information for developers can be found in the [Wiki](https://github.com/bitshares/bitshares-core/wiki) and the [BitShares Developer Portal](https://dev.bitshares.works/). Users interested in how BitShares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
-
-Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more resources and links E.G. chat groups, client libraries and extended APIs.
-
-* [Getting Started](#getting-started)
-* [Support](#support)
-* [Using Built-In APIs](#using-built-in-apis)
-* [Accessing restrictable node API sets](#accessing-restrictable-node-api-sets)
-* [FAQ](#faq)
-* [License](#license)
+- [RecEx Core](#recex-core)
+  - [Getting Started](#getting-started)
+    - [Installing Node and Command-Line Wallet Software](#installing-node-and-command-line-wallet-software)
+    - [Running and Stopping Node Software](#running-and-stopping-node-software)
+    - [Using Command-Line Wallet](#using-command-line-wallet)
+  - [Support](#support)
+  - [Using Built-In APIs](#using-built-in-apis)
+    - [Node API](#node-api)
+    - [Wallet API](#wallet-api)
+  - [Accessing restrictable node API sets](#accessing-restrictable-node-api-sets)
+  - [FAQ](#faq)
+  - [License](#license)
 
 |Branch|Build Status|
 |---|---|
-|`master`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Amaster)|
-|`develop`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Adevelop)|
-|`hardfork`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Ahardfork)|
-|`testnet`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Atestnet)|
+|`main`|[![](https://github.com/recex/recex-core/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/recex/recex-core/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/recex/recex-core/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster) [![](https://github.com/recex/recex-core/workflows/Windows%20MinGW64/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Amaster) [![](https://github.com/recex/recex-core/workflows/Docker/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Amaster)|
 |`master` of `bitshares-fc`|[![](https://github.com/bitshares/bitshares-fc/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster)|
 
 

@@ -28,9 +28,15 @@ on:
 #    branches: [ main ]
   pull_request:
   workflow_dispatch:
+
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.job }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
 jobs:
   test-release:
     name: Build and test in Release mode
@@ -46,10 +52,6 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
-        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
-        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
-          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
         sudo apt-get install -y \
                      ccache \
                      parallel \
@@ -93,7 +95,7 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 1 -C build
+        cmake --build build --parallel 2
         df -h
     - name: Unit-Tests
       run: |
