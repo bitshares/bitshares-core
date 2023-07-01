@@ -297,7 +297,7 @@ FC_REFLECT( graphene::protocol::call_order_update_operation::options_type, (targ
 FC_REFLECT( graphene::protocol::limit_order_create_operation,
             (fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
 FC_REFLECT( graphene::protocol::limit_order_update_operation,
-            (fee)(seller)(order)(new_price)(delta_amount_to_sell)(new_expiration)(extensions))
+            (fee)(seller)(order)(new_price)(delta_amount_to_sell)(new_expiration)(on_fill)(extensions))
 FC_REFLECT( graphene::protocol::limit_order_cancel_operation,
             (fee)(fee_paying_account)(order)(extensions) )
 FC_REFLECT( graphene::protocol::call_order_update_operation,
