@@ -419,21 +419,30 @@ BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
       generate_blocks(HARDFORK_CORE_1604_TIME + 10);
       set_expiration( db, trx );
 
-      ACTORS((nathan));
+      ACTORS((nathan)(dan));
 
       const auto& munee = create_user_issued_asset("MUNEE");
 
       transfer(committee_account, nathan_id, asset(10000));
-      issue_uia(nathan, munee.amount(1000));
+      issue_uia(dan, munee.amount(1000));
 
       auto expiration = db.head_block_time() + 1000;
       limit_order_id_type order_id = create_sell_order(nathan, asset(1000), munee.amount(100), expiration)->get_id();
 
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-995)), fc::exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1000000), munee.amount(100))),
-                             fc::exception);
-      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2000), munee.amount(100)), asset(-985)),
-                             fc::exception);
+      REQUIRE_EXCEPTION_WITH_TEXT( update_limit_order(order_id, {}, asset(-995)), "order becomes too small" );
+
+      // Partially fill the first order so that we can test price changes
+      const limit_order_object* order2 = create_sell_order( dan, munee.amount(99), asset(990) );
+      BOOST_CHECK( !order2 );
+
+      auto sell_price = asset(1000) / munee.amount(100);
+      BOOST_CHECK_EQUAL( fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price) );
+      BOOST_CHECK_EQUAL( order_id(db).for_sale.value, 10 );
+
+      REQUIRE_EXCEPTION_WITH_TEXT( update_limit_order(order_id, price(asset(1000), munee.amount(99))),
+                                   "order becomes too small" );
+      REQUIRE_EXCEPTION_WITH_TEXT( update_limit_order(order_id, price(asset(990), munee.amount(150)), asset(-5)),
+                                   "order becomes too small" );
 
       generate_block();
 
