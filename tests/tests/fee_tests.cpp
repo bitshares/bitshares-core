@@ -4259,7 +4259,7 @@ BOOST_AUTO_TEST_CASE( fee_change_test )
       cop.proposed_ops.emplace_back( cmuop );
       trx.operations.push_back( cop );
 
-      // It should fail
+      // It should succeed
       processed_transaction ptx = PUSH_TX(db, trx, ~0);
       trx.clear();
       proposal_id_type prop_id { ptx.operation_results[0].get<object_id_type>() };
