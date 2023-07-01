@@ -8,12 +8,26 @@ jobs:
     name: Build and test in Debug mode
     strategy:
       matrix:
-        os: [ ubuntu-18.04, ubuntu-20.04 ]
+        os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
-      elasticsearch:
-        image: docker://elasticsearch:7.17.7
-        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
+      elasticsearch8:
+        image: elastic/elasticsearch:8.8.1
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
+      elasticsearch7:
+        image: elastic/elasticsearch:7.17.10
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9201:9200
     steps:
     - name: Install dependencies
       run: |
@@ -51,11 +65,6 @@ jobs:
         pwd
         df -h .
         free
-        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
-        free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /_build/tests /mnt/_build
         sudo chmod a+rwx /_build/libraries /_build/programs /_build/tests
@@ -89,25 +98,25 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        make -j 1 -C _build chain_test
-        make -j 1 -C _build cli_test
-        make -j 1 -C _build app_test
-        make -j 1 -C _build es_test
-        make -j 1 -C _build cli_wallet
-        make -j 1 -C _build witness_node
-        make -j 1 -C _build
+        make -j 2 -C _build chain_test
+        make -j 2 -C _build cli_test
+        make -j 2 -C _build app_test
+        make -j 2 -C _build es_test
+        make -j 2 -C _build cli_wallet
+        make -j 2 -C _build witness_node
+        make -j 2 -C _build
         df -h
         du -hs _build/libraries/* _build/programs/* _build/tests/*
         du -hs _build/*
         du -hs /_build/*
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         df -h
         rm -rf /tmp/graphene*
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
-          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        echo
+        _build/tests/es_test -l test_suite
+        export GRAPHENE_TESTING_ES_URL=http://127.0.0.1:9201/
         _build/tests/es_test -l test_suite
         df -h
         rm -rf /tmp/graphene*

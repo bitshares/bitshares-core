@@ -33,11 +33,22 @@
 #include <graphene/chain/is_authorized_asset.hpp>
 
 #include <graphene/protocol/market.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace chain {
 void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_operation& op)
 { try {
    const database& d = db();
+
+   if( op.extensions.value.on_fill.valid() )
+   {
+      FC_ASSERT( HARDFORK_CORE_2535_PASSED( d.head_block_time() ) ,
+                 "The on_fill extension is not allowed until the core-2535 hardfork");
+      FC_ASSERT( 1 == op.extensions.value.on_fill->size(),
+                 "The on_fill action list must contain only one action until expanded in a future hardfork" );
+      const auto& take_profit_action = op.extensions.value.on_fill->front().get<create_take_profit_order_action>();
+      FC_ASSERT( d.find( take_profit_action.fee_asset_id ), "Fee asset does not exist" );
+   }
 
    FC_ASSERT( op.expiration >= d.head_block_time() );
 
@@ -74,13 +85,13 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
                     ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void limit_order_create_evaluator::convert_fee()
 {
    if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
       generic_evaluator::convert_fee();
-   else if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   else if( fee_asset->get_id() != asset_id_type() )
    {
       db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
          d.fee_pool -= core_fee_paid;
@@ -118,6 +129,8 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.expiration = op.expiration;
        obj.deferred_fee = _deferred_fee;
        obj.deferred_paid_fee = _deferred_paid_fee;
+       if( op.extensions.value.on_fill.valid() )
+          obj.on_fill = *op.extensions.value.on_fill;
    });
    object_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled;
@@ -132,7 +145,323 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
                     ("op",op) );
 
    return order_id;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+void limit_order_update_evaluator::convert_fee()
+{
+   if( fee_asset->get_id() != asset_id_type() )
+   {
+      db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& addo) {
+         addo.fee_pool -= core_fee_paid;
+      });
+   }
+}
+
+void limit_order_update_evaluator::pay_fee()
+{
+   _deferred_fee = core_fee_paid;
+   if( fee_asset->get_id() != asset_id_type() )
+      _deferred_paid_fee = fee_from_account;
+}
+
+void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
+{ try {
+   const database& d = db();
+   FC_ASSERT( HARDFORK_CORE_1604_PASSED( d.head_block_time() ) , "Operation has not activated yet");
+
+   if( o.on_fill.valid() )
+   {
+      // Note: Assuming that HF core-1604 and HF core-2535 will take place at the same time,
+      //       no check for HF core-2535 here.
+      FC_ASSERT( o.on_fill->size() <= 1,
+                 "The on_fill action list must contain zero or one action until expanded in a future hardfork" );
+      if( !o.on_fill->empty() )
+      {
+         const auto& take_profit_action = o.on_fill->front().get<create_take_profit_order_action>();
+         FC_ASSERT( d.find( take_profit_action.fee_asset_id ), "Fee asset does not exist" );
+      }
+   }
+
+   _order = d.find( o.order );
+
+   GRAPHENE_ASSERT( _order != nullptr,
+                    limit_order_update_nonexist_order,
+                    "Limit order ${oid} does not exist, cannot update",
+                    ("oid", o.order) );
+
+   // Check this is my order
+   GRAPHENE_ASSERT( o.seller == _order->seller,
+                    limit_order_update_owner_mismatch,
+                    "Limit order ${oid} is owned by someone else, cannot update",
+                    ("oid", o.order) );
+
+   // Check new price is compatible and appropriate
+   if (o.new_price) {
+      auto base_id = o.new_price->base.asset_id;
+      auto quote_id = o.new_price->quote.asset_id;
+      FC_ASSERT(base_id == _order->sell_price.base.asset_id && quote_id == _order->sell_price.quote.asset_id,
+                "Cannot update limit order with incompatible price");
+
+      // Do not allow inappropriate price manipulation
+      auto max_amount_for_sale = std::max( _order->for_sale, _order->sell_price.base.amount );
+      if( o.delta_amount_to_sell )
+         max_amount_for_sale += o.delta_amount_to_sell->amount;
+      FC_ASSERT( o.new_price->base.amount <= max_amount_for_sale,
+                 "The base amount in the new price cannot be greater than the estimated maximum amount for sale" );
+
+   }
+
+   // Check delta asset is compatible
+   if (o.delta_amount_to_sell) {
+      const auto& delta = *o.delta_amount_to_sell;
+      FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
+                "Cannot update limit order with incompatible asset");
+      if (delta.amount < 0)
+          FC_ASSERT(_order->for_sale > -delta.amount,
+                    "Cannot deduct all or more from order than order contains");
+      // Note: if the delta amount is positive, account balance will be checked when calling adjust_balance()
+   }
+
+   // Check dust
+   if (o.new_price || (o.delta_amount_to_sell && o.delta_amount_to_sell->amount < 0)) {
+      auto new_price = o.new_price? *o.new_price : _order->sell_price;
+      auto new_amount = _order->amount_for_sale();
+      if (o.delta_amount_to_sell)
+          new_amount += *o.delta_amount_to_sell;
+      auto new_amount_to_receive = new_amount * new_price;
+
+      FC_ASSERT( new_amount_to_receive.amount > 0,
+                 "Cannot update limit order: order becomes too small; cancel order instead" );
+   }
+
+   // Check expiration is in the future
+   if (o.new_expiration)
+      FC_ASSERT( *o.new_expiration >= d.head_block_time(), "Cannot update limit order to expire in the past" );
+
+   // Check asset authorization
+   // TODO refactor to fix duplicate code (see limit_order_create)
+   const auto sell_asset_id = _order->sell_asset_id();
+   const auto receive_asset_id = _order->receive_asset_id();
+   const auto& sell_asset = sell_asset_id(d);
+   const auto& receive_asset = receive_asset_id(d);
+   const auto& seller = *this->fee_paying_account;
+
+   if( !sell_asset.options.whitelist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.whitelist_markets.find( receive_asset_id )
+                          != sell_asset.options.whitelist_markets.end(),
+                 "This market has not been whitelisted by the selling asset" );
+   }
+   if( !sell_asset.options.blacklist_markets.empty() )
+   {
+      FC_ASSERT( sell_asset.options.blacklist_markets.find( receive_asset_id )
+                          == sell_asset.options.blacklist_markets.end(),
+                 "This market has been blacklisted by the selling asset" );
+   }
+
+   FC_ASSERT( is_authorized_asset( d, seller, sell_asset ),
+              "The account is not allowed to transact the selling asset" );
+
+   FC_ASSERT( is_authorized_asset( d, seller, receive_asset ),
+              "The account is not allowed to transact the receiving asset" );
+
+   return {};
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
+
+void limit_order_update_evaluator::process_deferred_fee()
+{
+   // Attempt to deduct a possibly discounted order cancellation fee, and refund the remainder.
+   // Only deduct fee if there is any fee deferred.
+   // TODO fix duplicate code (see database::cancel_limit_order())
+   if( _order->deferred_fee <= 0 )
+      return;
+
+   database& d = db();
+
+   share_type deferred_fee = _order->deferred_fee;
+   asset deferred_paid_fee = _order->deferred_paid_fee;
+   const asset_dynamic_data_object* deferred_fee_asset_dyn_data = nullptr;
+   const auto& current_fees = d.current_fee_schedule();
+   asset core_cancel_fee = current_fees.calculate_fee( limit_order_cancel_operation() );
+   if( core_cancel_fee.amount > 0 )
+   {
+      // maybe-discounted cancel_fee calculation:
+      //   limit_order_cancel_fee * limit_order_update_fee / limit_order_create_fee
+      asset core_create_fee = current_fees.calculate_fee( limit_order_create_operation() );
+      fc::uint128_t fee128( core_cancel_fee.amount.value );
+      if( core_create_fee.amount > 0 )
+      {
+         asset core_update_fee = current_fees.calculate_fee( limit_order_update_operation() );
+         fee128 *= core_update_fee.amount.value;
+         fee128 /= core_create_fee.amount.value;
+      }
+      // cap the fee
+      if( fee128 > static_cast<uint64_t>( deferred_fee.value ) )
+         fee128 = deferred_fee.value;
+      core_cancel_fee.amount = static_cast<int64_t>( fee128 );
+   }
+
+   // if there is any CORE fee to deduct, redirect it to referral program
+   if( core_cancel_fee.amount > 0 )
+   {
+      if( !_seller_acc_stats )
+         _seller_acc_stats = &d.get_account_stats_by_owner( _order->seller );
+      d.modify( *_seller_acc_stats, [&core_cancel_fee, &d]( account_statistics_object& obj ) {
+         obj.pay_fee( core_cancel_fee.amount, d.get_global_properties().parameters.cashback_vesting_threshold );
+      } );
+      deferred_fee -= core_cancel_fee.amount;
+      // handle originally paid fee if any:
+      //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
+      if( deferred_paid_fee.amount > 0 )
+      {
+         fc::uint128_t fee128( deferred_paid_fee.amount.value );
+         fee128 *= core_cancel_fee.amount.value;
+         // to round up
+         fee128 += _order->deferred_fee.value;
+         fee128 -= 1;
+         fee128 /= _order->deferred_fee.value;
+         share_type cancel_fee_amount = static_cast<int64_t>(fee128);
+         // cancel_fee should be positive, pay it to asset's accumulated_fees
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+         d.modify( *deferred_fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+            addo.accumulated_fees += cancel_fee_amount;
+         });
+         // cancel_fee should be no more than deferred_paid_fee
+         deferred_paid_fee.amount -= cancel_fee_amount;
+      }
+   }
+
+   // refund fee
+   if( 0 == _order->deferred_paid_fee.amount )
+   {
+      // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
+      // if order was created before hard fork 604,
+      //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
+      d.adjust_balance( _order->seller, deferred_fee );
+   }
+   else // need to refund fee in originally paid asset
+   {
+      d.adjust_balance( _order->seller, deferred_paid_fee );
+      // be here, must have: fee_asset != CORE
+      if( !deferred_fee_asset_dyn_data )
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(d).dynamic_asset_data_id(d);
+      d.modify( *deferred_fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+         addo.fee_pool += deferred_fee;
+      });
+   }
+
+}
+
+bool limit_order_update_evaluator::is_linked_tp_order_compatible(const limit_order_update_operation& o) const
+{
+   if( !o.on_fill ) // there is no change to on_fill, so do nothing
+      return true;
+   bool is_compatible = true;
+   if( o.on_fill->empty() )
+   {
+      if( !_order->on_fill.empty() ) // This order's on_fill is being removed
+      {
+         // Two scenarios:
+         // 1. The linked order is generated by this order, now this order's on_fill is being removed, so unlink
+         // 2. This order is generated by the linked order, and "repeat" was true, now this order's on_fill is
+         //      being removed, so it becomes incompatible with the linked order, so unlink
+         is_compatible = false;
+      }
+      // else there is no change, nothing to do here
+   }
+   else // o.on_fill is not empty
+   {
+      if( _order->on_fill.empty() )
+      {
+         // It means this order was generated by the linked order, and the linked order's "repeat" is false.
+         // We are adding on_fill to this order, so it becomes incompatible with the linked order, so unlink.
+         is_compatible = false;
+      }
+      else // Not empty
+      {
+         // Two scenarios:
+         // 1. Both order's "repeat" are true
+         // 2. This order's "repeat" was false, and the linked order was generated by this order
+         //
+         // Either way, if "spread_percent" or "repeat" in on_fill changed, unlink the linked take profit order.
+         const auto& old_take_profit_action = _order->get_take_profit_action();
+         const auto& new_take_profit_action = o.on_fill->front().get<create_take_profit_order_action>();
+         if( old_take_profit_action.spread_percent != new_take_profit_action.spread_percent
+             || old_take_profit_action.repeat != new_take_profit_action.repeat )
+         {
+            is_compatible = false;
+         }
+      } // whether order's on_fill is empty (both handled)
+   } // whether o.on_fill is empty (both handled)
+   return is_compatible;
+};
+
+void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
+{ try {
+   database& d = db();
+
+   // Adjust account balance
+   if( o.delta_amount_to_sell )
+   {
+      d.adjust_balance( o.seller, -*o.delta_amount_to_sell );
+      if( o.delta_amount_to_sell->asset_id == asset_id_type() )
+      {
+         _seller_acc_stats = &d.get_account_stats_by_owner( o.seller );
+         d.modify( *_seller_acc_stats, [&o]( account_statistics_object& bal ) {
+            bal.total_core_in_orders += o.delta_amount_to_sell->amount;
+         });
+      }
+   }
+
+   // Process deferred fee in the order.
+   process_deferred_fee();
+
+   // Process linked take profit order
+   bool unlink = false;
+   if( _order->take_profit_order_id.valid() )
+   {
+      // If price changed, unless it is triggered by on_fill of the linked take profit order,
+      //   unlink the linked take profit order.
+      if( !trx_state->skip_limit_order_price_check
+            && o.new_price.valid() && *o.new_price != _order->sell_price )
+      {
+         unlink = true;
+      }
+      // If on_fill changed and the order became incompatible with the linked order, unlink
+      else
+         unlink = !is_linked_tp_order_compatible( o );
+
+      // Now update database
+      if( unlink )
+      {
+         const auto& take_profit_order = (*_order->take_profit_order_id)(d);
+         d.modify( take_profit_order, []( limit_order_object& loo ) {
+            loo.take_profit_order_id.reset();
+         });
+      }
+   }
+
+   // Update order
+   d.modify(*_order, [&o,this,unlink](limit_order_object& loo) {
+      if (o.new_price)
+         loo.sell_price = *o.new_price;
+      if (o.delta_amount_to_sell)
+         loo.for_sale += o.delta_amount_to_sell->amount;
+      if (o.new_expiration)
+         loo.expiration = *o.new_expiration;
+      loo.deferred_fee = _deferred_fee;
+      loo.deferred_paid_fee = _deferred_paid_fee;
+      if( o.on_fill )
+         loo.on_fill= *o.on_fill;
+      if( unlink )
+         loo.take_profit_order_id.reset();
+   });
+
+   // Perform order matching if necessary
+   d.apply_order(*_order);
+
+   return {};
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)
 { try {
@@ -151,7 +480,7 @@ void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_o
                     ("oid", o.order) );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation& o) const
 { try {
@@ -173,7 +502,7 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    }
 
    return refunded;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result call_order_update_evaluator::do_evaluate(const call_order_update_operation& o)
 { try {
@@ -206,7 +535,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    /// if there is a settlement for this asset, then no further margin positions may be taken and
    /// all existing margin positions should have been closed va database::globally_settle_asset
-   FC_ASSERT( !_bitasset_data->has_settlement(),
+   FC_ASSERT( !_bitasset_data->is_globally_settled(),
               "Cannot update debt position when the asset has been globally settled" );
 
    FC_ASSERT( o.delta_collateral.asset_id == _bitasset_data->options.short_backing_asset,
@@ -257,7 +586,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 object_id_type call_order_update_evaluator::do_apply(const call_order_update_operation& o)
@@ -465,7 +794,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
    }
 
    return call_order_id;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)
 { try {
@@ -487,7 +816,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
-   FC_ASSERT( _bitasset_data->has_settlement(), "Cannot bid since the asset is not globally settled" );
+   FC_ASSERT( _bitasset_data->is_globally_settled(), "Cannot bid since the asset is not globally settled" );
 
    FC_ASSERT( o.additional_collateral.asset_id == _bitasset_data->options.short_backing_asset );
 
@@ -527,7 +856,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o) const
@@ -549,6 +878,6 @@ void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 } } // graphene::chain

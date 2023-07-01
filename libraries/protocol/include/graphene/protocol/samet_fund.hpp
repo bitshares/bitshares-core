@@ -35,7 +35,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;                   ///< Operation fee
       account_id_type owner_account;         ///< Owner of the fund
@@ -55,7 +55,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_delete_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_params_t { uint64_t fee = 0; };
 
       asset                fee;                ///< Operation fee
       account_id_type      owner_account;      ///< The account who owns the SameT Fund object
@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                fee;                   ///< Operation fee
       account_id_type      owner_account;         ///< Owner of the fund
@@ -93,7 +93,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_borrow_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          borrower;           ///< The account who borrows from the fund
@@ -112,7 +112,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_repay_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who repays to the SameT Fund
@@ -128,11 +128,11 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::samet_fund_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::samet_fund_delete_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::samet_fund_update_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::samet_fund_borrow_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::samet_fund_repay_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::samet_fund_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::samet_fund_delete_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::samet_fund_update_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::samet_fund_borrow_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::samet_fund_repay_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::samet_fund_create_operation,
             (fee)(owner_account)(asset_type)(balance)(fee_rate)(extensions) )
@@ -145,11 +145,11 @@ FC_REFLECT( graphene::protocol::samet_fund_borrow_operation,
 FC_REFLECT( graphene::protocol::samet_fund_repay_operation,
             (fee)(account)(fund_id)(repay_amount)(fund_fee)(extensions) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_delete_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_borrow_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_repay_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_delete_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_borrow_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_repay_operation::fee_params_t )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::samet_fund_delete_operation )

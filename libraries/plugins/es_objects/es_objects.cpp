@@ -358,12 +358,12 @@ void es_objects_plugin_impl::send_bulk_if_ready( bool force )
    // send data to elasticsearch when being forced or bulk is too large
    if( !es->send_bulk( bulk_lines ) )
    {
-      elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:",
-            ("n",bulk_lines.size()) );
+      elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:", // GCOVR_EXCL_LINE
+            ("n",bulk_lines.size()) ); // GCOVR_EXCL_LINE
       const auto log_max = std::min( bulk_lines.size(), size_t(10) );
       for( size_t i = 0; i < log_max; ++i )
       {
-         edump( (bulk_lines[i]) );
+         edump( (bulk_lines[i]) ); // GCOVR_EXCL_LINE
       }
       FC_THROW_EXCEPTION( graphene::chain::plugin_exception,
             "Error populating ES database, we are going to keep trying." );

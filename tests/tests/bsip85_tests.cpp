@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE( bsip85_maker_fee_discount_test )
       int64_t core_maker_refund = usd_maker_refund == 0 ? 0 : core_create_fee * 1123 / 10000;
 
       fee_parameters::flat_set_type new_fees;
-      limit_order_create_operation::fee_parameters_type create_fee_params;
+      limit_order_create_operation::fee_params_t create_fee_params;
       create_fee_params.fee = order_create_fee;
       new_fees.insert( create_fee_params );
 

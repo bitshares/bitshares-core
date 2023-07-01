@@ -373,7 +373,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //////
          call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
          BOOST_CHECK_EQUAL(bob_initial_cr.quote.amount.value, 2000000); // Debt of 2,000,000 satoshi SMARTBIT
@@ -401,7 +401,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          publish_feed(smartbit, feedproducer_id(db), current_feed);
 
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Check Bob's debt to the blockchain
          BOOST_CHECK_EQUAL(bob_call_id(db).debt.value, bob_initial_smart.amount.value);
@@ -652,7 +652,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          //////
          call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
          BOOST_CHECK_EQUAL(bob_initial_cr.quote.amount.value, 2000000); // Debt of 2,000,000 satoshi SMARTBIT
@@ -680,7 +680,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          publish_feed(smartbit, feedproducer_id(db), current_feed);
 
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Check Bob's debt to the blockchain
          BOOST_CHECK_EQUAL(bob_call_id(db).debt.value, bob_initial_smart.amount.value);
@@ -699,7 +699,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Charlie obtains his SMARTBIT by borrowing it from the blockchain
          call_order_id_type charlie_call_id = (*borrow(charlie, charlie_initial_smart, charlie_initial_core)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(charlie, smartbit), 200 * SMARTBIT_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price charlie_initial_cr = charlie_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK_EQUAL(charlie_initial_cr.base.amount.value, 120000000); // Collateral of 120,000,000 satoshi CORE
          BOOST_CHECK_EQUAL(charlie_initial_cr.quote.amount.value, 2000000); // Debt of 2,000,000 satoshi SMARTBIT
@@ -974,7 +974,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          const uint16_t tcr = 2200; // Bob's target collateral ratio (TCR) 220% expressed in terms of GRAPHENE_COLLATERAL_RATIO_DENOM
          call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
          BOOST_CHECK_EQUAL(bob_initial_cr.quote.amount.value, 2000000); // Debt of 2,000,000 satoshi SMARTBIT
@@ -1002,7 +1002,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          publish_feed(smartbit, feedproducer_id(db), current_feed);
 
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Check Bob's debt to the blockchain
          BOOST_CHECK_EQUAL(bob_call_id(db).debt.value, bob_initial_smart.amount.value);
@@ -1343,7 +1343,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).get_id();
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 500 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(alice_id, core_id), 0 * CORE_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Alice offer to sell the SMARTBIT
          // Create a "large" sell order at a "high" price of settlement_price * 1.1 = settlement_price * (11/10)
@@ -1382,7 +1382,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Bobs's balances should reflect that CORE was used to create SMARTBIT
          BOOST_CHECK_EQUAL(get_balance(bob_id, smartbit_id), 200 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(bob_id, core_id), 0);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK(bob_initial_cr == expected_bob_initial_cr);
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
@@ -1422,7 +1422,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Confirm the updated feed
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
          // Confirm no global settlement
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement());
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled());
 
 
          // The margin call of Bob's position should have closed the debt of bob_initial_smart
@@ -1641,7 +1641,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          borrow(alice, alice_initial_smart, alice_initial_core);
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 500 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(alice_id, core_id), 0 * CORE_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Alice offer to sell the SMARTBIT
          // Create a "large" sell order at a "high" price of settlement_price * 1.1 = settlement_price * (11/10)
@@ -1679,7 +1679,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          const uint16_t tcr = 2200; // Bob's target collateral ratio (TCR) 220% expressed in terms of GRAPHENE_COLLATERAL_RATIO_DENOM
          call_order_id_type bob_call_id = (*borrow(bob, bob_initial_smart, bob_initial_core, tcr)).get_id();
          BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 200 * SMARTBIT_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
          BOOST_CHECK_EQUAL(bob_initial_cr.quote.amount.value, 2000000); // Debt of 2,000,000 satoshi SMARTBIT
@@ -1709,7 +1709,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Confirm the updated feed
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
          // Confirm no global settlement
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement());
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled());
 
          // When a TCR is set for a call order, the ideal is to not sell all of the collateral
          // but only enough collateral so that the remaining collateral and the remaining debt in the debt position
@@ -2040,7 +2040,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          call_order_id_type alice_call_id = (*borrow(alice, alice_initial_smart, alice_initial_core)).get_id();
          BOOST_CHECK_EQUAL(get_balance(alice_id(db), smartbit_id(db)), 500 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(alice_id, core_id), 0 * CORE_UNIT);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
 
          // Alice offer to sell the SMARTBIT
          const asset alice_debt_to_sell = smartbit.amount(500 * SMARTBIT_UNIT);
@@ -2085,7 +2085,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Bobs's balances should reflect that CORE was used to create SMARTBIT
          BOOST_CHECK_EQUAL(get_balance(bob_id, smartbit_id), 200 * SMARTBIT_UNIT);
          BOOST_CHECK_EQUAL(get_balance(bob_id, core_id), 0);
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement()); // No global settlement
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled()); // No global settlement
          const price bob_initial_cr = bob_call_id(db).collateralization(); // Units of collateral / debt
          BOOST_CHECK(bob_initial_cr == expected_bob_initial_cr);
          BOOST_CHECK_EQUAL(bob_initial_cr.base.amount.value, 80000000); // Collateral of 80,000,000 satoshi CORE
@@ -2120,7 +2120,7 @@ BOOST_FIXTURE_TEST_SUITE(margin_call_fee_tests, bitasset_database_fixture)
          // Confirm the updated feed
          BOOST_CHECK(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
          // Confirm no global settlement
-         BOOST_CHECK(!smartbit.bitasset_data(db).has_settlement());
+         BOOST_CHECK(!smartbit.bitasset_data(db).is_globally_settled());
          // Verify the margin call order price is as planned
          BOOST_CHECK(smartbit_id(db).bitasset_data(db).current_feed.margin_call_order_price(initial_mcfr)
                      == planned_initial_mcop);

@@ -305,7 +305,7 @@ void database::update_active_witnesses()
       });
    });
 
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::update_active_committee_members()
 { try {
@@ -412,7 +412,7 @@ void database::update_active_committee_members()
                      std::inserter(gp.active_committee_members, gp.active_committee_members.begin()),
                      [](const committee_member_object& d) { return d.get_id(); });
    });
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::initialize_budget_record( fc::time_point_sec now, budget_record& rec )const
 {
@@ -564,7 +564,7 @@ void database::process_budget()
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
    }
-   FC_CAPTURE_AND_RETHROW()
+   FC_CAPTURE_AND_RETHROW() // GCOVR_EXCL_LINE
 }
 
 template< typename Visitor >
@@ -984,7 +984,7 @@ void database::process_bitassets()
    for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
    {
       modify( d, update_bitasset );
-      if( d.has_settlement() )
+      if( d.is_globally_settled() )
          process_bids(d);
    }
 }

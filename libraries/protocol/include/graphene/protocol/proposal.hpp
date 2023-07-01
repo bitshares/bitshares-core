@@ -69,7 +69,7 @@ namespace graphene { namespace protocol {
     */
    struct proposal_create_operation : public base_operation
    {
-       struct fee_parameters_type { 
+       struct fee_params_t {
           uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
           uint32_t price_per_kbyte = 10;
        };
@@ -95,7 +95,7 @@ namespace graphene { namespace protocol {
 
        account_id_type fee_payer()const { return fee_paying_account; }
        void            validate()const;
-       share_type      calculate_fee(const fee_parameters_type& k)const;
+       share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -118,7 +118,7 @@ namespace graphene { namespace protocol {
     */
    struct proposal_update_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct fee_params_t {
          uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
          uint32_t price_per_kbyte = 10;
       };
@@ -136,7 +136,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
       void get_required_authorities( vector<authority>& )const;
       void get_required_active_authorities( flat_set<account_id_type>& )const;
       void get_required_owner_authorities( flat_set<account_id_type>& )const;
@@ -155,7 +155,7 @@ namespace graphene { namespace protocol {
     */
    struct proposal_delete_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       account_id_type   fee_paying_account;
       bool              using_owner_authority = false;
@@ -170,9 +170,9 @@ namespace graphene { namespace protocol {
    
 }} // graphene::protocol
 
-FC_REFLECT( graphene::protocol::proposal_create_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::proposal_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::proposal_delete_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::proposal_create_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::proposal_update_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::proposal_delete_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::proposal_create_operation, (fee)(fee_paying_account)(expiration_time)
             (proposed_ops)(review_period_seconds)(extensions) )
@@ -181,9 +181,9 @@ FC_REFLECT( graphene::protocol::proposal_update_operation, (fee)(fee_paying_acco
             (key_approvals_to_add)(key_approvals_to_remove)(extensions) )
 FC_REFLECT( graphene::protocol::proposal_delete_operation, (fee)(fee_paying_account)(using_owner_authority)(proposal)(extensions) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_delete_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_delete_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::proposal_delete_operation )

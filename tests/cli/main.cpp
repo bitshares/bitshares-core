@@ -1246,8 +1246,8 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       // then confirm that balances are received, and then analyze the range
       // prooofs to make sure the mantissa length does not reveal approximate
       // balance (issue #480).
-      std::map<std::string, share_type> to_list = {{"alice",100000000000},
-                                                   {"bob",    1000000000}};
+      std::map<std::string, share_type> to_list = {{"alice",100000000000LL},
+                                                   {"bob",    1000000000LL}};
       vector<blind_confirmation> bconfs;
       auto core_asset = W.get_asset("1.3.0");
       BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
