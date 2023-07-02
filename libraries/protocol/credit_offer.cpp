@@ -76,7 +76,7 @@ void credit_offer_create_operation::validate()const
    validate_acceptable_borrowers( acceptable_borrowers );
 }
 
-share_type credit_offer_create_operation::calculate_fee( const fee_parameters_type& schedule )const
+share_type credit_offer_create_operation::calculate_fee( const fee_params_t& schedule )const
 {
    share_type core_fee_required = schedule.fee;
    core_fee_required += calculate_data_fee( fc::raw::pack_size(*this), schedule.price_per_kbyte );
@@ -134,7 +134,7 @@ void credit_offer_update_operation::validate()const
               "Should change something - at least one of the optional data fields should be present" );
 }
 
-share_type credit_offer_update_operation::calculate_fee( const fee_parameters_type& schedule )const
+share_type credit_offer_update_operation::calculate_fee( const fee_params_t& schedule )const
 {
    share_type core_fee_required = schedule.fee;
    core_fee_required += calculate_data_fee( fc::raw::pack_size(*this), schedule.price_per_kbyte );
@@ -146,6 +146,12 @@ void credit_offer_accept_operation::validate()const
    FC_ASSERT( fee.amount >= 0, "Fee should not be negative" );
    FC_ASSERT( borrow_amount.amount > 0, "Amount to borrow should be positive" );
    FC_ASSERT( collateral.amount > 0, "Collateral amount should be positive" );
+   if( extensions.value.auto_repay.valid() )
+   {
+      constexpr auto cdar_count = static_cast<uint8_t>( credit_deal_auto_repayment_type::CDAR_TYPE_COUNT );
+      FC_ASSERT( *extensions.value.auto_repay < cdar_count,
+                 "auto_repay should be less than ${c}", ("c",cdar_count) );
+   }
 }
 
 void credit_deal_repay_operation::validate()const
@@ -157,13 +163,25 @@ void credit_deal_repay_operation::validate()const
              "Asset type of repay amount and credit fee should be the same" );
 }
 
+void credit_deal_update_operation::validate()const
+{
+   FC_ASSERT( fee.amount >= 0, "Fee should not be negative" );
+
+   constexpr auto cdar_count = static_cast<uint8_t>( credit_deal_auto_repayment_type::CDAR_TYPE_COUNT );
+   FC_ASSERT( auto_repay < cdar_count,
+              "auto_repay should be less than ${c}", ("c",cdar_count) );
+}
+
 } } // graphene::protocol
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_update_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_update_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_update_operation::fee_params_t )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation::ext )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_delete_operation )
@@ -171,3 +189,4 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_upda
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_offer_accept_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_repay_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_expired_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::credit_deal_update_operation )

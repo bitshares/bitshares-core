@@ -69,6 +69,20 @@ struct proposal_operation_hardfork_visitor
    template<typename T>
    void operator()(const T &v) const {}
 
+   // TODO review and cleanup code below after hard fork
+   // hf_1604
+   void operator()(const graphene::chain::limit_order_update_operation &) const {
+      FC_ASSERT( HARDFORK_CORE_1604_PASSED(block_time), "Operation is not enabled yet" );
+   }
+
+   // hf_2535
+   void operator()(const graphene::chain::limit_order_create_operation& op) const {
+      if( !HARDFORK_CORE_2535_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.on_fill.valid(),
+                    "The on_fill extension is not allowed until the core-2535 hardfork");
+      }
+   }
+
    void operator()(const graphene::chain::asset_create_operation &v) const {
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.common_options);
@@ -143,6 +157,10 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
+      if (!HARDFORK_CORE_1604_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<limit_order_update_operation>(),
+                   "Cannot set fees for limit_order_update_operation before its hardfork time");
+      }
       if (!HARDFORK_BSIP_40_PASSED(block_time)) {
          FC_ASSERT(!op.new_parameters.extensions.value.custom_authority_options.valid(),
                    "Unable to set Custom Authority Options before hardfork BSIP 40");
@@ -205,6 +223,14 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_expired_operation>(),
                    "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
       }
+      if (!HARDFORK_CORE_2595_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_update_operation>(),
+                   "Unable to define fees for credit deal update operation prior to the core-2595 hardfork");
+      }
+      if (!HARDFORK_CORE_2604_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_update_operation>(),
+                   "Unable to define fees for liquidity pool update operation prior to the core-2604 hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -246,6 +272,9 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::liquidity_pool_delete_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
+   void operator()(const graphene::chain::liquidity_pool_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
+   }
    void operator()(const graphene::chain::liquidity_pool_deposit_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
@@ -279,13 +308,20 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::credit_offer_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
    }
-   void operator()(const graphene::chain::credit_offer_accept_operation&) const {
+   void operator()(const graphene::chain::credit_offer_accept_operation& op) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+      if( !HARDFORK_CORE_2595_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.auto_repay.valid(),
+                    "auto_repay unavailable until the core-2595 hardfork");
+      }
    }
    void operator()(const graphene::chain::credit_deal_repay_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
    }
    // Note: credit_deal_expired_operation is a virtual operation thus no need to add code here
+   void operator()(const graphene::chain::credit_deal_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
+   }
 
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
@@ -403,7 +439,7 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
    _proposed_trx.validate();
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 object_id_type proposal_create_evaluator::do_apply( const proposal_create_operation& o )
 { try {
@@ -438,7 +474,7 @@ object_id_type proposal_create_evaluator::do_apply( const proposal_create_operat
    });
 
    return proposal.id;
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_update_evaluator::do_evaluate( const proposal_update_operation& o )
 { try {
@@ -462,7 +498,7 @@ void_result proposal_update_evaluator::do_evaluate( const proposal_update_operat
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 bool _testnet_old_is_authorized(const proposal_object& proposal, database& db);
 
@@ -502,14 +538,15 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
          d.modify(*_proposal, [&e](proposal_object& p) {
             p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
          });
-         wlog("Proposed transaction ${id} failed to apply once approved with exception:\n----\n${reason}\n----\nWill try again when it expires.",
+         wlog("Proposed transaction ${id} failed to apply once approved with exception:\n"
+              "----\n${reason}\n----\nWill try again when it expires.",
               ("id", o.proposal)("reason", e.to_detail_string()));
          _proposal_failed = true;
       }
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
 { try {
@@ -524,14 +561,14 @@ void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operati
               ("provided", o.fee_paying_account)("required", *required_approvals));
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation& o)
 { try {
    db().remove(*_proposal);
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 } } // graphene::chain

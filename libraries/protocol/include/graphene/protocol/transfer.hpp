@@ -44,7 +44,7 @@ namespace graphene { namespace protocol {
     */
    struct transfer_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee       = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10 * GRAPHENE_BLOCKCHAIN_PRECISION; /// only required for large memos.
       };
@@ -63,7 +63,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return from; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -76,7 +76,7 @@ namespace graphene { namespace protocol {
     */
    struct override_transfer_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee       = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10; /// only required for large memos.
       };
@@ -96,18 +96,18 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
 }} // graphene::protocol
 
-FC_REFLECT( graphene::protocol::transfer_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::override_transfer_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::transfer_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::override_transfer_operation::fee_params_t, (fee)(price_per_kbyte) )
 
 FC_REFLECT( graphene::protocol::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo)(extensions) )
 FC_REFLECT( graphene::protocol::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation )

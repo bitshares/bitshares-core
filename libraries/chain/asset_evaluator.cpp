@@ -182,7 +182,7 @@ namespace detail {
 
 } // graphene::chain::detail
 
-void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
+void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op ) const
 { try {
 
    const database& d = db();
@@ -238,11 +238,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       if( dotpos != std::string::npos )
       {
          auto prefix = op.symbol.substr( 0, dotpos );
-         auto asset_symbol_itr = asset_indx.find( prefix );
-         FC_ASSERT( asset_symbol_itr != asset_indx.end(),
+         auto asset_prefix_itr = asset_indx.find( prefix );
+         FC_ASSERT( asset_prefix_itr != asset_indx.end(),
                     "Asset ${s} may only be created by issuer of asset ${p}, but asset ${p} has not been created",
                     ("s",op.symbol)("p",prefix) );
-         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
+         FC_ASSERT( asset_prefix_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
       }
    }
@@ -272,7 +272,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void asset_create_evaluator::pay_fee()
 {
@@ -282,7 +282,7 @@ void asset_create_evaluator::pay_fee()
    generic_evaluator::pay_fee();
 }
 
-object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
+object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op ) const
 { try {
    database& d = db();
 
@@ -297,7 +297,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    if( fee_is_odd && !hf_429 )
    {
       d.modify( d.get_core_dynamic_data(), []( asset_dynamic_data_object& dd ) {
-         dd.current_supply++;
+         ++dd.current_supply;
       });
    }
 
@@ -320,7 +320,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 	    a.symbol = "BEET" + op.symbol.substr(3);
          a.precision = op.precision;
          a.options = op.common_options;
-         if( a.options.core_exchange_rate.base.asset_id.instance.value == 0 )
+         if( 0 == a.options.core_exchange_rate.base.asset_id.instance.value )
             a.options.core_exchange_rate.quote.asset_id = next_asset_id;
          else
             a.options.core_exchange_rate.base.asset_id = next_asset_id;
@@ -333,7 +333,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    FC_ASSERT( new_asset.id == next_asset_id, "Unexpected object database error, object id mismatch" );
 
    return new_asset.id;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 { try {
@@ -354,9 +354,9 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
-void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
+void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o ) const
 { try {
    db().adjust_balance( o.issue_to_account, o.asset_to_issue );
 
@@ -365,7 +365,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation& o )
 { try {
@@ -396,9 +396,9 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
-void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o )
+void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o ) const
 { try {
    db().adjust_balance( o.payer, -o.amount_to_reserve );
 
@@ -407,20 +407,20 @@ void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o 
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
 
    const asset_object& a = o.asset_id(d);
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
-void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o)
+void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o) const
 { try {
    db().adjust_balance(o.from_account, -o.amount);
 
@@ -429,7 +429,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
 { try {
@@ -446,7 +446,7 @@ static void validate_new_issuer( const database& d, const asset_object& a, accou
          FC_ASSERT( backing.get_id() == asset_id_type(),
                     "May not create a blockchain-controlled market asset which is not backed by CORE.");
    }
-} FC_CAPTURE_AND_RETHROW( (a)(new_issuer) ) }
+} FC_CAPTURE_AND_RETHROW( (a)(new_issuer) ) } // GCOVR_EXCL_LINE
 
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
@@ -598,7 +598,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       d.get(id);
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW((o)) }
+} FC_CAPTURE_AND_RETHROW((o)) } // GCOVR_EXCL_LINE
 
 void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
 { try {
@@ -660,7 +660,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer_operation& o)
 { try {
@@ -676,7 +676,7 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW((o)) }
+} FC_CAPTURE_AND_RETHROW((o)) } // GCOVR_EXCL_LINE
 
 void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_operation& o)
 { try {
@@ -686,7 +686,7 @@ void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_op
    });
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 /****************
  * Loop through assets, looking for ones that are backed by the asset being changed. When found,
@@ -748,7 +748,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
    if( !HARDFORK_CORE_2282_PASSED( next_maint_time ) )
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Cannot update a bitasset after a global settlement has executed" );
 
    if( current_bitasset_data.is_prediction_market )
@@ -789,14 +789,14 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    if( old_bsrm != new_bsrm )
    {
       FC_ASSERT( asset_obj.can_owner_update_bsrm(), "No permission to update BSRM" );
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Unable to update BSRM when the asset has been globally settled" );
 
       // Note: it is probably OK to allow BSRM update, be conservative here so far
       using bsrm_type = bitasset_options::black_swan_response_type;
       if( bsrm_type::individual_settlement_to_fund == old_bsrm )
-         FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
-                 "Unable to update BSRM when the individual settlement pool is not empty" );
+         FC_ASSERT( !current_bitasset_data.is_individually_settled_to_fund(),
+                 "Unable to update BSRM when the individual settlement pool (for force-settlements) is not empty" );
       else if( bsrm_type::individual_settlement_to_order == old_bsrm )
          FC_ASSERT( !d.find_settled_debt_order( op.asset_to_update ),
                  "Unable to update BSRM when there exists an individual settlement order" );
@@ -813,7 +813,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
-      FC_ASSERT( !current_bitasset_data.has_settlement(),
+      FC_ASSERT( !current_bitasset_data.is_globally_settled(),
                  "Cannot change backing asset after a global settlement has executed" );
 
       const asset_dynamic_data_object& dyn = asset_obj.dynamic_asset_data_id(d);
@@ -892,7 +892,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    asset_to_update = &asset_obj;
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 /*******
  * @brief Apply requested changes to bitasset options
@@ -1047,7 +1047,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
 
       return void_result();
 
-   } FC_CAPTURE_AND_RETHROW( (op) )
+   } FC_CAPTURE_AND_RETHROW( (op) ) // GCOVR_EXCL_LINE
 }
 
 void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_operation& o)
@@ -1072,7 +1072,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
       d.get(id);
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_operation& o) const
 { try {
@@ -1110,7 +1110,7 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
    d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle_evaluator::operation_type& op)
 { try {
@@ -1124,7 +1124,7 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
-   FC_ASSERT( !_bitasset_data.has_settlement(),
+   FC_ASSERT( !_bitasset_data.is_globally_settled(),
               "This asset has been globally settled, cannot globally settle again" );
 
    // Note: after core-2467 hard fork, there can be no debt position due to individual settlements, so we check here
@@ -1138,14 +1138,14 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
    d.globally_settle_asset( *asset_to_settle, op.settle_price );
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::operation_type& op)
 { try {
@@ -1155,14 +1155,14 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
               "Can only force settle a predition market or a market issued asset" );
 
    const auto& bitasset = asset_to_settle->bitasset_data(d);
-   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.has_settlement()
-                 || bitasset.has_individual_settlement(),
+   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.is_globally_settled()
+                 || bitasset.is_individually_settled_to_fund(),
               "Either the asset need to have the force_settle flag enabled, or it need to be globally settled, "
-              "or the individual settlement pool is not empty" );
+              "or the individual settlement pool (for force-settlements) is not empty" );
 
    if( bitasset.is_prediction_market )
    {
-      FC_ASSERT( bitasset.has_settlement(),
+      FC_ASSERT( bitasset.is_globally_settled(),
                  "Global settlement must occur before force settling a prediction market" );
    }
    else if( bitasset.current_feed.settlement_price.is_null() )
@@ -1174,11 +1174,11 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
                              "Before the core-216 hard fork, unable to force settle when there is no sufficient "
                              " price feeds, no matter if the asset has been globally settled" );
       }
-      if( !bitasset.has_settlement() && !bitasset.has_individual_settlement() )
+      if( !bitasset.is_globally_settled() && !bitasset.is_individually_settled_to_fund() )
       {
          FC_THROW_EXCEPTION( insufficient_feeds,
                              "Cannot force settle with no price feed if the asset is not globally settled and the "
-                             "individual settlement pool is not empty" );
+                             "individual settlement pool (for force-settlements) is not empty" );
       }
    }
 
@@ -1196,7 +1196,33 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    bitasset_ptr = &bitasset;
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+static optional<asset> pay_collateral_fees( database& d,
+                                            const asset& pays,
+                                            const asset& settled_amount,
+                                            const asset_object& asset_to_settle,
+                                            const asset_bitasset_data_object& bitasset )
+{
+   const auto& head_time = d.head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill settlement at MCOP)
+   if( after_core_hardfork_2591 && !bitasset.is_prediction_market
+         && !bitasset.current_feed.settlement_price.is_null() )
+   {
+      price fill_price = bitasset.get_margin_call_order_price();
+      try
+      {
+         asset settled_amount_by_mcop = pays.multiply_and_round_up( fill_price ); // Throws fc::exception if overflow
+         if( settled_amount_by_mcop < settled_amount )
+         {
+            asset collateral_fees = settled_amount - settled_amount_by_mcop;
+            asset_to_settle.accumulate_fee( d, collateral_fees );
+            return collateral_fees;
+         }
+      } FC_CAPTURE_AND_LOG( (pays)(settled_amount)(fill_price) ) // Catch and log the exception // GCOVR_EXCL_LINE
+   }
+   return optional<asset>();
+}
 
 static extendable_operation_result pay_settle_from_gs_fund( database& d,
                                                  const asset_settle_evaluator::operation_type& op,
@@ -1234,11 +1260,18 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
    d.adjust_balance( op.account, -pays );
 
    asset issuer_fees( 0, bitasset.options.short_backing_asset );
+   optional<asset> collateral_fees;
+
    if( settled_amount.amount > 0 )
    {
       d.modify( bitasset, [&settled_amount]( asset_bitasset_data_object& obj ){
          obj.settlement_fund -= settled_amount.amount;
       });
+
+      // Calculate and pay collateral fees after HF core-2591
+      collateral_fees = pay_collateral_fees( d, pays, settled_amount, asset_to_settle, bitasset );
+      if( collateral_fees.valid() )
+         settled_amount -= *collateral_fees;
 
       // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
       //
@@ -1264,7 +1297,8 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
 
    result.value.paid = vector<asset>({ pays });
    result.value.received = vector<asset>({ settled_amount });
-   result.value.fees  = vector<asset>({ issuer_fees });
+   result.value.fees = collateral_fees.valid() ? vector<asset>({ *collateral_fees, issuer_fees })
+                                               : vector<asset>({ issuer_fees });
 
    return result;
 }
@@ -1293,6 +1327,12 @@ static extendable_operation_result pay_settle_from_individual_pool( database& d,
    d.modify( asset_to_settle.dynamic_asset_data_id(d), [&pays]( asset_dynamic_data_object& obj ){
       obj.current_supply -= pays.amount;
    });
+
+   // Calculate and pay collateral fees after HF core-2591
+   optional<asset> collateral_fees = pay_collateral_fees( d, pays, settled_amount, asset_to_settle, bitasset );
+   if( collateral_fees.valid() )
+      settled_amount -= *collateral_fees;
+
    auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
    settled_amount -= issuer_fees;
 
@@ -1315,7 +1355,8 @@ static extendable_operation_result pay_settle_from_individual_pool( database& d,
 
    result.value.paid = vector<asset>({ pays });
    result.value.received = vector<asset>({ settled_amount });
-   result.value.fees  = vector<asset>({ issuer_fees });
+   result.value.fees = collateral_fees.valid() ? vector<asset>({ *collateral_fees, issuer_fees })
+                                               : vector<asset>({ issuer_fees });
 
    return result;
 }
@@ -1327,18 +1368,18 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& bitasset = *bitasset_ptr;
 
    // Process global settlement fund
-   if( bitasset.has_settlement() )
+   if( bitasset.is_globally_settled() )
       return pay_settle_from_gs_fund( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
    // Process individual settlement pool
    extendable_operation_result result;
    asset to_settle = op.amount;
-   if( bitasset.has_individual_settlement() )
+   if( bitasset.is_individually_settled_to_fund() )
    {
       result = pay_settle_from_individual_pool( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
       // If the amount to settle is too small, or force settlement is disabled, we return
-      if( bitasset.has_individual_settlement() || !asset_to_settle->can_force_settle() )
+      if( bitasset.is_individually_settled_to_fund() || !asset_to_settle->can_force_settle() )
          return result;
 
       to_settle -= result.value.paid->front();
@@ -1346,13 +1387,16 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    // Process the rest
    const auto& head_time = d.head_block_time();
-   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
-   d.adjust_balance( op.account, -to_settle );
 
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
    if( after_core_hardfork_2582 && 0 == to_settle.amount )
       return result;
 
+   bool after_core_hardfork_2587 = HARDFORK_CORE_2587_PASSED( head_time );
+   if( after_core_hardfork_2587 && bitasset.current_feed.settlement_price.is_null() )
+      return result;
+
+   d.adjust_balance( op.account, -to_settle );
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
       s.owner = op.account;
@@ -1362,6 +1406,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    result.value.new_objects = flat_set<object_id_type>({ settle.id });
 
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    if( HARDFORK_CORE_2481_PASSED( maint_time ) )
    {
       d.apply_force_settlement( settle, bitasset, *asset_to_settle );
@@ -1369,7 +1414,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    return result;
 
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
 { try {
@@ -1386,7 +1431,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    if( bitasset.is_prediction_market || now <= HARDFORK_CORE_216_TIME )
    {
-      FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+      FC_ASSERT( !bitasset.is_globally_settled(), "No further feeds may be published after a settlement event" );
    }
 
    // the settlement price must be quoted in terms of the backing asset
@@ -1431,7 +1476,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    bitasset_ptr = &bitasset;
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW((o)) }
+} FC_CAPTURE_AND_RETHROW((o)) } // GCOVR_EXCL_LINE
 
 void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
@@ -1460,7 +1505,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       return void_result();
 
    // Feed changed, check whether need to revive the asset and proceed if need
-   if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
+   if( bad.is_globally_settled() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
        && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
    {
       bool should_revive = false;
@@ -1494,7 +1539,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    d.check_call_orders( base, true, false, bitasset_ptr );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW((o)) }
+} FC_CAPTURE_AND_RETHROW((o)) } // GCOVR_EXCL_LINE
 
 
 /***
@@ -1539,7 +1584,7 @@ void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_oper
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 /***
@@ -1562,7 +1607,7 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
    d.adjust_balance( o.issuer, o.amount_to_claim );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
@@ -1570,7 +1615,7 @@ void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_oper
     FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
 
     return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operation& o )
 { try {
@@ -1587,7 +1632,7 @@ void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operati
     d.adjust_balance( o.issuer, o.amount_to_claim );
 
     return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o) ) } // GCOVR_EXCL_LINE
 
 
 } } // graphene::chain

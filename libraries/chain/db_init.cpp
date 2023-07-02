@@ -97,6 +97,7 @@ void database::initialize_evaluators()
    register_evaluator<asset_global_settle_evaluator>();
    register_evaluator<assert_evaluator>();
    register_evaluator<limit_order_create_evaluator>();
+   register_evaluator<limit_order_update_evaluator>();
    register_evaluator<limit_order_cancel_evaluator>();
    register_evaluator<call_order_update_evaluator>();
    register_evaluator<bid_collateral_evaluator>();
@@ -133,6 +134,7 @@ void database::initialize_evaluators()
    register_evaluator<ticket_update_evaluator>();
    register_evaluator<liquidity_pool_create_evaluator>();
    register_evaluator<liquidity_pool_delete_evaluator>();
+   register_evaluator<liquidity_pool_update_evaluator>();
    register_evaluator<liquidity_pool_deposit_evaluator>();
    register_evaluator<liquidity_pool_withdraw_evaluator>();
    register_evaluator<liquidity_pool_exchange_evaluator>();
@@ -146,6 +148,7 @@ void database::initialize_evaluators()
    register_evaluator<credit_offer_update_evaluator>();
    register_evaluator<credit_offer_accept_evaluator>();
    register_evaluator<credit_deal_repay_evaluator>();
+   register_evaluator<credit_deal_update_evaluator>();
 }
 
 void database::initialize_indexes()

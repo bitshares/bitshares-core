@@ -79,28 +79,23 @@ database& generic_evaluator::db()const { return trx_state->db(); }
 
    void generic_evaluator::convert_fee()
    {
-      if( !trx_state->skip_fee ) {
-         if( fee_asset->get_id() != asset_id_type() )
-         {
-            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
-               d.accumulated_fees += fee_from_account.amount;
-               d.fee_pool -= core_fee_paid;
-            });
-         }
+      if( fee_asset->get_id() != asset_id_type() )
+      {
+         db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+            d.accumulated_fees += fee_from_account.amount;
+            d.fee_pool -= core_fee_paid;
+         });
       }
    }
 
    void generic_evaluator::pay_fee()
    { try {
-      if( !trx_state->skip_fee ) {
-         database& d = db();
-         /// TODO: db().pay_fee( account_id, core_fee );
-         d.modify(*fee_paying_account_statistics, [&](account_statistics_object& s)
-         {
-            s.pay_fee( core_fee_paid, d.get_global_properties().parameters.cashback_vesting_threshold );
-         });
-      }
-   } FC_CAPTURE_AND_RETHROW() }
+      database& d = db();
+      d.modify(*fee_paying_account_statistics, [this,&d](account_statistics_object& s)
+      {
+         s.pay_fee( core_fee_paid, d.get_global_properties().parameters.cashback_vesting_threshold );
+      });
+   } FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
    void generic_evaluator::pay_fba_fee( uint64_t fba_id )
    {

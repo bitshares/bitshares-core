@@ -36,13 +36,13 @@ namespace graphene { namespace chain {
       public:
          using operation_type = asset_create_operation;
 
-         void_result do_evaluate( const asset_create_operation& o );
-         object_id_type do_apply( const asset_create_operation& o );
+         void_result do_evaluate( const asset_create_operation& o ) const;
+         object_id_type do_apply( const asset_create_operation& o ) const;
 
          /** override the default behavior defined by generic_evalautor which is to
           * post the fee to fee_paying_account_stats.pending_fees
           */
-         virtual void pay_fee() override;
+         void pay_fee() override;
       private:
          bool fee_is_odd;
    };
@@ -52,8 +52,9 @@ namespace graphene { namespace chain {
       public:
          using operation_type = asset_issue_operation;
          void_result do_evaluate( const asset_issue_operation& o );
-         void_result do_apply( const asset_issue_operation& o );
+         void_result do_apply( const asset_issue_operation& o ) const;
 
+      private:
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
          const account_object*            to_account = nullptr;
    };
@@ -63,8 +64,9 @@ namespace graphene { namespace chain {
       public:
          using operation_type = asset_reserve_operation;
          void_result do_evaluate( const asset_reserve_operation& o );
-         void_result do_apply( const asset_reserve_operation& o );
+         void_result do_apply( const asset_reserve_operation& o ) const;
 
+      private:
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
          const account_object*            from_account = nullptr;
    };
@@ -78,6 +80,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_update_operation& o );
          void_result do_apply( const asset_update_operation& o );
 
+      private:
          const asset_object* asset_to_update = nullptr;
          const asset_bitasset_data_object* bitasset_data = nullptr;
    };
@@ -90,6 +93,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_update_issuer_operation& o );
          void_result do_apply( const asset_update_issuer_operation& o );
 
+      private:
          const asset_object* asset_to_update = nullptr;
    };
 
@@ -116,6 +120,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const operation_type& o );
          void_result do_apply( const operation_type& o ) const;
 
+      private:
          const asset_object* asset_to_update = nullptr;
    };
 
@@ -125,8 +130,9 @@ namespace graphene { namespace chain {
          using operation_type = asset_fund_fee_pool_operation;
 
          void_result do_evaluate(const asset_fund_fee_pool_operation& op);
-         void_result do_apply(const asset_fund_fee_pool_operation& op);
+         void_result do_apply(const asset_fund_fee_pool_operation& op) const;
 
+      private:
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
    };
 
@@ -138,6 +144,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate(const operation_type& op);
          void_result do_apply(const operation_type& op);
 
+      private:
          const asset_object* asset_to_settle = nullptr;
    };
    class asset_settle_evaluator : public evaluator<asset_settle_evaluator>
@@ -174,6 +181,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_claim_fees_operation& o );
          void_result do_apply( const asset_claim_fees_operation& o );
 
+      private:
          const asset_object* container_asset = nullptr;
          const asset_dynamic_data_object* container_ddo = nullptr;
    };

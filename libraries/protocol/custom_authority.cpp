@@ -29,7 +29,7 @@
 
 namespace graphene { namespace protocol {
 
-share_type custom_authority_create_operation::calculate_fee(const fee_parameters_type& k)const {
+share_type custom_authority_create_operation::calculate_fee(const fee_params_t& k)const {
    share_type core_fee_required = k.basic_fee;
    // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
    //       and the results of pack_size() won't be too big
@@ -58,7 +58,7 @@ void custom_authority_create_operation::validate()const {
    get_restriction_predicate(restrictions, operation_type);
 }
 
-share_type custom_authority_update_operation::calculate_fee(const fee_parameters_type& k)const {
+share_type custom_authority_update_operation::calculate_fee(const fee_params_t& k)const {
    share_type core_fee_required = k.basic_fee;
    // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
    //       and the results of pack_size() won't be too big

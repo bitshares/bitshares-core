@@ -47,6 +47,7 @@ struct hardfork_visitor {
    using BSIP_40_ops = fc::typelist::list< protocol::custom_authority_create_operation,
                                            protocol::custom_authority_update_operation,
                                            protocol::custom_authority_delete_operation>;
+   using hf1604_ops = fc::typelist::list< protocol::limit_order_update_operation>;
    using hf2103_ops = fc::typelist::list< protocol::ticket_create_operation,
                                           protocol::ticket_update_operation>;
    using liquidity_pool_ops = fc::typelist::list< protocol::liquidity_pool_create_operation,
@@ -54,6 +55,7 @@ struct hardfork_visitor {
                                                   protocol::liquidity_pool_deposit_operation,
                                                   protocol::liquidity_pool_withdraw_operation,
                                                   protocol::liquidity_pool_exchange_operation >;
+   using liquidity_pool_update_op = fc::typelist::list< protocol::liquidity_pool_update_operation >;
    using samet_fund_ops = fc::typelist::list< protocol::samet_fund_create_operation,
                                               protocol::samet_fund_delete_operation,
                                               protocol::samet_fund_update_operation,
@@ -65,6 +67,8 @@ struct hardfork_visitor {
                                                 protocol::credit_offer_accept_operation,
                                                 protocol::credit_deal_repay_operation,
                                                 protocol::credit_deal_expired_operation >;
+   using credit_deal_update_op = fc::typelist::list< protocol::credit_deal_update_operation >;
+
    fc::time_point_sec now;
 
    /// @note using head block time for all operations
@@ -79,6 +83,9 @@ struct hardfork_visitor {
    std::enable_if_t<fc::typelist::contains<BSIP_40_ops, Op>(), bool>
    visit() { return HARDFORK_BSIP_40_PASSED(now); }
    template<typename Op>
+   std::enable_if_t<fc::typelist::contains<hf1604_ops, Op>(), bool>
+   visit() { return HARDFORK_CORE_1604_PASSED(now); }
+   template<typename Op>
    std::enable_if_t<fc::typelist::contains<hf2103_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2103_PASSED(now); }
    template<typename Op>
@@ -90,6 +97,12 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<credit_offer_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2362_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<credit_deal_update_op, Op>(), bool>
+   visit() { return HARDFORK_CORE_2595_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<liquidity_pool_update_op, Op>(), bool>
+   visit() { return HARDFORK_CORE_2604_PASSED(now); }
    /// @}
 
    /// typelist::runtime::dispatch adaptor

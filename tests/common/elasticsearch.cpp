@@ -48,7 +48,6 @@ bool checkES(ES& es)
    if(doCurl(curl_request).empty())
       return false;
    return true;
-
 }
 
 std::string getESVersion(ES& es)
@@ -69,6 +68,7 @@ void checkESVersion7OrAbove(ES& es, bool& result) noexcept
    static const int64_t version_7 = 7;
    try {
       const auto es_version = graphene::utilities::getESVersion(es);
+      ilog( "ES version detected: ${v}", ("v", es_version) );
       auto dot_pos = es_version.find('.');
       result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
    }
@@ -100,10 +100,29 @@ bool deleteAll(ES& es)
    curl_request.type = "DELETE";
 
    auto curl_response = doCurl(curl_request);
-   if(curl_response.empty())
+   if( curl_response.empty() )
+   {
+      wlog( "Empty ES response" );
       return false;
-   else
-      return true;
+   }
+
+   // Check errors in response
+   try
+   {
+      fc::variant j = fc::json::from_string(curl_response);
+      if( j.is_object() && j.get_object().contains("error") )
+      {
+         wlog( "ES returned an error: ${r}", ("r", curl_response) );
+         return false;
+      }
+   }
+   catch( const fc::exception& e )
+   {
+      wlog( "Error while checking ES response ${r}", ("r", curl_response) );
+      wdump( (e.to_detail_string()) );
+      return false;
+   }
+   return true;
 }
 
 std::string getEndPoint(ES& es)
@@ -146,6 +165,12 @@ std::string doCurl(CurlRequest& curl)
    if(!curl.auth.empty())
       curl_easy_setopt(curl.handler, CURLOPT_USERPWD, curl.auth.c_str());
    curl_easy_perform(curl.handler);
+
+   long code;
+   curl_easy_getinfo( curl.handler, CURLINFO_RESPONSE_CODE, &code );
+
+   if( 200 != code )
+      wlog( "doCurl response [${code}] ${msg}", ("code", ((int64_t)code))("msg", CurlReadBuffer) );
 
    return CurlReadBuffer;
 }

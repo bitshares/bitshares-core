@@ -84,4 +84,15 @@ namespace graphene { namespace chain {
          const credit_deal_object* _deal = nullptr;
    };
 
+   class credit_deal_update_evaluator : public evaluator<credit_deal_update_evaluator>
+   {
+      public:
+         using operation_type = credit_deal_update_operation;
+
+         void_result do_evaluate( const credit_deal_update_operation& op );
+         void_result do_apply( const credit_deal_update_operation& op ) const;
+
+         const credit_deal_object* _deal = nullptr;
+   };
+
 } } // graphene::chain

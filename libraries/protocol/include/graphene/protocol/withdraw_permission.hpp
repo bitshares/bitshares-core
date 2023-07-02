@@ -49,7 +49,7 @@ namespace graphene { namespace protocol {
     */
    struct withdraw_permission_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset             fee;
       /// The account authorizing withdrawals from its balances
@@ -82,7 +82,7 @@ namespace graphene { namespace protocol {
     */
    struct withdraw_permission_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                         fee;
       /// This account pays the fee. Must match permission_to_update->withdraw_from_account
@@ -119,7 +119,7 @@ namespace graphene { namespace protocol {
     */
    struct withdraw_permission_claim_operation : public base_operation
    {
-      struct fee_parameters_type {
+      struct fee_params_t {
          uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10;
       };
@@ -139,7 +139,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return withdraw_to_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& k)const;
+      share_type      calculate_fee(const fee_params_t& k)const;
    };
 
    /**
@@ -152,7 +152,7 @@ namespace graphene { namespace protocol {
     */
    struct withdraw_permission_delete_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_params_t { uint64_t fee = 0; };
 
       asset                         fee;
       /// Must match withdrawal_permission->withdraw_from_account. This account pays the fee.
@@ -168,10 +168,10 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::withdraw_permission_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::withdraw_permission_update_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::withdraw_permission_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::withdraw_permission_update_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::withdraw_permission_claim_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::withdraw_permission_create_operation,
             (fee)(withdraw_from_account)(authorized_account)
@@ -186,10 +186,10 @@ FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation,
             (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation )
