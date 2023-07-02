@@ -4240,8 +4240,9 @@ BOOST_AUTO_TEST_CASE( fee_change_test )
    // The fee schedule is still all zero
    check_zero_fees();
 
-   // Pass the BSIP-40 hardfork
-   generate_blocks( HARDFORK_BSIP_40_TIME );
+   // Proceed to a time in the far future
+   generate_blocks( fc::time_point_sec::maximum() - 86400
+                    - db.get_global_properties().parameters.maximum_proposal_lifetime );
    set_expiration( db, trx );
 
    // The fee schedule is still all zero
