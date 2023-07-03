@@ -974,8 +974,8 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_no_feed )
       BOOST_CHECK_THROW( force_settle( seller, asset(100001,mpa_id) ), fc::exception );
 
       // Advance to core-2587 hard fork
-      generate_blocks(HARDFORK_CORE_2587_TIME - mi);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      generate_blocks( HARDFORK_CORE_2587_TIME );
+      generate_block();
       set_expiration( db, trx );
 
       // able to settle more than the fund
