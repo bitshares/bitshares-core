@@ -121,11 +121,11 @@ BOOST_AUTO_TEST_CASE( validation_and_basic_logic_test )
       {
          auto& fee_params = gpo.parameters.get_mutable_fees().parameters;
 
-         auto itr = fee_params.find( ticket_create_operation::fee_parameters_type() );
-         itr->get<ticket_create_operation::fee_parameters_type>().fee = 1;
+         auto itr = fee_params.find( ticket_create_operation::fee_params_t() );
+         itr->get<ticket_create_operation::fee_params_t>().fee = 1;
 
-         itr = fee_params.find( ticket_update_operation::fee_parameters_type() );
-         itr->get<ticket_update_operation::fee_parameters_type>().fee = 2;
+         itr = fee_params.find( ticket_update_operation::fee_params_t() );
+         itr->get<ticket_update_operation::fee_params_t>().fee = 2;
       });
 
       int64_t expected_balance = init_amount;

@@ -33,7 +33,7 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;                         ///< Operation fee
       account_id_type account;                     ///< The account who creates the liquidity pool
@@ -55,11 +55,31 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_delete_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 0; };
+      struct fee_params_t { uint64_t fee = 0; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who owns the liquidity pool
       liquidity_pool_id_type   pool;               ///< ID of the liquidity pool
+
+      extensions_type extensions;  ///< Unused. Reserved for future use.
+
+      account_id_type fee_payer()const { return account; }
+      void            validate()const;
+   };
+
+   /**
+    * @brief Update a liquidity pool
+    * @ingroup operations
+    */
+   struct liquidity_pool_update_operation : public base_operation
+   {
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset                    fee;                ///< Operation fee
+      account_id_type          account;            ///< The account who owns the liquidity pool
+      liquidity_pool_id_type   pool;               ///< ID of the liquidity pool
+      optional<uint16_t>       taker_fee_percent;       ///< Taker fee percent
+      optional<uint16_t>       withdrawal_fee_percent;  ///< Withdrawal fee percent
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
@@ -73,7 +93,7 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_deposit_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION / 10; };
+      struct fee_params_t { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION / 10; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who deposits to the liquidity pool
@@ -93,7 +113,7 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_withdraw_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who withdraws from the liquidity pool
@@ -117,7 +137,7 @@ namespace graphene { namespace protocol {
     */
    struct liquidity_pool_exchange_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                    fee;                ///< Operation fee
       account_id_type          account;            ///< The account who exchanges with the liquidity pool
@@ -133,17 +153,20 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::liquidity_pool_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::liquidity_pool_delete_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::liquidity_pool_exchange_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_delete_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_update_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::liquidity_pool_exchange_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::liquidity_pool_create_operation,
             (fee)(account)(asset_a)(asset_b)(share_asset)
             (taker_fee_percent)(withdrawal_fee_percent)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_delete_operation,
             (fee)(account)(pool)(extensions) )
+FC_REFLECT( graphene::protocol::liquidity_pool_update_operation,
+            (fee)(account)(pool)(taker_fee_percent)(withdrawal_fee_percent)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation,
             (fee)(account)(pool)(amount_a)(amount_b)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,
@@ -151,14 +174,16 @@ FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,
 FC_REFLECT( graphene::protocol::liquidity_pool_exchange_operation,
             (fee)(account)(pool)(amount_to_sell)(min_to_receive)(extensions) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_delete_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_deposit_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_withdraw_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_exchange_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_delete_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_deposit_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_withdraw_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_exchange_operation::fee_params_t )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_delete_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_deposit_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_withdraw_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::liquidity_pool_exchange_operation )

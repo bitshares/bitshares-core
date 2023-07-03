@@ -46,7 +46,7 @@ namespace graphene { namespace protocol {
     */
    struct ticket_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;         ///< Operation fee
       account_id_type account;     ///< The account who creates the ticket
@@ -65,7 +65,7 @@ namespace graphene { namespace protocol {
     */
    struct ticket_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;         ///< Operation fee
       ticket_id_type  ticket;      ///< The ticket to update
@@ -84,16 +84,16 @@ namespace graphene { namespace protocol {
 FC_REFLECT_ENUM( graphene::protocol::ticket_type,
                  (liquid)(lock_180_days)(lock_360_days)(lock_720_days)(lock_forever)(TICKET_TYPE_COUNT) )
 
-FC_REFLECT( graphene::protocol::ticket_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::ticket_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::ticket_create_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::ticket_update_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::ticket_create_operation,
             (fee)(account)(target_type)(amount)(extensions) )
 FC_REFLECT( graphene::protocol::ticket_update_operation,
             (fee)(ticket)(account)(target_type)(amount_for_new_target)(extensions) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation::fee_params_t )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation )

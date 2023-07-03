@@ -170,7 +170,7 @@ void account_options::validate() const
               "May not specify fewer witnesses or committee members than the number voted for.");
 }
 
-share_type account_create_operation::calculate_fee( const fee_parameters_type& k )const
+share_type account_create_operation::calculate_fee( const fee_params_t& k )const
 {
    auto core_fee_required = k.basic_fee;
 
@@ -215,7 +215,7 @@ void account_create_operation::validate()const
    }
 }
 
-share_type account_update_operation::calculate_fee( const fee_parameters_type& k )const
+share_type account_update_operation::calculate_fee( const fee_params_t& k )const
 {
    auto core_fee_required = k.fee;  
    if( new_options )
@@ -260,7 +260,7 @@ void account_update_operation::validate()const
       validate_special_authority( *extensions.value.active_special_authority );
 }
 
-share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k) const
+share_type account_upgrade_operation::calculate_fee(const fee_params_t& k) const
 {
    if( upgrade_to_lifetime_member )
       return k.membership_lifetime_fee;
@@ -280,11 +280,11 @@ void account_transfer_operation::validate()const
 } } // graphene::protocol
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation )

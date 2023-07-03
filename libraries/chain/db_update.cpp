@@ -150,7 +150,7 @@ void database::clear_expired_transactions()
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
    while( (!dedupe_index.empty()) && (head_block_time() > dedupe_index.begin()->trx.expiration) )
       transaction_idx.remove(*dedupe_index.begin());
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::clear_expired_proposals()
 {
@@ -222,6 +222,51 @@ static optional<price> get_derived_current_feed_price( const database& db,
    return result;
 }
 
+// Helper function to update the limit order which is the individual settlement fund of the specified asset
+static void update_settled_debt_order( database& db, const asset_bitasset_data_object& bitasset )
+{
+   // To avoid unexpected price fluctuations, do not update the order if no sufficient price feeds
+   if( bitasset.current_feed.settlement_price.is_null() )
+      return;
+
+   const limit_order_object* limit_ptr = db.find_settled_debt_order( bitasset.asset_id );
+   if( !limit_ptr )
+      return;
+
+   bool sell_all = true;
+   share_type for_sale;
+
+   // Note: bitasset.get_margin_call_order_price() is in debt/collateral
+   price sell_price = ~bitasset.get_margin_call_order_price();
+   asset settled_debt( bitasset.individual_settlement_debt, limit_ptr->receive_asset_id() );
+   try
+   {
+      for_sale = settled_debt.multiply_and_round_up( sell_price ).amount; // may overflow
+      if( for_sale <= bitasset.individual_settlement_fund ) // "=" is for the consistency of order matching logic
+         sell_all = false;
+   }
+   catch( const fc::exception& e ) // catch the overflow
+   {
+      // do nothing
+      dlog( e.to_detail_string() );
+   }
+
+   // TODO Potential optimization: to avoid unnecessary database update, check before update
+   db.modify( *limit_ptr, [sell_all, &sell_price, &for_sale, &bitasset]( limit_order_object& obj )
+   {
+      if( sell_all )
+      {
+         obj.for_sale = bitasset.individual_settlement_fund;
+         obj.sell_price = ~bitasset.get_individual_settlement_price();
+      }
+      else
+      {
+         obj.for_sale = for_sale;
+         obj.sell_price = sell_price;
+      }
+   } );
+}
+
 void database::update_bitasset_current_feed( const asset_bitasset_data_object& bitasset, bool skip_median_update )
 {
    // For better performance, if nothing to update, we return
@@ -245,13 +290,14 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
       }
    }
 
+   const auto& head_time = head_block_time();
+
    // We need to update the database
-   modify( bitasset, [this, skip_median_update, &new_current_feed_price, &bsrm]
+   modify( bitasset, [this, skip_median_update, &head_time, &new_current_feed_price, &bsrm]
                      ( asset_bitasset_data_object& abdo )
    {
       if( !skip_median_update )
       {
-         const auto& head_time = head_block_time();
          const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
          abdo.update_median_feeds( head_time, maint_time );
          abdo.current_feed = abdo.median_feed;
@@ -261,6 +307,14 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
       if( new_current_feed_price.valid() )
          abdo.current_feed.settlement_price = *new_current_feed_price;
    } );
+
+   // Update individual settlement order price
+   if( !skip_median_update
+         && bsrm_type::individual_settlement_to_order == bsrm
+         && HARDFORK_CORE_2591_PASSED( head_time ) ) // Tighter peg (fill individual settlement order at MCOP)
+   {
+      update_settled_debt_order( *this, bitasset );
+   }
 }
 
 void database::clear_expired_orders()
@@ -289,7 +343,7 @@ void database::clear_expired_orders()
                check_call_orders( quote_asset( *this ) );
             }
          }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::clear_expired_force_settlements()
 { try {
@@ -351,7 +405,7 @@ void database::clear_expired_force_settlements()
       const asset_object& mia_object = *mia_object_ptr;
       const asset_bitasset_data_object& mia = *mia_ptr;
 
-      if( mia.has_settlement() )
+      if( mia.is_globally_settled() )
       {
          ilog( "Canceling a force settlement because of black swan" );
          cancel_settle_order( settle_order );
@@ -471,7 +525,7 @@ void database::clear_expired_force_settlements()
          });
       }
    }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void database::update_expired_feeds()
 {
@@ -714,6 +768,63 @@ void database::update_credit_offers_and_deals()
    for( auto deal_itr = deal_idx.begin(); deal_itr != deal_itr_end; deal_itr = deal_idx.begin() )
    {
       const credit_deal_object& deal = *deal_itr;
+
+      // Process automatic repayment
+      // Note: an automatic repayment may fail, in which case we consider the credit deal past due without repayment
+      using repay_type = credit_deal_auto_repayment_type;
+      if( static_cast<uint8_t>(repay_type::no_auto_repayment) != deal.auto_repay )
+      {
+         credit_deal_repay_operation op;
+         op.account = deal.borrower;
+         op.deal_id = deal.get_id();
+         // Amounts
+         // Note: the result can be larger than 64 bit
+         auto required_fee = ( ( ( fc::uint128_t( deal.debt_amount.value ) * deal.fee_rate )
+                                 + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+         fc::uint128_t total_required = required_fee + deal.debt_amount.value;
+         auto balance = get_balance( deal.borrower, deal.debt_asset );
+         if( static_cast<uint8_t>(repay_type::only_full_repayment) == deal.auto_repay
+               || fc::uint128_t( balance.amount.value ) >= total_required )
+         { // if only full repayment or account balance is sufficient
+            op.repay_amount = asset( deal.debt_amount, deal.debt_asset );
+            op.credit_fee = asset( static_cast<int64_t>( required_fee ), deal.debt_asset );
+         }
+         else // Allow partial repayment
+         {
+            fc::uint128_t debt_to_repay = ( fc::uint128_t( balance.amount.value ) * GRAPHENE_FEE_RATE_DENOM )
+                                          / ( GRAPHENE_FEE_RATE_DENOM + deal.fee_rate ); // Round down
+            fc::uint128_t collateral_to_release = ( debt_to_repay * deal.collateral_amount.value )
+                                                  / deal.debt_amount.value; // Round down
+            debt_to_repay = ( ( ( collateral_to_release * deal.debt_amount.value ) + deal.collateral_amount.value )
+                              - 1 ) / deal.collateral_amount.value; // Round up
+            fc::uint128_t fee_to_pay = ( ( ( debt_to_repay * deal.fee_rate )
+                                           + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+            op.repay_amount = asset( static_cast<int64_t>( debt_to_repay ), deal.debt_asset );
+            op.credit_fee = asset( static_cast<int64_t>( fee_to_pay ), deal.debt_asset );
+         }
+
+         auto deal_copy = deal; // Make a copy for logging
+
+         transaction_evaluation_state eval_state(this);
+         eval_state.skip_fee_schedule_check = true;
+
+         try
+         {
+            try_push_virtual_operation( eval_state, op );
+         }
+         catch( const fc::exception& e )
+         {
+            // We can in fact get here,
+            // e.g. if the debt asset issuer blacklisted the account, or account balance is insufficient
+            wlog( "Automatic repayment ${op} for credit deal ${credit_deal} failed at block ${n}; "
+                  "account balance was ${balance}; exception was ${e}",
+                  ("op", op)("credit_deal", deal_copy)
+                  ("n", head_block_num())("balance", balance)("e", e.to_detail_string()) );
+         }
+
+         if( !find( op.deal_id ) ) // The credit deal is fully repaid
+            continue;
+      }
 
       // Update offer
       // Note: offer balance can be zero after updated. TODO remove zero-balance offers after a period

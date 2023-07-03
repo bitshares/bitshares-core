@@ -88,7 +88,7 @@ namespace graphene { namespace protocol {
          optional< buyback_account_options > buyback_options;
       };
 
-      struct fee_parameters_type
+      struct fee_params_t
       {
          uint64_t basic_fee      = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
          uint64_t premium_fee    = 2000*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
@@ -114,7 +114,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
-      share_type      calculate_fee(const fee_parameters_type& )const;
+      share_type      calculate_fee(const fee_params_t& )const;
 
       void get_required_active_authorities( flat_set<account_id_type>& a )const
       {
@@ -142,7 +142,7 @@ namespace graphene { namespace protocol {
          optional< special_authority > active_special_authority;
       };
 
-      struct fee_parameters_type
+      struct fee_params_t
       {
          share_type fee             = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t   price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -163,7 +163,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return account; }
       void       validate()const;
-      share_type calculate_fee( const fee_parameters_type& k )const;
+      share_type calculate_fee( const fee_params_t& k )const;
 
       bool is_owner_update()const
       { return owner || extensions.value.owner_special_authority.valid(); }
@@ -196,7 +196,7 @@ namespace graphene { namespace protocol {
     */
    struct account_whitelist_operation : public base_operation
    {
-      struct fee_parameters_type { share_type fee = 300000; };
+      struct fee_params_t { share_type fee = 300000; };
       enum account_listing {
          no_listing = 0x0, ///< No opinion is specified about this account
          white_listed = 0x1, ///< This account is whitelisted, but not blacklisted
@@ -234,7 +234,7 @@ namespace graphene { namespace protocol {
     */
    struct account_upgrade_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct fee_params_t {
          uint64_t membership_annual_fee   =  2000 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint64_t membership_lifetime_fee = 10000 * GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to upgrade to a lifetime member
       };
@@ -248,7 +248,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return account_to_upgrade; }
       void       validate()const;
-      share_type calculate_fee( const fee_parameters_type& k )const;
+      share_type calculate_fee( const fee_params_t& k )const;
    };
 
    /**
@@ -266,7 +266,7 @@ namespace graphene { namespace protocol {
     */
    struct account_transfer_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
       account_id_type account_id;
@@ -302,20 +302,20 @@ FC_REFLECT( graphene::protocol::account_upgrade_operation,
 
 FC_REFLECT( graphene::protocol::account_whitelist_operation, (fee)(authorizing_account)(account_to_list)(new_listing)(extensions))
 
-FC_REFLECT( graphene::protocol::account_create_operation::fee_parameters_type, (basic_fee)(premium_fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::account_whitelist_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::account_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_parameters_type, (membership_annual_fee)(membership_lifetime_fee) )
-FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::account_create_operation::fee_params_t, (basic_fee)(premium_fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::account_whitelist_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::account_update_operation::fee_params_t, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_params_t, (membership_annual_fee)(membership_lifetime_fee) )
+FC_REFLECT( graphene::protocol::account_transfer_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation )

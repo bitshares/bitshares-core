@@ -78,7 +78,7 @@ namespace graphene { namespace protocol {
     */
    struct worker_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5000*GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_params_t { uint64_t fee = 5000*GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                fee;
       account_id_type      owner;
@@ -102,9 +102,9 @@ FC_REFLECT( graphene::protocol::burn_worker_initializer, )
 FC_REFLECT( graphene::protocol::refund_worker_initializer, )
 FC_REFLECT_TYPENAME( graphene::protocol::worker_initializer )
 
-FC_REFLECT( graphene::protocol::worker_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::worker_create_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::worker_create_operation,
             (fee)(owner)(work_begin_date)(work_end_date)(daily_pay)(name)(url)(initializer) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::worker_create_operation )

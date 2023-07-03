@@ -272,6 +272,7 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
    os.virtual_op = oho->virtual_op;
+   os.is_virtual = oho->is_virtual;
    os.fee_payer = oho->op.visit( get_fee_payer_visitor() );
 
    if(_options.operation_string)
@@ -291,7 +292,7 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
       os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array(),
                                          _options.max_mapping_depth - current_depth );
    }
-} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
+} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) } // GCOVR_EXCL_LINE
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const
 {
@@ -611,6 +612,9 @@ static operation_history_object fromEStoOperation(const variant& source)
    result.trx_in_block = source["operation_history"]["trx_in_block"].as_uint64();
    result.op_in_trx = source["operation_history"]["op_in_trx"].as_uint64();
    result.trx_in_block = source["operation_history"]["virtual_op"].as_uint64();
+   result.is_virtual = source["operation_history"]["is_virtual"].as_bool();
+
+   result.block_time = fc::time_point_sec::from_iso_string( source["block_data"]["block_time"].as_string() );
 
    return result;
 }
@@ -630,7 +634,8 @@ operation_history_object elasticsearch_plugin::get_operation_by_id( const operat
    }
    )";
 
-   const auto response = my->es->query( my->_options.index_prefix + "*/_doc/_search", query );
+   const auto uri = my->_options.index_prefix + ( my->is_es_version_7_or_above ? "*/_search" : "*/_doc/_search" );
+   const auto response = my->es->query( uri, query );
    variant variant_response = fc::json::from_string(response);
    const auto source = variant_response["hits"]["hits"][size_t(0)]["_source"];
    return fromEStoOperation(source);
@@ -677,7 +682,8 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
    if( !my->es->check_status() )
       return result;
 
-   const auto response = my->es->query( my->_options.index_prefix + "*/_doc/_search", query );
+   const auto uri = my->_options.index_prefix + ( my->is_es_version_7_or_above ? "*/_search" : "*/_doc/_search" );
+   const auto response = my->es->query( uri, query );
 
    variant variant_response = fc::json::from_string(response);
 

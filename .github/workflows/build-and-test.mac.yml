@@ -42,9 +42,10 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 2 -C _build witness_node cli_wallet app_test cli_test chain_test
+        make -j 3 -C _build witness_node cli_wallet app_test cli_test chain_test
         df -h
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite

@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             return (total == "5");
          });
 
-         es.endpoint = es.index_prefix + "*/_doc/_search";
+         es.endpoint = es.index_prefix + "*/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
 
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
@@ -129,6 +129,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          BOOST_CHECK_EQUAL(last_transfer_amount, "300");
          auto last_transfer_payer = j["_source"]["operation_history"]["fee_payer"].as_string();
          BOOST_CHECK_EQUAL(last_transfer_payer, "1.2.0");
+         auto is_virtual = j["_source"]["operation_history"]["is_virtual"].as_bool();
+         BOOST_CHECK( !is_virtual );
 
          // To test credit offers
          generate_blocks( HARDFORK_CORE_2362_TIME );
@@ -197,7 +199,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
@@ -228,6 +230,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       // The head block number is 1
       BOOST_CHECK_EQUAL( db.head_block_num(), 1u );
 
+      generate_blocks( HARDFORK_CORE_2535_TIME ); // For Order-Sends-Take-Profit-Order
+      generate_block();
+      set_expiration( db, trx );
+
       // delete all first, this will delete genesis data and data inserted at block 1
       auto delete_objects = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_objects); // require successful deletion
@@ -241,7 +247,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/_doc/_count";
+         es.endpoint = es.index_prefix + "*/_count";
          es.query = query;
 
          string res;
@@ -255,14 +261,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "2");
          });
 
-         es.endpoint = es.index_prefix + "asset/_doc/_search";
+         es.endpoint = es.index_prefix + "asset/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_source"]["symbol"].as_string();
          BOOST_CHECK_EQUAL(first_id, "USD");
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
-         es.endpoint = es.index_prefix + "bitasset/_doc/_search";
+         es.endpoint = es.index_prefix + "bitasset/_search";
          es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""
                   + bitasset_data_id + "\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
@@ -270,12 +276,16 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          auto bitasset_object_id = j["hits"]["hits"][size_t(0)]["_source"]["object_id"].as_string();
          BOOST_CHECK_EQUAL(bitasset_object_id, bitasset_data_id);
 
+         //                                           fee_asset, spread,  size,   expiration, repeat
+         create_take_profit_order_action tpa1 { asset_id_type(),    300,  9900,        86400, true };
+         vector<limit_order_auto_action> on_fill_1 { tpa1 };
          // create a limit order that expires at the next maintenance time
          create_sell_order( account_id_type(), asset(1), asset(1, usd_id),
-                            db.get_dynamic_global_properties().next_maintenance_time );
+                            db.get_dynamic_global_properties().next_maintenance_time,
+                            price::unit_price(), on_fill_1 );
          generate_block();
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -293,7 +303,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
          generate_block();
 
-         es.endpoint = es.index_prefix + "budget/_doc/_count";
+         es.endpoint = es.index_prefix + "budget/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -307,7 +317,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "1"); // new record inserted at the first maintenance block
          });
 
-         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.endpoint = es.index_prefix + "limitorder/_count";
          es.query = "";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::getEndPoint(es);
@@ -329,39 +339,6 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
    }
 }
 
-BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
-   try {
-
-      CURL *curl; // curl handler
-      curl = curl_easy_init();
-      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es.index_prefix = es_index_prefix;
-      auto delete_account_history = graphene::utilities::deleteAll(es);
-      BOOST_REQUIRE(delete_account_history); // require successful deletion
-
-      graphene::utilities::ES es_obj;
-      es_obj.curl = curl;
-      es_obj.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
-      es_obj.index_prefix = es_obj_index_prefix;
-      auto delete_objects = graphene::utilities::deleteAll(es_obj);
-      BOOST_REQUIRE(delete_objects); // require successful deletion
-
-      if(delete_account_history && delete_objects) { // all records deleted
-
-
-      }
-      // Note: this test case ends too quickly, sometimes causing an memory access violation on cleanup
-   }
-   catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
    try {
       CURL *curl; // curl handler
@@ -372,6 +349,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
       es.curl = curl;
       es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_index_prefix;
+
+      generate_blocks( HARDFORK_CORE_2535_TIME ); // For Order-Sends-Take-Profit-Order
+      generate_block();
+      set_expiration( db, trx );
 
       auto delete_account_history = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_account_history); // require successful deletion
@@ -390,8 +371,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          generate_block();
 
+         // Test history APIs
          graphene::app::history_api hist_api(app);
-         app.enable_plugin("elasticsearch");
 
          // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
          auto histories = hist_api.get_account_history(
@@ -407,6 +388,9 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[3].id.instance(), 0u);
+
+         BOOST_CHECK( !histories[0].is_virtual );
+         BOOST_CHECK( histories[0].block_time == db.head_block_time() );
 
          // f(A, 0, 4, 6) = { 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(6));
@@ -660,7 +644,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories.size(), 0u);
 
          // create a new account C = alice { 7 }
-         create_account("alice");
+         auto alice = create_account("alice");
+         account_id_type alice_id = alice.get_id();
 
          generate_block();
 
@@ -685,6 +670,61 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[3].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[4].id.instance(), 0u);
+
+         // Ugly test to cover elasticsearch_plugin::get_operation_by_id()
+         if( !app.elasticsearch_thread )
+            app.elasticsearch_thread = std::make_shared<fc::thread>("elasticsearch");
+         auto es_plugin = app.get_plugin< graphene::elasticsearch::elasticsearch_plugin >("elasticsearch");
+         auto his_obj7 = app.elasticsearch_thread->async([&es_plugin]() {
+            return es_plugin->get_operation_by_id( operation_history_id_type(7) );
+         }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+         BOOST_REQUIRE( his_obj7.op.is_type<account_create_operation>() );
+         BOOST_CHECK_EQUAL( his_obj7.op.get<account_create_operation>().name, "alice" );
+
+         // Test virtual operation
+
+         // Prepare funds
+         transfer( account_id_type()(db), alice_id(db), asset(100) );
+         //                                           fee_asset, spread,  size,   expiration, repeat
+         create_take_profit_order_action tpa1 { asset_id_type(),    100, 10000,        86400, false };
+         vector<limit_order_auto_action> on_fill_1 { tpa1 };
+         // Create a limit order that expires in 300 seconds
+         create_sell_order( alice_id, asset(1), asset(1, asset_id_type(1)), db.head_block_time() + 300,
+                            price::unit_price(), on_fill_1 );
+
+         generate_block();
+
+         // f(C, 0, 4, 0) = { 9, 8, 7 }
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "alice", operation_history_id_type(0), 4, operation_history_id_type(0));
+            return (histories.size() == 3u);
+         });
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
+         BOOST_CHECK( histories[0].op.is_type<limit_order_create_operation>() );
+         BOOST_CHECK( !histories[0].is_virtual );
+         BOOST_CHECK( histories[0].block_time == db.head_block_time() );
+         BOOST_CHECK( histories[1].op.is_type<transfer_operation>() );
+         BOOST_CHECK( !histories[1].is_virtual );
+
+         // Let the limit order expire
+         generate_blocks( db.head_block_time() + 300 );
+         generate_block();
+
+         // f(C, 0, 4, 0) = { 10, 9, 8, 7 }
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "alice", operation_history_id_type(0), 4, operation_history_id_type(0));
+            return (histories.size() == 4u);
+         });
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
+         BOOST_CHECK( histories[0].op.is_type<limit_order_cancel_operation>() );
+         BOOST_CHECK( histories[0].is_virtual );
+         BOOST_CHECK( histories[1].op.is_type<limit_order_create_operation>() );
+         BOOST_CHECK( !histories[1].is_virtual );
+         BOOST_CHECK( histories[2].op.is_type<transfer_operation>() );
+         BOOST_CHECK( !histories[2].is_virtual );
+
       }
    }
    catch (fc::exception &e) {

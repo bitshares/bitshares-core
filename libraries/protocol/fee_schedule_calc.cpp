@@ -48,7 +48,7 @@ namespace graphene { namespace protocol {
              auto itr = param.parameters.find(params);
              if( itr != param.parameters.end() )
                 params = *itr;
-             return op.calculate_fee( params.get<typename OpType::fee_parameters_type>() ).value;
+             return op.calculate_fee( params.get<typename OpType::fee_params_t>() ).value;
          }
       }
    };
@@ -57,7 +57,7 @@ namespace graphene { namespace protocol {
    uint64_t calc_fee_visitor::operator()(const htlc_create_operation& op)const
    {
       //TODO: refactor for performance (see https://github.com/bitshares/bitshares-core/issues/2150)
-      transfer_operation::fee_parameters_type t;
+      transfer_operation::fee_params_t t;
       if (param.exists<transfer_operation>())
          t = param.get<transfer_operation>();
       return op.calculate_fee( param.get<htlc_create_operation>(), t.price_per_kbyte).value;
@@ -70,7 +70,7 @@ namespace graphene { namespace protocol {
       optional<uint64_t> sub_asset_creation_fee;
       if( param.exists<account_transfer_operation>() && param.exists<ticket_create_operation>() )
          sub_asset_creation_fee = param.get<account_transfer_operation>().fee;
-      asset_create_operation::fee_parameters_type old_asset_creation_fee_params;
+      asset_create_operation::fee_params_t old_asset_creation_fee_params;
       if( param.exists<asset_create_operation>() )
          old_asset_creation_fee_params = param.get<asset_create_operation>();
       return op.calculate_fee( old_asset_creation_fee_params, sub_asset_creation_fee ).value;

@@ -59,7 +59,7 @@ void_result liquidity_pool_create_evaluator::do_evaluate(const liquidity_pool_cr
               "Current supply of the share asset needs to be zero" );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 generic_operation_result liquidity_pool_create_evaluator::do_apply(const liquidity_pool_create_operation& op)
 { try {
@@ -81,7 +81,7 @@ generic_operation_result liquidity_pool_create_evaluator::do_apply(const liquidi
    });
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result liquidity_pool_delete_evaluator::do_evaluate(const liquidity_pool_delete_operation& op)
 { try {
@@ -96,9 +96,9 @@ void_result liquidity_pool_delete_evaluator::do_evaluate(const liquidity_pool_de
    FC_ASSERT( _share_asset->issuer == op.account, "The account is not the owner of the liquidity pool" );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
-generic_operation_result liquidity_pool_delete_evaluator::do_apply(const liquidity_pool_delete_operation& op)
+generic_operation_result liquidity_pool_delete_evaluator::do_apply(const liquidity_pool_delete_operation& op) const
 { try {
    database& d = db();
    generic_operation_result result;
@@ -112,7 +112,45 @@ generic_operation_result liquidity_pool_delete_evaluator::do_apply(const liquidi
    d.remove( *_pool );
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+void_result liquidity_pool_update_evaluator::do_evaluate(const liquidity_pool_update_operation& op)
+{ try {
+   const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
+
+   _pool = &op.pool(d);
+
+   const asset_object* _share_asset = &_pool->share_asset(d);
+
+   FC_ASSERT( _share_asset->issuer == op.account, "The account is not the owner of the liquidity pool" );
+
+   if( op.taker_fee_percent.valid() )
+   {
+      FC_ASSERT( 0 == _pool->withdrawal_fee_percent
+                     || ( op.withdrawal_fee_percent.valid() && 0 == *op.withdrawal_fee_percent ),
+                 "Taker fee percent can only be updated if withdrawal fee percent is zero or "
+                 "withdrawal fee percent is to be updated to zero at the same time" );
+   }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+void_result liquidity_pool_update_evaluator::do_apply(const liquidity_pool_update_operation& op) const
+{ try {
+   database& d = db();
+
+   d.modify( *_pool, [&op](liquidity_pool_object& obj) {
+      if( op.taker_fee_percent.valid() )
+         obj.taker_fee_percent = *op.taker_fee_percent;
+      if( op.withdrawal_fee_percent.valid() )
+         obj.withdrawal_fee_percent = *op.withdrawal_fee_percent;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_deposit_operation& op)
 { try {
@@ -181,7 +219,7 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 generic_exchange_operation_result liquidity_pool_deposit_evaluator::do_apply(
       const liquidity_pool_deposit_operation& op)
@@ -211,7 +249,7 @@ generic_exchange_operation_result liquidity_pool_deposit_evaluator::do_apply(
    result.received.emplace_back( _account_receives );
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_withdraw_operation& op)
 { try {
@@ -265,7 +303,7 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(
       const liquidity_pool_withdraw_operation& op)
@@ -300,7 +338,7 @@ generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(
    result.fees.emplace_back( _fee_b );
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_exchange_operation& op)
 { try {
@@ -398,7 +436,7 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    _pool_taker_fee = asset( static_cast<int64_t>( pool_taker_fee ), op.min_to_receive.asset_id );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
       const liquidity_pool_exchange_operation& op)
@@ -445,6 +483,6 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    result.fees.emplace_back( _pool_taker_fee );
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 } } // graphene::chain

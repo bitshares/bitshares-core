@@ -44,7 +44,7 @@ namespace graphene { namespace protocol {
 
       struct htlc_create_operation : public base_operation 
       {
-         struct fee_parameters_type {
+         struct fee_params_t {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
@@ -84,12 +84,12 @@ namespace graphene { namespace protocol {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params, uint32_t fee_per_kb)const;
+         share_type calculate_fee(const fee_params_t& fee_params, uint32_t fee_per_kb)const;
       };
 
       struct htlc_redeem_operation : public base_operation
       {
-         struct fee_parameters_type {
+         struct fee_params_t {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_kb = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
@@ -118,7 +118,7 @@ namespace graphene { namespace protocol {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const;
+         share_type calculate_fee(const fee_params_t& fee_params)const;
       };
 
       /**
@@ -126,7 +126,7 @@ namespace graphene { namespace protocol {
        */
       struct htlc_redeemed_operation : public base_operation
       {
-         struct fee_parameters_type {};
+         struct fee_params_t {};
 
          htlc_redeemed_operation() {}
          htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to,
@@ -138,7 +138,7 @@ namespace graphene { namespace protocol {
          account_id_type fee_payer()const { return to; }
          void validate()const { FC_ASSERT( !"virtual operation" ); }
 
-         share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+         share_type      calculate_fee(const fee_params_t& k)const { return 0; }
 
          htlc_id_type htlc_id;
          account_id_type from, to, redeemer;
@@ -152,7 +152,7 @@ namespace graphene { namespace protocol {
 
       struct htlc_extend_operation : public base_operation
       {
-         struct fee_parameters_type {
+         struct fee_params_t {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
@@ -181,12 +181,12 @@ namespace graphene { namespace protocol {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const;
+         share_type calculate_fee(const fee_params_t& fee_params)const;
       };
 
       struct htlc_refund_operation : public base_operation
       {
-         struct fee_parameters_type {};
+         struct fee_params_t {};
 
          htlc_refund_operation(){}
          htlc_refund_operation( const htlc_id_type& htlc_id,
@@ -199,7 +199,7 @@ namespace graphene { namespace protocol {
          void            validate()const { FC_ASSERT( !"virtual operation" ); }
 
          /// This is a virtual operation; there is no fee
-         share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+         share_type      calculate_fee(const fee_params_t& k)const { return 0; }
 
          asset fee;
 
@@ -216,12 +216,12 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT_TYPENAME( graphene::protocol::htlc_hash )
 
-FC_REFLECT( graphene::protocol::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
+FC_REFLECT( graphene::protocol::htlc_create_operation::fee_params_t, (fee) (fee_per_day) )
 FC_REFLECT( graphene::protocol::htlc_create_operation::additional_options_type, (memo))
-FC_REFLECT( graphene::protocol::htlc_redeem_operation::fee_parameters_type, (fee) (fee_per_kb) )
-FC_REFLECT( graphene::protocol::htlc_redeemed_operation::fee_parameters_type, ) // VIRTUAL
-FC_REFLECT( graphene::protocol::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
-FC_REFLECT( graphene::protocol::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
+FC_REFLECT( graphene::protocol::htlc_redeem_operation::fee_params_t, (fee) (fee_per_kb) )
+FC_REFLECT( graphene::protocol::htlc_redeemed_operation::fee_params_t, ) // VIRTUAL
+FC_REFLECT( graphene::protocol::htlc_extend_operation::fee_params_t, (fee) (fee_per_day))
+FC_REFLECT( graphene::protocol::htlc_refund_operation::fee_params_t, ) // VIRTUAL
 
 FC_REFLECT( graphene::protocol::htlc_create_operation,
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
@@ -232,10 +232,10 @@ FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_iss
 FC_REFLECT( graphene::protocol::htlc_refund_operation,
       (fee)(htlc_id)(to)(original_htlc_recipient)(htlc_amount)(htlc_preimage_hash)(htlc_preimage_size))
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::additional_options_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_extend_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_extend_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeemed_operation )
