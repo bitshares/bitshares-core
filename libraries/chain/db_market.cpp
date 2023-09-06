@@ -1225,7 +1225,7 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
                wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
                obj.for_sale = bitasset.individual_settlement_fund;
                obj.sell_price = ~bitasset.get_individual_settlement_price();
-            } // GCOVR_EXEL_STOP
+            } // GCOVR_EXCL_STOP
          }
          else
          {
