@@ -45,10 +45,11 @@ using namespace graphene::db;
 class limit_order_object : public abstract_object<limit_order_object, protocol_ids, limit_order_object_type>
 {
    public:
-      time_point_sec   expiration;
-      account_id_type  seller;
-      share_type       for_sale; ///< asset id is sell_price.base.asset_id
-      price            sell_price;
+      time_point_sec   expiration; ///< When this limit order will expire
+      account_id_type  seller; ///< Who is selling
+      share_type       for_sale; ///< The amount for sale, asset id is sell_price.base.asset_id
+      price            sell_price; ///< The seller's asking price
+      fc::uint128_t    filled_amount = 0; ///< The amount that has been sold, asset id is sell_price.base.asset_id
       share_type       deferred_fee; ///< fee converted to CORE
       asset            deferred_paid_fee; ///< originally paid fee
       bool             is_settled_debt = false; ///< Whether this order is an individual settlement fund
