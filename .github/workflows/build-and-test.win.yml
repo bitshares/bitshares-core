@@ -6,9 +6,9 @@ env:
   # The following are for windows cross-build only:
   BOOST_VERSION: 1_69_0
   BOOST_DOTTED_VERSION: 1.69.0
-  CURL_VERSION: 8.1.2
-  OPENSSL_VERSION: 1.1.1u
-  ZLIB_VERSION: 1.2.13
+  CURL_VERSION: 8.2.1
+  OPENSSL_VERSION: 1.1.1v
+  ZLIB_VERSION: 1.3
 jobs:
   prepare-mingw64-libs:
     name: Build required 3rd-party libraries

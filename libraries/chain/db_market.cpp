@@ -1225,13 +1225,14 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
                wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
                obj.for_sale = bitasset.individual_settlement_fund;
                obj.sell_price = ~bitasset.get_individual_settlement_price();
-            } // GCOVR_EXEL_STOP
+            } // GCOVR_EXCL_STOP
          }
          else
          {
             obj.for_sale = bitasset.individual_settlement_fund;
             obj.sell_price = ~bitasset.get_individual_settlement_price();
          }
+         // Note: filled_amount is not updated, but it should be fine
       });
       // Note:
       // After the price is updated, it is possible that the order can be matched with another order on the order
@@ -1325,6 +1326,7 @@ database::match_result_type database::match_settled_debt_limit( const limit_orde
             obj.for_sale = bitasset.individual_settlement_fund;
             obj.sell_price = ~bitasset.get_individual_settlement_price();
          } // GCOVR_EXCL_STOP
+         // Note: filled_amount is not updated, but it should be fine
       });
    }
 
@@ -1889,6 +1891,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    }
    modify( order, [&pays,&new_take_profit_order_id]( limit_order_object& b ) {
       b.for_sale -= pays.amount;
+      b.filled_amount += pays.amount.value;
       b.deferred_fee = 0;
       b.deferred_paid_fee.amount = 0;
       if( new_take_profit_order_id.valid() ) // A new take profit order is created, link it to this order
