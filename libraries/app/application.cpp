@@ -634,7 +634,7 @@ bool application_impl::is_plugin_enabled(const string& name) const
    return !(_active_plugins.find(name) == _active_plugins.end());
 }
 
-/**
+/*
  * If delegate has the item, the network has no need to fetch it.
  */
 bool application_impl::has_item(const net::item_id& id)
@@ -649,7 +649,7 @@ bool application_impl::has_item(const net::item_id& id)
    FC_CAPTURE_AND_RETHROW( (id) ) // GCOVR_EXCL_LINE
 }
 
-/**
+/*
  * @brief allows the application to validate an item prior to broadcasting to peers.
  *
  * @param sync_mode true if the message was fetched through the sync process, false during normal operation
@@ -759,7 +759,7 @@ bool application_impl::is_included_block(const block_id_type& block_id)
   return block_id == block_id_in_preferred_chain;
 }
 
-/**
+/*
  * Assuming all data elements are ordered in some way, this method should
  * return up to limit ids that occur *after* the last ID in synopsis that
  * we recognize.
@@ -816,7 +816,7 @@ std::vector<item_hash_t> application_impl::get_block_ids(const std::vector<item_
    return result;
 } FC_CAPTURE_AND_RETHROW( (blockchain_synopsis)(remaining_item_count)(limit) ) } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Given the hash of the requested data, fetch the body.
  */
 message application_impl::get_item(const item_id& id)
@@ -840,7 +840,7 @@ chain_id_type application_impl::get_chain_id() const
    return _chain_db->get_chain_id();
 }
 
-/**
+/*
  * Returns a synopsis of the blockchain used for syncing.  This consists of a list of
  * block hashes at intervals exponentially increasing towards the genesis block.
  * When syncing to a peer, the peer uses this data to determine if we're on the same
@@ -1018,7 +1018,7 @@ std::vector<item_hash_t> application_impl::get_blockchain_synopsis(const item_ha
     return synopsis;
 } FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Call this after the call to handle_message succeeds.
  *
  * @param item_type the type of the item we're synchronizing, will be the same as item passed to the sync_from() call
@@ -1030,7 +1030,7 @@ void application_impl::sync_status(uint32_t item_type, uint32_t item_count)
    // any status reports to GUI go here
 }
 
-/**
+/*
  * Call any time the number of connected peers changes.
  */
 void application_impl::connection_count_changed(uint32_t c)
@@ -1043,7 +1043,7 @@ uint32_t application_impl::get_block_number(const item_hash_t& block_id)
    return block_header::num_from_id(block_id);
 } FC_CAPTURE_AND_RETHROW( (block_id) ) } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Returns the time a block was produced (if block_id = 0, returns genesis time).
  * If we don't know about the block, returns time_point_sec::min()
  */
