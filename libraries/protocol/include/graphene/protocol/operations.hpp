@@ -133,8 +133,6 @@ namespace graphene { namespace protocol {
             /* 77 */ limit_order_update_operation
          >;
 
-   /// @} // operations group
-
    /**
     *  Appends required authorites to the result vector.  The authorities appended are not the
     *  same as those returned by get_required_auth 
