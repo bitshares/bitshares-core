@@ -16,7 +16,7 @@ my $fileHeader = <<'END';
 #include <graphene/wallet/wallet.hpp>
 
 namespace graphene { namespace wallet {
-   namespace detail 
+   namespace detail
    {
       struct api_method_name_collector_visitor
       {
@@ -29,7 +29,7 @@ namespace graphene { namespace wallet {
          }
       };
    }
-  
+
    api_documentation::api_documentation()
    {
 END
@@ -110,17 +110,26 @@ sub formatDocComment
 
   for (my $i = 0; $i < @{$doc}; ++$i)
   {
-    if ($doc->[$i] eq 'params')
+    if (($doc->[$i] eq 'params') # doxygen version 1.8.11 (Ubuntu 16.04) or 1.8.13 (Ubuntu 18.04)
+        or ($doc->[$i]->{params})) # doxygen version 1.8.17 (Ubuntu 20.04)
     {
       $paramDocs .= "Parameters:\n";
-      @parametersList = @{$doc->[$i + 1]};
+      if ($doc->[$i] eq 'params')
+      {
+        ++$i;
+        @parametersList = @{$doc->[$i]};
+      }
+      else
+      {
+        @parametersList = @{$doc->[$i]->{params}};
+      }
       for my $parameter (@parametersList)
       {
         my $declname = $parameter->{parameters}->[0]->{name};
         my $decltype = cleanupDoxygenType($paramInfo->{$declname}->{type});
-        $paramDocs .= Text::Wrap::fill('    ', '        ', "$declname: " . formatDocComment($parameter->{doc}) . " (type: $decltype)") . "\n";
+        $paramDocs .= Text::Wrap::fill('    ', '        ', "$declname: " . formatDocComment($parameter->{doc})
+                                                                         . " (type: $decltype)") . "\n";
       }
-      ++$i;
     }
     elsif ($doc->[$i]->{return})
     {
@@ -154,7 +163,7 @@ sub formatDocComment
   my $result = Text::Wrap::fill('', '', $bodyDocs);
   $result .= "\n\n" . $paramDocs if $paramDocs;
   $result .= "\n\n" . $returnDocs if $returnDocs;
-  
+
   return $result;
 }
 

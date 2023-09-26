@@ -1,0 +1,5 @@
+// bitshares-core issue #2587 settle more than total debt in individual settlement fund when no sufficient price feeds
+#ifndef HARDFORK_CORE_2587_TIME
+#define HARDFORK_CORE_2587_TIME (fc::time_point_sec( 1700143200 )) // Thursday, November 16, 2023 14:00:00 UTC
+#define HARDFORK_CORE_2587_PASSED(head_block_time) (head_block_time >= HARDFORK_CORE_2587_TIME)
+#endif

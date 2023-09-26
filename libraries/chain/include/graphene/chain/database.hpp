@@ -326,6 +326,12 @@ namespace graphene { namespace chain {
                            share_type collateral_from_fund, const price_feed& current_feed );
 
       private:
+         /// Clean up for a limit order and then remove it from database
+         void cleanup_and_remove_limit_order( const limit_order_object& order );
+         /// Process on_fill for a limit order
+         /// @return the ID of the newly created take profit order (in that case), otherwise null
+         optional<limit_order_id_type> process_limit_order_on_fill( const limit_order_object& order,
+                                                                    const asset& order_receives );
          void _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
@@ -396,6 +402,16 @@ namespace graphene { namespace chain {
                                  bool mute_exceptions = false,
                                  bool skip_matching_settle_orders = false );
 
+         /**
+          * @brief Match the settled debt order of the specified asset as taker with other orders on the opposite side
+          *        of the order book
+          * @param bitasset The bitasset data object
+          *
+          * Since the core-2591 hard fork, this function is called after processed all call orders in
+          * @ref check_call_orders().
+          */
+         void check_settled_debt_order( const asset_bitasset_data_object& bitasset );
+
          // Note: Ideally this should be private.
          //       Now it is public because we use it in a non-member function in db_market.cpp .
          enum class match_result_type
@@ -418,6 +434,8 @@ namespace graphene { namespace chain {
          match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
                                                      const price& trade_price );
          match_result_type match_limit_settled_debt( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
+         match_result_type match_settled_debt_limit( const limit_order_object& taker, const limit_order_object& maker,
                                                      const price& trade_price );
          /***
           * @brief Match limit order as taker to a call order as maker
@@ -691,6 +709,11 @@ namespace graphene { namespace chain {
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
 
+         /// Validate, evaluate and apply a virtual operation using a temporary undo_database session,
+         /// if fail, rewind any changes made
+         operation_result      try_push_virtual_operation( transaction_evaluation_state& eval_state,
+                                                           const operation& op );
+
          ///Steps involved in applying a new block
          ///@{
 
@@ -803,8 +826,8 @@ namespace graphene { namespace chain {
           */
          bool                              _opened = false;
 
-         // Counts nested proposal updates
-         uint32_t                          _push_proposal_nesting_depth = 0;
+         /// Counts nested undo sessions due to (for example) proposal updates or order-sends-order executions
+         uint32_t                          _undo_session_nesting_depth = 0;
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;

@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    // settlement price = 1/20, mssp = 1/22
 
    // black swan event doesn't occur #649
-   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
 
    // generate a block
    generate_block();
@@ -418,7 +418,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // settlement price = 1/16, mssp = 10/176
 
    // black swan event will occur: #649 fixed
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    // short positions will be closed
    BOOST_CHECK( !db.find( call_id ) );
    BOOST_CHECK( !db.find( call2_id ) );
@@ -958,7 +958,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
    // settlement price = 1/16, mssp = 10/176
 
    // due to sell_low, black swan won't occur
-   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
 
    BOOST_CHECK_EQUAL( 3000-1000-1007-7, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -982,7 +982,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
    // collateralization of call3 is (16000-56-64) / (1000-7-7) = 15880/986 = 16.1, it's > 16 but < 17.6
    // although there is no sell order, it should trigger a black swan event right away,
    // because after hard fork new limit order won't trigger black swan event
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    BOOST_CHECK( !db.find( call3_id ) );
    BOOST_CHECK( !db.find( call4_id ) );
 
@@ -1084,16 +1084,16 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    // settlement price = 1/20, mssp = 1/22
 
    // due to #649, black swan won't occur
-   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
 
    // generate a block to include operations above
    generate_block();
-   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
    // go over the hard fork, make sure feed doesn't expire
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    // a black swan event should occur
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    BOOST_CHECK( !db.find( call_id ) );
    BOOST_CHECK( !db.find( call2_id ) );
    BOOST_CHECK( !db.find( call3_id ) );
@@ -1313,7 +1313,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test)
    // settlement price = 1/18, mssp = 10/198
 
    // GS occurs even when there is a good sell order
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    BOOST_CHECK( !db.find( call_id ) );
    BOOST_CHECK( !db.find( call2_id ) );
    // GS price is 1/18, but the first call order has only 15000 thus capped
@@ -1419,7 +1419,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
    // settlement price = 1/18, mssp = 10/198
 
    // GS occurs even when there is a good sell order
-   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
    BOOST_CHECK( !db.find( call_id ) );
    BOOST_CHECK( !db.find( call2_id ) );
    BOOST_CHECK( !db.find( call3_id ) );
@@ -1517,7 +1517,7 @@ BOOST_AUTO_TEST_CASE(gs_price_test)
    if( !hf2481 )
    {
       // GS occurs
-      BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_CHECK( !db.find( call2_id ) );
       // sell order did not change
@@ -1526,7 +1526,7 @@ BOOST_AUTO_TEST_CASE(gs_price_test)
    else
    {
       // GS does not occur, call got filled
-      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
       BOOST_CHECK( !db.find( call_id ) );
 
       // sell order got half-filled
@@ -1648,7 +1648,7 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
       publish_feed( bitusd, feedproducer, feed2 );
 
       // blackswan
-      BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).is_globally_settled() );
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_CHECK( !db.find( call2_id ) );
       int64_t call_pays_to_fund = (15000 * 10 + 10) / 11;
@@ -1696,7 +1696,7 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
       generate_blocks( db.head_block_time() + fc::seconds(43200) );
 
       // The first call order should have been filled
-      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).is_globally_settled() );
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_REQUIRE( db.find( call2_id ) );
 

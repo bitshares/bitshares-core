@@ -1,0 +1,5 @@
+// bitshares-core issue #1604 Operation to modify existing limit order
+#ifndef HARDFORK_CORE_1604_TIME
+#define HARDFORK_CORE_1604_TIME (fc::time_point_sec( 1700143200 )) // Thursday, November 16, 2023 14:00:00 UTC
+#define HARDFORK_CORE_1604_PASSED(head_block_time) (head_block_time >= HARDFORK_CORE_1604_TIME)
+#endif

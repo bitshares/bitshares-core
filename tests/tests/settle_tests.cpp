@@ -1551,7 +1551,7 @@ BOOST_AUTO_TEST_CASE( create_bitassets )
       transfer( committee_account, rachelregistrar_id, asset( 10000000 ) );
       transfer( committee_account, rachelreferrer_id, asset( 10000000 ) );
       transfer( committee_account, rachel.get_id(), asset( 10000000) );
-      transfer( committee_account, paul_id, asset( 10000000000 ) );
+      transfer( committee_account, paul_id, asset( 10000000000LL ) );
 
       asset_update_operation op;
       op.issuer = biteur.issuer;
@@ -1888,6 +1888,309 @@ BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
    } FC_LOG_AND_RETHROW()
 }
 
+/// Tests instant settlement:
+/// * After hf core-2591, forced-settlements are filled at margin call order price (MCOP) when applicable
+BOOST_AUTO_TEST_CASE( collateral_fee_of_instant_settlement_test )
+{ try {
+
+   // Advance to a recent hard fork
+   generate_blocks(HARDFORK_CORE_2582_TIME);
+   generate_block();
+
+   // multiple passes,
+   // i == 0 : before hf core-2591, extreme feed price
+   // i == 1 : before hf core-2591, normal feed price
+   // i == 2 : before hf core-2591, normal feed price, and price recovers after GS
+   // i == 3 : after hf core-2591, extreme feed price
+   // i == 4 : after hf core-2591, normal feed price
+   // i == 5 : after hf core-2591, normal feed price, and price recovers after GS
+   for( int i = 0; i < 6; ++ i )
+   {
+      idump( (i) );
+
+      if( 3 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
+         generate_block();
+      }
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+
+      using bsrm_type = bitasset_options::black_swan_response_type;
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->extensions.value.margin_call_fee_ratio = 11;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.get_id();
+
+      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
+                   == bsrm_type::global_settlement );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+
+      // borrowers borrow some
+      // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->get_id();
+
+      // Transfer funds to sellers
+      transfer( borrower, seller, asset(100000,mpa_id) );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // publish a new feed so that borrower's debt position is undercollateralized
+      if( 0 == i || 3 == i )
+         f.settlement_price = price( asset(1,mpa_id), asset(GRAPHENE_MAX_SHARE_SUPPLY) );
+      else
+         f.settlement_price = price( asset(100,mpa_id), asset(2) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+
+      // fund receives 1600
+      BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 1600 );
+
+      BOOST_CHECK( mpa_id(db).dynamic_data(db).accumulated_collateral_fees == 400 );
+
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).settlement_price
+                   == price( asset(100000,mpa_id), asset(1600) ) );
+
+      BOOST_CHECK( !db.find( call_id ) );
+
+      if( 2 == i || 5 == i )
+      {
+         // price recovers
+         f.settlement_price = price( asset(100,mpa_id), asset(1) );
+         // call pays price  (MSSP) = 100:1 * 1000:1250 = 100000:1250 = 80
+         // call match price (MCOP) = 100:1 * 1000:1239 = 100000:1239 = 80.710250202
+         publish_feed( mpa_id, feeder_id, f, feed_icr );
+      }
+
+      // seller settles
+      share_type amount_to_settle = 56789;
+      auto result = force_settle( seller, asset(amount_to_settle, mpa_id) );
+      auto op_result = result.get<extendable_operation_result>().value;
+
+      auto check_result = [&]
+      {
+         BOOST_CHECK( !op_result.new_objects.valid() ); // force settlement order not created
+
+         if( 5 == i )
+         {
+            // settlement fund pays = round_down(56789 * 1600 / 100000) = 908
+            // seller pays = round_up(908 * 100000 / 1600) = 56750
+            // settlement fund = 1600 - 908 = 692
+            // settlement debt = 100000 - 56750 = 43250
+            // seller would receive = round_up(56750 * 1239 / 10000 ) = 704 (<908, so ok)
+            // collateral fee = 908 - 704 = 204
+            BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
+            BOOST_CHECK( *op_result.paid->begin() == asset( 56750, mpa_id ) );
+            BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
+            BOOST_CHECK( *op_result.received->begin() == asset( 704 ) );
+            BOOST_REQUIRE( op_result.fees.valid() && 2U == op_result.fees->size() );
+            BOOST_CHECK( *op_result.fees->begin() == asset( 204 ) );
+
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 692 );
+
+            BOOST_CHECK( mpa_id(db).dynamic_data(db).accumulated_collateral_fees == 604 ); // 400 + 204
+
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 43250 );
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 704 );
+         }
+         else
+         {
+            // receives = round_down(56789 * 1600 / 100000) = 908
+            // pays = round_up(908 * 100000 / 1600) = 56750
+            // settlement fund = 1600 - 908 = 692
+            // settlement debt = 100000 - 56750 = 43250
+            BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
+            BOOST_CHECK( *op_result.paid->begin() == asset( 56750, mpa_id ) );
+            BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
+            BOOST_CHECK( *op_result.received->begin() == asset( 908 ) );
+            BOOST_REQUIRE( op_result.fees.valid() && 1U == op_result.fees->size() );
+            BOOST_CHECK( *op_result.fees->begin() == asset( 0 ) );
+
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 692 );
+
+            BOOST_CHECK( mpa_id(db).dynamic_data(db).accumulated_collateral_fees == 400 );
+
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 43250 );
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 908 );
+         }
+
+      };
+
+      check_result();
+
+      BOOST_TEST_MESSAGE( "Generate a block" );
+      generate_block();
+
+      check_result();
+
+      // reset
+      db.pop_block();
+
+   } // for i
+
+} FC_LOG_AND_RETHROW() }
+
+/// Tests instant settlement:
+/// * After hf core-2591, for prediction markets, forced-settlements are NOT filled at margin call order price (MCOP)
+BOOST_AUTO_TEST_CASE( pm_instant_settlement_price_test )
+{ try {
+
+   // Advance to a recent hard fork
+   generate_blocks(HARDFORK_CORE_2582_TIME);
+   generate_block();
+
+   // multiple passes,
+   // i == 0 : before hf core-2591
+   // i == 1 : after hf core-2591
+   for( int i = 0; i < 2; ++ i )
+   {
+      idump( (i) );
+
+      if( 1 == i )
+      {
+         // Advance to core-2591 hard fork
+         generate_blocks(HARDFORK_CORE_2591_TIME);
+         generate_block();
+      }
+
+      set_expiration( db, trx );
+
+      ACTORS((judge)(alice)(feeder));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      asset_id_type pm_id = pmark.get_id();
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, alice_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( alice, pmark.amount(1000), asset(1000) );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( pm_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,pm_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,pm_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( pm_id, feeder_id, f, feed_icr );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      BOOST_TEST_MESSAGE( "Globally settling" );
+      force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 1000 );
+      BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 1000 );
+
+      // alice settles
+      auto result = force_settle( alice, asset(300, pm_id) );
+      auto op_result = result.get<extendable_operation_result>().value;
+
+      BOOST_CHECK( !op_result.new_objects.valid() ); // force settlement order not created
+
+      BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
+      BOOST_CHECK( *op_result.paid->begin() == asset( 300, pm_id ) );
+      BOOST_REQUIRE( op_result.received.valid() && 1U == op_result.received->size() );
+      BOOST_CHECK( *op_result.received->begin() == asset( 300 ) );
+      BOOST_REQUIRE( op_result.fees.valid() && 1U == op_result.fees->size() );
+      BOOST_CHECK( *op_result.fees->begin() == asset( 0 ) );
+
+      auto check_result = [&]
+      {
+         BOOST_CHECK( !pm_id(db).bitasset_data(db).is_individually_settled_to_fund() );
+         BOOST_CHECK( pm_id(db).bitasset_data(db).is_globally_settled() );
+         BOOST_CHECK_EQUAL( pm_id(db).bitasset_data(db).settlement_fund.value, 700 );
+
+         BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).accumulated_collateral_fees.value, 0 );
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, pm_id ), 700 );
+         BOOST_CHECK_EQUAL( get_balance( alice_id, asset_id_type() ), init_balance - 700 );
+      };
+
+      check_result();
+
+      BOOST_TEST_MESSAGE( "Generate a block" );
+      generate_block();
+
+      check_result();
+
+      // reset
+      db.pop_block();
+
+   } // for i
+
+} FC_LOG_AND_RETHROW() }
+
 /**
  * Test case to reproduce https://github.com/bitshares/bitshares-core/issues/1883.
  * When there is only one fill_order object in the ticker rolling buffer, it should only be rolled out once.
@@ -2081,7 +2384,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
 
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       // generate a block
       generate_block();
@@ -2099,7 +2402,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       publish_feed( mpa_id, feeder_id, f );
 
       // check
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       BOOST_REQUIRE( db.find(settle_id) );
 
@@ -2112,7 +2415,7 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
       generate_block();
 
       // check
-      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).is_globally_settled() );
 
       // the settle order is cancelled
       BOOST_REQUIRE( !db.find(settle_id) );

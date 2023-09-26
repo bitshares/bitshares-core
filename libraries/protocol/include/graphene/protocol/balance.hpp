@@ -39,7 +39,7 @@ namespace graphene { namespace protocol {
     */
    struct balance_claim_operation : public base_operation
    {
-      struct fee_parameters_type {};
+      struct fee_params_t {};
 
       asset             fee;
       account_id_type   deposit_to_account;
@@ -48,7 +48,7 @@ namespace graphene { namespace protocol {
       asset             total_claimed;
 
       account_id_type fee_payer()const { return deposit_to_account; }
-      share_type      calculate_fee(const fee_parameters_type& )const { return 0; }
+      share_type      calculate_fee(const fee_params_t& )const { return 0; }
       void            validate()const;
       void            get_required_authorities( vector<authority>& a )const
       {
@@ -58,7 +58,7 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::balance_claim_operation::fee_parameters_type,  )
+FC_REFLECT( graphene::protocol::balance_claim_operation::fee_params_t,  )
 FC_REFLECT( graphene::protocol::balance_claim_operation,
             (fee)(deposit_to_account)(balance_to_claim)(balance_owner_key)(total_claimed) )
 

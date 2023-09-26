@@ -149,7 +149,7 @@ struct blind_output
  */
 struct transfer_to_blind_operation : public base_operation
 {
-   struct fee_parameters_type { 
+   struct fee_params_t {
       uint64_t fee              = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
       uint32_t price_per_output = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
    };
@@ -163,7 +163,7 @@ struct transfer_to_blind_operation : public base_operation
 
    account_id_type fee_payer()const { return from; }
    void            validate()const;
-   share_type      calculate_fee(const fee_parameters_type& )const;
+   share_type      calculate_fee(const fee_params_t& )const;
 };
 
 /**
@@ -172,7 +172,7 @@ struct transfer_to_blind_operation : public base_operation
  */
 struct transfer_from_blind_operation : public base_operation
 {
-   struct fee_parameters_type { 
+   struct fee_params_t {
       uint64_t fee              = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
    };
 
@@ -237,7 +237,7 @@ struct transfer_from_blind_operation : public base_operation
  */
 struct blind_transfer_operation : public base_operation
 {
-   struct fee_parameters_type { 
+   struct fee_params_t {
       uint64_t fee              = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
       uint32_t price_per_output = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
    };
@@ -249,7 +249,7 @@ struct blind_transfer_operation : public base_operation
    /** graphene TEMP account */
    account_id_type fee_payer()const;
    void            validate()const;
-   share_type      calculate_fee( const fee_parameters_type& k )const;
+   share_type      calculate_fee( const fee_params_t& k )const;
 
    void            get_required_authorities( vector<authority>& a )const
    {
@@ -280,13 +280,13 @@ FC_REFLECT( graphene::protocol::transfer_from_blind_operation,
             (fee)(amount)(to)(blinding_factor)(inputs) )
 FC_REFLECT( graphene::protocol::blind_transfer_operation,
             (fee)(inputs)(outputs) )
-FC_REFLECT( graphene::protocol::transfer_to_blind_operation::fee_parameters_type, (fee)(price_per_output) )
-FC_REFLECT( graphene::protocol::transfer_from_blind_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::blind_transfer_operation::fee_parameters_type, (fee)(price_per_output) )
+FC_REFLECT( graphene::protocol::transfer_to_blind_operation::fee_params_t, (fee)(price_per_output) )
+FC_REFLECT( graphene::protocol::transfer_from_blind_operation::fee_params_t, (fee) )
+FC_REFLECT( graphene::protocol::blind_transfer_operation::fee_params_t, (fee)(price_per_output) )
 
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_parameters_type )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation )

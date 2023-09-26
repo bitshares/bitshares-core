@@ -61,7 +61,7 @@ void transfer_to_blind_operation::validate()const
    }
 }
 
-share_type transfer_to_blind_operation::calculate_fee( const fee_parameters_type& k )const
+share_type transfer_to_blind_operation::calculate_fee( const fee_params_t& k )const
 {
     return k.fee + outputs.size() * k.price_per_output;
 }
@@ -134,7 +134,7 @@ void blind_transfer_operation::validate()const
    FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
-share_type blind_transfer_operation::calculate_fee( const fee_parameters_type& k )const
+share_type blind_transfer_operation::calculate_fee( const fee_params_t& k )const
 {
     return k.fee + outputs.size() * k.price_per_output;
 }
@@ -156,9 +156,9 @@ stealth_confirmation::stealth_confirmation( const std::string& base58 )
 
 } } // graphene::protocol
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation )

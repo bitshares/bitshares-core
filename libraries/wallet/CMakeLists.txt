@@ -50,8 +50,18 @@ target_link_libraries( graphene_wallet PRIVATE graphene_app graphene_chain graph
                        ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 target_include_directories( graphene_db PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
+set( GRAPHENE_WALLET_BIG_FILES
+     wallet.cpp
+     wallet_api_impl.cpp
+     wallet_voting.cpp
+   )
+
 if(MSVC)
-  set_source_files_properties( wallet.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
+  set_source_files_properties( ${GRAPHENE_WALLET_BIG_FILES} PROPERTIES COMPILE_FLAGS "/bigobj" )
+else( MSVC )
+   if( MINGW )
+      set_source_files_properties( ${GRAPHENE_WALLET_BIG_FILES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
+   endif( MINGW )
 endif(MSVC)
 
 install( TARGETS

@@ -127,10 +127,11 @@ namespace graphene { namespace protocol {
             /* 71 */ credit_offer_update_operation,
             /* 72 */ credit_offer_accept_operation,
             /* 73 */ credit_deal_repay_operation,
-            /* 74 */ credit_deal_expired_operation    // VIRTUAL
+            /* 74 */ credit_deal_expired_operation,   // VIRTUAL
+            /* 75 */ liquidity_pool_update_operation,
+            /* 76 */ credit_deal_update_operation,
+            /* 77 */ limit_order_update_operation
          >;
-
-   /// @} // operations group
 
    /**
     *  Appends required authorites to the result vector.  The authorities appended are not the

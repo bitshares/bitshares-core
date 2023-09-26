@@ -50,10 +50,8 @@ namespace graphene { namespace wallet { namespace detail {
          for( operation_detail& d : r )
          {
             operation_history_object& i = d.op;
-            auto b = _remote_db->get_block_header(i.block_num);
-            FC_ASSERT(b);
             ss << i.block_num << " ";
-            ss << b->timestamp.to_iso_string() << " ";
+            ss << i.block_time.to_iso_string() << " ";
             ss << string(i.id) << " ";
             i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
@@ -72,10 +70,8 @@ namespace graphene { namespace wallet { namespace detail {
           ss << "result_count : " << r.result_count << " \n";
           for (operation_detail_ex& d : r.details) {
               operation_history_object& i = d.op;
-              auto b = _remote_db->get_block_header(i.block_num);
-              FC_ASSERT(b);
               ss << i.block_num << " ";
-              ss << b->timestamp.to_iso_string() << " ";
+              ss << i.block_time.to_iso_string() << " ";
               ss << string(i.id) << " ";
               i.op.visit(operation_printer(ss, *this, i));
               ss << " transaction_id : ";

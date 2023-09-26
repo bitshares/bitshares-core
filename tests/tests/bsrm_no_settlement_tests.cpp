@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1250,mpa_id), asset(2000) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // borrower3 is unable to create debt position if its CR is below ICR which is calculated with median_feed
       // 1000 * (2000/1250) * 1.9 = 3040
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1250,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Sam update MSSR and MCFR
       // note: borrower's position is undercollateralized again due to the mssr change
@@ -151,7 +151,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_CHECK_EQUAL( mpa.bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1300u );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1300,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(1000,mpa_id) );
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
                    == price( asset(11557,mpa_id), asset(18670) ) ); // 13:10 * (1000-111):(2100-111*210/100)
                                                                     // 13:10 * 889:1867
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
                    == price( asset(8957,mpa_id), asset(19600) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 689 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1960 );
@@ -283,7 +283,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
          BOOST_CHECK( !db.find(call_id) );
          BOOST_CHECK( !db.find(call2_id) );
@@ -381,7 +381,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2000) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // borrower3 is unable to create debt position if its CR is below ICR which is calculated with median_feed
       // 100000 * (2000/125000) * 1.9 = 3040
@@ -400,7 +400,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Sam update MSSR and MCFR
       // note: borrower's position is undercollateralized again due to the mssr change
@@ -420,7 +420,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       BOOST_CHECK_EQUAL( mpa.bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1300u );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(130000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
                    == price( asset(1156259,mpa_id), asset(18680) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -545,7 +545,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price
                       == price( asset(896649,mpa_id), asset(19620) ) );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
          BOOST_CHECK_EQUAL( call_id(db).debt.value, 68973 );
          BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1962 );
@@ -646,7 +646,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1250,mpa_id), asset(2000) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // borrower3 is unable to create debt position if its CR is below ICR which is calculated with median_feed
       // 1000 * (2000/1250) * 1.9 = 3040
@@ -665,7 +665,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1250,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Sam update MSSR and MCFR
       // note: borrower's position is undercollateralized again due to the mssr change
@@ -685,7 +685,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_CHECK_EQUAL( mpa.bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1300u );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1300,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(1000,mpa_id) );
@@ -738,7 +738,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
                    == price( asset(11557,mpa_id), asset(18670) ) ); // 13:10 * (1000-111):(2100-111*210/100)
                                                                     // 13:10 * 889:1867
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -796,7 +796,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
                    == price( asset(8957,mpa_id), asset(19510) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 689 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1951 );
@@ -826,7 +826,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
          BOOST_CHECK( !db.find(call_id) );
          BOOST_CHECK( !db.find(call2_id) );
@@ -924,7 +924,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2000) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // borrower3 is unable to create debt position if its CR is below ICR which is calculated with median_feed
       // 100000 * (2000/125000) * 1.9 = 3040
@@ -943,7 +943,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Sam update MSSR and MCFR
       // note: borrower's position is undercollateralized again due to the mssr change
@@ -963,7 +963,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       BOOST_CHECK_EQUAL( mpa.bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1300u );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(130000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Transfer funds to sellers
       transfer( borrower, seller, asset(100000,mpa_id) );
@@ -1025,7 +1025,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price
                       == price( asset(1156259,mpa_id), asset(18680) ) );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
 
          BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
          BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -1327,7 +1327,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_taker_test )
       auto check_result = [&]
       {
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
          BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), expected_seller_balance_mpa );
          BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), expected_seller2_balance_mpa );
          BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
@@ -2254,7 +2254,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2000) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // borrower3 is unable to create debt position if its CR is below ICR which is calculated with median_feed
       // 100000 * (2000/125000) * 1.9 = 3040
@@ -2273,7 +2273,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(125000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Sam update MSSR and MCFR
       // note: borrower's position is undercollateralized again due to the mssr change
@@ -2293,7 +2293,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       BOOST_CHECK_EQUAL( mpa.bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1300u );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(130000,mpa_id), asset(2100) ) );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa.bitasset_data(db).is_globally_settled() );
 
       // Transfer funds to seller2
       transfer( borrower3, seller2, asset(50000,mpa_id) );
@@ -2376,7 +2376,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_update_debt_test )
       {
          BOOST_TEST_MESSAGE( "Check result");
          BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_globally_settled() );
          BOOST_CHECK_EQUAL( call3_id(db).debt.value, 100000 );
          BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 

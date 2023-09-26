@@ -8,12 +8,26 @@ jobs:
     name: Build and test in Release mode
     strategy:
       matrix:
-        os: [ ubuntu-18.04, ubuntu-20.04 ]
+        os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
-      elasticsearch:
-        image: docker://elasticsearch:7.17.7
-        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
+      elasticsearch8:
+        image: elastic/elasticsearch:8.10.2
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
+      elasticsearch7:
+        image: elastic/elasticsearch:7.17.13
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9201:9200
     steps:
     - name: Install dependencies
       run: |
@@ -45,6 +59,8 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
+        df -h
+        free
         mkdir -p _build
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
@@ -68,14 +84,14 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 1 -C _build
+        make -j 2 -C _build
         df -h
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
-          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        echo
+        _build/tests/es_test -l test_suite
+        export GRAPHENE_TESTING_ES_URL=http://127.0.0.1:9201/
         _build/tests/es_test -l test_suite
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite

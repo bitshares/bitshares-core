@@ -43,7 +43,7 @@ void withdraw_permission_claim_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
 }
 
-share_type withdraw_permission_claim_operation::calculate_fee(const fee_parameters_type& k)const
+share_type withdraw_permission_claim_operation::calculate_fee(const fee_params_t& k)const
 {
    share_type core_fee_required = k.fee;
    if( memo )
@@ -69,10 +69,10 @@ void withdraw_permission_delete_operation::validate() const
 
 } } // graphene::protocol
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation )

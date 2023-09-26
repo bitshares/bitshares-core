@@ -59,21 +59,19 @@ namespace graphene { namespace app {
           return uint32_t(1); // Note: hard code it here for backward compatibility
 
        FC_ASSERT( o_user.valid() && o_password.valid(), "Must provide both user and password" );
-       string user = *o_user;
 
-       optional< api_access_info > acc = _app.get_api_access_info( user );
-       if( !acc.valid() )
+       optional< api_access_info > acc = _app.get_api_access_info( *o_user );
+       if( !acc )
           return logout();
        if( acc->password_hash_b64 != "*" )
        {
-          std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
           std::string acc_password_hash = fc::base64_decode( acc->password_hash_b64 );
-
-          string password = *o_password;
-          fc::sha256 hash_obj = fc::sha256::hash( password + password_salt );
-          if( hash_obj.data_size() != acc_password_hash.length() )
+          if( fc::sha256::data_size() != acc_password_hash.length() )
              return logout();
-          if( memcmp( hash_obj.data(), acc_password_hash.c_str(), hash_obj.data_size() ) != 0 )
+
+          std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
+          fc::sha256 hash_obj = fc::sha256::hash( *o_password + password_salt );
+          if( memcmp( hash_obj.data(), acc_password_hash.data(), fc::sha256::data_size() ) != 0 )
              return logout();
        }
 

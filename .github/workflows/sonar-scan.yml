@@ -11,9 +11,16 @@ jobs:
         os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
     services:
-      elasticsearch:
-        image: docker://elasticsearch:7.17.7
-        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
+      elasticsearch8:
+        image: elastic/elasticsearch:8.10.2
+        options: >-
+          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
+          --env discovery.type=single-node
+          --env xpack.security.enabled=false
+          --env xpack.security.http.ssl.enabled=false
+          --env action.destructive_requires_name=false
+          --env cluster.routing.allocation.disk.threshold_enabled=false
+          --publish 9200:9200
     steps:
     - name: Download and install latest SonarScanner CLI tool
       run: |
@@ -43,6 +50,7 @@ jobs:
           sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
         sudo apt-get install -y \
                      ccache \
+                     gcovr \
                      parallel \
                      libboost-thread-dev \
                      libboost-iostreams-dev \
@@ -69,11 +77,6 @@ jobs:
       run: |
         pwd
         df -h .
-        free
-        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
         free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
@@ -107,7 +110,6 @@ jobs:
       with:
         path: |
           ccache
-          sonar_cache
         key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
           sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
@@ -117,7 +119,7 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        programs/build_helpers/make_with_sonar bw-output -j 1 -C _build \
+        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
           witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
           app_test chain_test cli_test es_test
         df -h
@@ -162,14 +164,12 @@ jobs:
         rm -rf _build/programs/genesis_util/get_dev_key
         df -h
     - name: Unit-Tests
+      timeout-minutes: 15
       run: |
         _build/tests/app_test -l test_suite
         df -h
         echo "Cleanup"
         rm -rf /tmp/graphene*
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
-          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        echo
         _build/tests/es_test -l test_suite
         df -h
         echo "Cleanup"
@@ -185,24 +185,14 @@ jobs:
         df -h
     - name: Prepare for scanning with SonarScanner
       run: |
-        mkdir -p sonar_cache
-        find _build/libraries/[acdenptuw]*/CMakeFiles/*.dir \
-             _build/libraries/plugins/*/CMakeFiles/*.dir \
-             -type d -print \
-          | while read d; do \
-              tmpd="${d:7}"; \
-              srcd="${tmpd/CMakeFiles*.dir/.}"; \
-              gcov -o "$d" "${srcd}"/*.[ch][px][px] \
-                           "${srcd}"/include/graphene/*/*.[ch][px][px] ; \
-            done >/dev/null
-        find _build/programs/[cdgjsw]*/CMakeFiles/*.dir \
-             -type d -print \
-          | while read d; do \
-              tmpd="${d:7}"; \
-              srcd="${tmpd/CMakeFiles*.dir/.}"; \
-              gcov -o "$d" "${srcd}"/*.[ch][px][px] ; \
-            done >/dev/null
         programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
+        pushd _build
+        gcovr --version
+        gcovr --exclude-unreachable-branches --exclude-throw-branches \
+              --exclude '\.\./programs/' \
+              --exclude '\.\./tests/' \
+              --sonarqube ../coverage.xml -r ..
+        popd
     - name: Scan with SonarScanner
       env:
         # to get access to secrets.SONAR_TOKEN, provide GITHUB_TOKEN

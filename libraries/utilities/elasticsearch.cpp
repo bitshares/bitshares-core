@@ -211,13 +211,14 @@ std::string es_client::get_version() const
 
    fc::variant content = fc::json::from_string( response.content );
    return content["version"]["number"].as_string();
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_LOG_AND_RETHROW( (base_url) ) } // GCOVR_EXCL_LINE
 
 void es_client::check_version_7_or_above( bool& result ) const noexcept
 {
    static const int64_t version_7 = 7;
    try {
       const auto es_version = get_version();
+      ilog( "ES version detected: ${v}", ("v", es_version) );
       auto dot_pos = es_version.find('.');
       result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
    }
@@ -271,28 +272,41 @@ fc::variant es_data_adaptor::adapt( const fc::variant_object& op, uint16_t max_d
 
    fc::mutable_variant_object o(op);
 
-   // Note: these fields are maps, but were stored in ES as flattened arrays
-   static const std::unordered_set<std::string> flattened_fields = { "account_auths", "address_auths", "key_auths" };
+   // Note:
+   // These fields are maps, they are stored redundantly in ES,
+   //   one instance is a nested string array using the original field names (for backward compatibility, although
+   //     ES queries return results in JSON format a little differently than node APIs),
+   //   and a new instance is an object array with "_object" suffix added to the field name.
+   static const std::unordered_set<std::string> to_string_array_fields = { "account_auths", "address_auths",
+                                                                           "key_auths" };
 
    // Note:
-   // object arrays listed in this map are stored redundantly in ES, with one instance as a nested object and
-   //      the other as a string for backward compatibility,
-   // object arrays not listed in this map are stored as nested objects only.
+   // These fields are stored redundantly in ES,
+   //   one instance is a string using the original field names (originally for backward compatibility,
+   //     but new fields are added here as well),
+   //   and a new instance is a nested object or nested object array with "_object" suffix added to the field name.
+   //
+   // Why do we add new fields here?
+   // Because we want to keep the JSON format made by node (stored in ES as a string), and store the object format
+   //   at the same time for more flexible query.
+   //
+   // Object arrays not listed in this map (if any) are stored as nested objects only.
    static const std::unordered_map<std::string, data_type> to_string_fields = {
       { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
       { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
-      { "proposed_ops",             data_type::array_type },
+      { "proposed_ops",             data_type::array_type }, // proposal_create_op.proposed_ops
       { "operations",               data_type::array_type }, // proposal_object.operations
-      { "initializer",              data_type::static_variant_type },
-      { "policy",                   data_type::static_variant_type },
-      { "predicates",               data_type::array_type },
-      { "active_special_authority", data_type::static_variant_type },
-      { "owner_special_authority",  data_type::static_variant_type },
-      { "htlc_preimage_hash",       data_type::static_variant_type },
+      { "initializer",              data_type::static_variant_type }, // for workers
+      { "policy",                   data_type::static_variant_type }, // for vesting balances
+      { "predicates",               data_type::array_type }, // for assert_operation
+      { "active_special_authority", data_type::static_variant_type }, // for accounts
+      { "owner_special_authority",  data_type::static_variant_type }, // for accounts
+      { "htlc_preimage_hash",       data_type::static_variant_type }, // for HTLCs
       { "argument",                 data_type::static_variant_type }, // for custom authority, restriction.argument
       { "feeds",                    data_type::map_type }, // asset_bitasset_data_object.feeds
-      { "acceptable_collateral",    data_type::map_type },
-      { "acceptable_borrowers",     data_type::map_type }
+      { "acceptable_collateral",    data_type::map_type }, // for credit offers
+      { "acceptable_borrowers",     data_type::map_type }, // for credit offers
+      { "on_fill",                  data_type::array_type } // for limit orders
    };
    std::vector<std::pair<std::string, fc::variants>> original_arrays;
    std::vector<std::string> keys_to_rename;
@@ -320,7 +334,7 @@ fc::variant es_data_adaptor::adapt( const fc::variant_object& op, uint16_t max_d
             original_arrays.emplace_back( name, array );
          element = fc::json::to_string(element);
       }
-      else if( flattened_fields.find(name) != flattened_fields.end() )
+      else if( to_string_array_fields.find(name) != to_string_array_fields.end() )
       {
          // make a backup (only if depth is sufficient) and adapt the original
          if( max_depth > 1 )

@@ -53,7 +53,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( !mia.is_market_issued() ) return false;
 
     const asset_bitasset_data_object& bitasset = bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this);
-    if( bitasset.has_settlement() ) return true; // already force settled
+    if( bitasset.is_globally_settled() ) return true; // already globally settled
     auto settle_price = bitasset.current_feed.settlement_price;
     if( settle_price.is_null() ) return false; // no feed
 
@@ -246,7 +246,10 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                                            bool check_margin_calls )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
-   FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
+   // GCOVR_EXCL_START
+   // Defensive code, normally it should not fail
+   FC_ASSERT( !bitasset.is_globally_settled(), "black swan already occurred, it should not happen again" );
+   // GCOVR_EXCL_STOP
 
    asset collateral_gathered( 0, bitasset.options.short_backing_asset );
 
@@ -315,13 +318,10 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                  "Internal error: unable to close margin call ${o}", ("o", order) );
    }
 
-   // Move the individual settlement order to the GS fund
+   // Remove the individual settlement order
    const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
    if( limit_ptr )
-   {
-      collateral_gathered.amount += limit_ptr->for_sale;
       remove( *limit_ptr );
-   }
 
    // Move individual settlement fund to the GS fund
    collateral_gathered.amount += bitasset.individual_settlement_fund;
@@ -335,7 +335,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
       obj.settlement_fund  = collateral_gathered.amount;
    });
 
-} FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
+} FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) } // GCOVR_EXCL_LINE
 
 void database::individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& order )
 {
@@ -355,22 +355,44 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
    auto margin_call_fee = order_collateral - fund_receives;
 
-   if( bsrm_type::individual_settlement_to_fund == bsrm ) // settle to fund
+   modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt += order.debt;
+      obj.individual_settlement_fund += fund_receives.amount;
+   });
+
+   if( bsrm_type::individual_settlement_to_order == bsrm ) // settle to order
    {
-      modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
-         obj.individual_settlement_debt += order.debt;
-         obj.individual_settlement_fund += fund_receives.amount;
-      });
-   }
-   else // settle to order
-   {
+      const auto& head_time = head_block_time();
+      bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+
       const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
       if( limit_ptr )
       {
-         modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
-            obj.for_sale += fund_receives.amount;
-            obj.sell_price.base.amount = obj.for_sale;
-            obj.sell_price.quote.amount += order.debt;
+         modify( *limit_ptr, [after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
+            // TODO fix duplicate code
+            bool sell_all = true;
+            if( after_core_hardfork_2591 )
+            {
+               obj.sell_price = ~bitasset.get_margin_call_order_price();
+               asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
+               try
+               {
+                  obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount; // may overflow
+                  // Note: the "=" below is for the consistency of order matching logic
+                  if( obj.for_sale <= bitasset.individual_settlement_fund )
+                     sell_all = false;
+               }
+               catch( fc::exception& e ) // catch the overflow
+               {
+                  // do nothing
+                  dlog( e.to_detail_string() );
+               }
+            }
+            if( sell_all )
+            {
+               obj.for_sale = bitasset.individual_settlement_fund;
+               obj.sell_price = ~bitasset.get_individual_settlement_price();
+            }
          } );
       }
       else
@@ -399,11 +421,14 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
 void database::revive_bitasset( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( bitasset.is_market_issued() );
    FC_ASSERT( bitasset.id == bad.asset_id );
-   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
+   // GCOVR_EXCL_STOP
 
    const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
    if( bdd.current_supply > 0 )
@@ -420,13 +445,16 @@ void database::revive_bitasset( const asset_object& bitasset, const asset_bitass
       FC_ASSERT( bad.settlement_fund == 0 );
 
    _cancel_bids_and_revive_mpa( bitasset, bad );
-} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) } // GCOVR_EXCL_LINE
 
 void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( bitasset.is_market_issued() );
-   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( bad.is_globally_settled() );
    FC_ASSERT( !bad.is_prediction_market );
+   // GCOVR_EXCL_STOP
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
@@ -444,7 +472,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
               obj.settlement_price = price();
               obj.settlement_fund = 0;
            });
-} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) } // GCOVR_EXCL_LINE
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
 {
@@ -509,7 +537,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    // 1. due to expiration: always deduct a fee if there is any fee deferred
    // 2. due to cull_small: deduct a fee after hard fork 604, but not before (will set skip_cancel_fee)
    const account_statistics_object* seller_acc_stats = nullptr;
-   const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+   const asset_dynamic_data_object* deferred_fee_asset_dyn_data = nullptr;
    limit_order_cancel_operation vop;
    share_type deferred_fee = order.deferred_fee;
    asset deferred_paid_fee = order.deferred_paid_fee;
@@ -548,8 +576,8 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
                fee128 /= order.deferred_fee.value;
                share_type cancel_fee_amount = static_cast<int64_t>(fee128);
                // cancel_fee should be positive, pay it to asset's accumulated_fees
-               fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-               modify( *fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
+               deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+               modify( *deferred_fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
                   addo.accumulated_fees += cancel_fee_amount;
                });
                // cancel_fee should be no more than deferred_paid_fee
@@ -585,15 +613,32 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    {
       adjust_balance(order.seller, deferred_paid_fee);
       // be here, must have: fee_asset != CORE
-      if( !fee_asset_dyn_data )
-         fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+      if( !deferred_fee_asset_dyn_data )
+         deferred_fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+      modify( *deferred_fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
          addo.fee_pool += deferred_fee;
       });
    }
 
    if( create_virtual_op )
-      push_applied_operation( vop );
+   {
+      auto op_id = push_applied_operation( vop );
+      set_applied_operation_result( op_id, refunded );
+   }
+
+   cleanup_and_remove_limit_order( order );
+}
+
+void database::cleanup_and_remove_limit_order( const limit_order_object& order )
+{
+   // Unlink the linked take profit order if it exists
+   if( order.take_profit_order_id.valid() )
+   {
+      const auto& take_profit_order = (*order.take_profit_order_id)(*this);
+      modify( take_profit_order, []( limit_order_object& loo ) {
+         loo.take_profit_order_id.reset();
+      });
+   }
 
    remove(order);
 }
@@ -760,7 +805,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
       sell_abd = &sell_asset.bitasset_data( *this );
       if( sell_abd->options.short_backing_asset == recv_asset_id
           && !sell_abd->is_prediction_market
-          && !sell_abd->has_settlement()
+          && !sell_abd->is_globally_settled()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
          if( before_core_hardfork_1270 ) {
@@ -901,11 +946,14 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( new_settlement.balance.asset_id == bitasset.asset_id, "Internal error: asset type mismatch" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
-   FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
+   FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
+   // GCOVR_EXCL_STOP
 
    auto head_time = head_block_time();
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
@@ -986,28 +1034,31 @@ static database::match_result_type get_match_result( bool taker_filled, bool mak
 /**
  *  Matches the two orders, the first parameter is taker, the second is maker.
  *
- *  @return a bit field indicating which orders were filled (and thus removed)
- *
- *  0 - no orders were matched
- *  1 - taker was filled
- *  2 - maker was filled
- *  3 - both were filled
+ *  @return which orders were filled (and thus removed)
  */
 database::match_result_type database::match( const limit_order_object& taker, const limit_order_object& maker,
                                              const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( taker.sell_price.quote.asset_id == maker.sell_price.base.asset_id );
    FC_ASSERT( taker.sell_price.base.asset_id  == maker.sell_price.quote.asset_id );
    FC_ASSERT( taker.for_sale > 0 && maker.for_sale > 0 );
+   // GCOVR_EXCL_STOP
 
    return maker.is_settled_debt ? match_limit_settled_debt( taker, maker, match_price )
                                 : match_limit_normal_limit( taker, maker, match_price );
 }
 
+/// Match a normal limit order with another normal limit order
 database::match_result_type database::match_limit_normal_limit( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
+   FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
+   // GCOVR_EXCL_STOP
 
    auto taker_for_sale = taker.amount_for_sale();
    auto maker_for_sale = maker.amount_for_sale();
@@ -1077,23 +1128,30 @@ database::match_result_type database::match_limit_normal_limit( const limit_orde
    return result;
 }
 
-// When matching a limit order against settled debt, the maker actually behaviors like a call order
+/// When matching a limit order against settled debt, the maker actually behaviors like a call order
 database::match_result_type database::match_limit_settled_debt( const limit_order_object& taker,
                                const limit_order_object& maker, const price& match_price )
 {
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( maker.is_settled_debt, "Internal error: maker is not settled debt" );
+   FC_ASSERT( !taker.is_settled_debt, "Internal error: taker is settled debt" );
+   // GCOVR_EXCL_STOP
 
    bool cull_taker = false;
    bool maker_filled = false;
 
+   const auto& mia = maker.receive_asset_id()(*this);
+   const auto& bitasset = mia.bitasset_data(*this);
+
    auto usd_for_sale = taker.amount_for_sale();
-   auto usd_to_buy = maker.sell_price.quote;
+   auto usd_to_buy = asset( bitasset.individual_settlement_debt, maker.receive_asset_id() );
 
    asset call_receives;
    asset order_receives;
    if( usd_to_buy > usd_for_sale )
    {  // fill taker limit order
-      order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
+      order_receives  = usd_for_sale * match_price; // round down here, in favor of "call order"
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
@@ -1117,16 +1175,38 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
    // seller, pays, receives, ...
    bool taker_filled = fill_limit_order( taker, call_receives, order_receives, cull_taker, match_price, false );
 
-   // Reduce current supply
-   const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
-   modify( mia_ddo, [&call_receives]( asset_dynamic_data_object& ao ){
+   const auto& head_time = head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+
+   asset call_pays = order_receives;
+   if( maker_filled ) // Regardless of hf core-2591
+      call_pays.amount = bitasset.individual_settlement_fund;
+   else if( maker.for_sale != bitasset.individual_settlement_fund ) // implies hf core-2591
+      call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
+   if( call_pays < order_receives ) // be defensive, maybe unnecessary
+   { // GCOVR_EXCL_START
+      wlog( "Unexpected scene: call_pays < order_receives" );
+      call_pays = order_receives;
+   } // GCOVR_EXCL_STOP
+   asset collateral_fee = call_pays - order_receives;
+
+   // Reduce current supply, and accumulate collateral fees
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
+   modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
       ao.current_supply -= call_receives.amount;
+      ao.accumulated_collateral_fees += collateral_fee.amount;
    });
 
    // Push fill_order vitual operation
    // id, seller, pays, receives, ...
-   push_applied_operation( fill_order_operation( maker.id, maker.seller, order_receives, call_receives,
-                                                 asset(0, call_receives.asset_id), match_price, true ) );
+   push_applied_operation( fill_order_operation( maker.id, maker.seller, call_pays, call_receives,
+                                                 collateral_fee, match_price, true ) );
+
+   // Update bitasset data
+   modify( bitasset, [&call_receives,&call_pays]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= call_receives.amount;
+      obj.individual_settlement_fund -= call_pays.amount;
+   });
 
    // Update the maker order
    // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
@@ -1134,16 +1214,129 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
       remove( maker );
    else
    {
-      modify( maker, [&order_receives,&call_receives]( limit_order_object& obj ) {
-         obj.for_sale -= order_receives.amount;
-         obj.sell_price.base.amount = obj.for_sale;
-         obj.sell_price.quote.amount -= call_receives.amount;
+      modify( maker, [after_core_hardfork_2591,&bitasset]( limit_order_object& obj ) {
+         if( after_core_hardfork_2591 )
+         {
+            // Note: for simplicity, only update price when necessary
+            asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
+            obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
+            if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
+            { // GCOVR_EXCL_START
+               wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
+               obj.for_sale = bitasset.individual_settlement_fund;
+               obj.sell_price = ~bitasset.get_individual_settlement_price();
+            } // GCOVR_EXCL_STOP
+         }
+         else
+         {
+            obj.for_sale = bitasset.individual_settlement_fund;
+            obj.sell_price = ~bitasset.get_individual_settlement_price();
+         }
+         // Note: filled_amount is not updated, but it should be fine
       });
+      // Note:
+      // After the price is updated, it is possible that the order can be matched with another order on the order
+      // book, which may then be matched with more other orders. For simplicity, we don't do more matching here.
    }
 
    match_result_type result = get_match_result( taker_filled, maker_filled );
    return result;
 }
+
+/// When matching a settled debt order against a limit order, the taker actually behaviors like a call order
+// TODO fix duplicate code
+database::match_result_type database::match_settled_debt_limit( const limit_order_object& taker,
+                               const limit_order_object& maker, const price& match_price )
+{
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
+   FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
+   FC_ASSERT( taker.is_settled_debt, "Internal error: taker is not settled debt" );
+   // GCOVR_EXCL_STOP
+
+   bool taker_filled = false;
+
+   const auto& mia = taker.receive_asset_id()(*this);
+   const auto& bitasset = mia.bitasset_data(*this);
+
+   auto usd_for_sale = maker.amount_for_sale();
+   auto usd_to_buy = asset( bitasset.individual_settlement_debt, taker.receive_asset_id() );
+
+   asset call_receives;
+   asset order_receives;
+   if( usd_to_buy > usd_for_sale )
+   {  // fill maker limit order
+      order_receives = usd_for_sale * match_price; // round down here, in favor of call order
+
+      // Be here, the limit order won't be paying something for nothing, since if it would, it would have
+      //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing).
+
+      call_receives = order_receives.multiply_and_round_up( match_price );
+   }
+   else
+   {  // fill taker "call order"
+      call_receives = usd_to_buy;
+      order_receives = call_receives.multiply_and_round_up( match_price ); // round up here, in favor of limit order
+      taker_filled = true;
+   }
+
+   asset call_pays = order_receives;
+   if( taker_filled )
+      call_pays.amount = bitasset.individual_settlement_fund;
+   else if( taker.for_sale != bitasset.individual_settlement_fund )
+      call_pays = call_receives * bitasset.get_individual_settlement_price(); // round down, in favor of "call order"
+   if( call_pays < order_receives ) // be defensive, maybe unnecessary
+   { // GCOVR_EXCL_START
+      wlog( "Unexpected scene: call_pays < order_receives" );
+      call_pays = order_receives;
+   } // GCOVR_EXCL_STOP
+   asset collateral_fee = call_pays - order_receives;
+
+   // Reduce current supply, and accumulate collateral fees
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
+   modify( mia_ddo, [&call_receives,&collateral_fee]( asset_dynamic_data_object& ao ){
+      ao.current_supply -= call_receives.amount;
+      ao.accumulated_collateral_fees += collateral_fee.amount;
+   });
+
+   // Push fill_order vitual operation
+   // id, seller, pays, receives, ...
+   push_applied_operation( fill_order_operation( taker.id, taker.seller, call_pays, call_receives,
+                                                 collateral_fee, match_price, false ) );
+
+   // Update bitasset data
+   modify( bitasset, [&call_receives,&call_pays]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= call_receives.amount;
+      obj.individual_settlement_fund -= call_pays.amount;
+   });
+
+   // Update the taker order
+   // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
+   if( taker_filled )
+      remove( taker );
+   else
+   {
+      modify( taker, [&bitasset]( limit_order_object& obj ) {
+         // Note: for simplicity, only update price when necessary
+         asset settled_debt( bitasset.individual_settlement_debt, obj.receive_asset_id() );
+         obj.for_sale = settled_debt.multiply_and_round_up( obj.sell_price ).amount;
+         if( obj.for_sale > bitasset.individual_settlement_fund ) // be defensive, maybe unnecessary
+         { // GCOVR_EXCL_START
+            wlog( "Unexpected scene: obj.for_sale > bitasset.individual_settlement_fund" );
+            obj.for_sale = bitasset.individual_settlement_fund;
+            obj.sell_price = ~bitasset.get_individual_settlement_price();
+         } // GCOVR_EXCL_STOP
+         // Note: filled_amount is not updated, but it should be fine
+      });
+   }
+
+   // seller, pays, receives, ...
+   bool maker_filled = fill_limit_order( maker, call_receives, order_receives, true, match_price, true );
+
+   match_result_type result = get_match_result( taker_filled, maker_filled );
+   return result;
+}
+
 
 database::match_result_type database::match( const limit_order_object& bid, const call_order_object& ask,
                      const price& match_price,
@@ -1460,7 +1653,133 @@ asset database::match_impl( const force_settlement_object& settle,
       cancel_settle_order( settle );
 
    return call_receives;
-} FC_CAPTURE_AND_RETHROW( (p_match_price)(max_settlement)(p_fill_price)(is_margin_call)(settle_is_taker) ) }
+} FC_CAPTURE_AND_RETHROW( (p_match_price)(max_settlement)(p_fill_price) // GCOVR_EXCL_LINE
+                          (is_margin_call)(settle_is_taker) ) } // GCOVR_EXCL_LINE
+
+optional<limit_order_id_type> database::process_limit_order_on_fill( const limit_order_object& order,
+                                                                     const asset& order_receives )
+{
+   optional<limit_order_id_type> result;
+   if( order.on_fill.empty() )
+      return result;
+
+   const auto& take_profit_action = order.get_take_profit_action();
+
+   fc::uint128_t amount128( order_receives.amount.value );
+   amount128 *= take_profit_action.size_percent;
+   amount128 += (GRAPHENE_100_PERCENT - 1); // Round up
+   amount128 /= GRAPHENE_100_PERCENT;
+   // GCOVR_EXCL_START
+   // Defensive code, should not happen
+   if( amount128 <= 0 )
+      return result;
+   // GCOVR_EXCL_STOP
+
+   asset for_sale( static_cast<int64_t>( amount128 ), order_receives.asset_id );
+
+   if( order.take_profit_order_id.valid() ) // Update existing take profit order
+   {
+      limit_order_update_operation op;
+      op.seller = order.seller;
+      op.order = *order.take_profit_order_id;
+      op.delta_amount_to_sell = for_sale;
+
+      if( ( time_point_sec::maximum() - take_profit_action.expiration_seconds ) > head_block_time() )
+         op.new_expiration = head_block_time() + take_profit_action.expiration_seconds;
+      else
+         op.new_expiration = time_point_sec::maximum();
+
+      try
+      {
+         if( take_profit_action.fee_asset_id == asset_id_type() )
+            op.fee = current_fee_schedule().calculate_fee( op );
+         else
+            op.fee = current_fee_schedule().calculate_fee( op,
+                        take_profit_action.fee_asset_id(*this).options.core_exchange_rate ); // This may throw
+
+         if( *order.take_profit_order_id > order.get_id() ) //The linked take profit order was generated by this order
+         {
+            // Update order price
+            const auto& take_profit_order = (*order.take_profit_order_id)(*this);
+            for_sale.amount += take_profit_order.for_sale;
+            auto sell_price = (~order.sell_price) * ratio_type( GRAPHENE_100_PERCENT,
+                                 int32_t(GRAPHENE_100_PERCENT) + take_profit_action.spread_percent );
+            auto new_min_to_receive = for_sale.multiply_and_round_up( sell_price ); // This may throw
+            op.new_price = for_sale / new_min_to_receive;
+         }
+         // else do not update order price
+
+         // GCOVR_EXCL_START
+         // Defensive code, should not fail
+         FC_ASSERT( !op.new_price || ( ~(*op.new_price) > order.sell_price ),
+                    "Internal error: the take profit order should not match the current order" );
+         // GCOVR_EXCL_STOP
+
+         transaction_evaluation_state eval_state(this);
+         eval_state.skip_limit_order_price_check = true;
+
+         try_push_virtual_operation( eval_state, op );
+      }
+      catch( const fc::exception& e )
+      {
+         // We can in fact get here
+         // e.g. if the selling or receiving asset issuer blacklisted the account,
+         //      or no sufficient balance to pay fees, or undo sessions nested too deeply
+         wlog( "At block ${n}, failed to process on_fill for limit order ${order}, "
+               "automatic action (maybe incomplete) was ${op}, exception was ${e}",
+               ("op", operation(op))("order", order)
+               ("n", head_block_num())("e", e.to_detail_string()) );
+      }
+   }
+   else // Create a new take profit order
+   {
+      limit_order_create_operation op;
+      op.seller = order.seller;
+      op.amount_to_sell = for_sale;
+      if( ( time_point_sec::maximum() - take_profit_action.expiration_seconds ) > head_block_time() )
+         op.expiration = head_block_time() + take_profit_action.expiration_seconds;
+      else
+         op.expiration = time_point_sec::maximum();
+      if( take_profit_action.repeat )
+         op.extensions.value.on_fill = order.on_fill;
+
+      try
+      {
+         if( take_profit_action.fee_asset_id == asset_id_type() )
+            op.fee = current_fee_schedule().calculate_fee( op );
+         else
+            op.fee = current_fee_schedule().calculate_fee( op,
+                        take_profit_action.fee_asset_id(*this).options.core_exchange_rate ); // This may throw
+
+         auto sell_price = (~order.sell_price) * ratio_type( GRAPHENE_100_PERCENT,
+                              int32_t(GRAPHENE_100_PERCENT) + take_profit_action.spread_percent );
+         op.min_to_receive = for_sale.multiply_and_round_up( sell_price ); // This may throw
+
+         // GCOVR_EXCL_START
+         // Defensive code, should not fail
+         FC_ASSERT( ~op.get_price() > order.sell_price,
+                    "Internal error: the take profit order should not match the current order" );
+         // GCOVR_EXCL_STOP
+
+         transaction_evaluation_state eval_state(this);
+
+         auto op_result = try_push_virtual_operation( eval_state, op );
+         result = limit_order_id_type( op_result.get<object_id_type>() );
+      }
+      catch( const fc::exception& e )
+      {
+         // We can in fact get here
+         // e.g. if the selling or receiving asset issuer blacklisted the account,
+         //      or no sufficient balance to pay fees, or undo sessions nested too deeply
+         wlog( "At block ${n}, failed to process on_fill for limit order ${order}, "
+               "automatic action (maybe incomplete) was ${op}, exception was ${e}",
+               ("op", operation(op))("order", order)
+               ("n", head_block_num())("e", e.to_detail_string()) );
+      }
+   }
+
+   return result;
+}
 
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives,
                                  bool cull_if_small, const price& fill_price, const bool is_maker)
@@ -1468,16 +1787,19 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    if( head_block_time() < HARDFORK_555_TIME )
       cull_if_small = true;
 
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
    FC_ASSERT( pays.asset_id != receives.asset_id );
+   // GCOVR_EXCL_STOP
 
    const account_object& seller = order.seller(*this);
 
    const auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
 
-   pay_order( seller, receives - issuer_fees, pays );
+   auto order_receives = receives - issuer_fees;
+   pay_order( seller, order_receives, pays );
 
-   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives,
                                                  issuer_fees, fill_price, is_maker ) );
 
@@ -1550,23 +1872,35 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
       }
    }
 
+   // Process on_fill for order_receives
+   optional<limit_order_id_type> new_take_profit_order_id = process_limit_order_on_fill( order, order_receives );
+
+   // If this order is fully filled
    if( pays == order.amount_for_sale() )
    {
-      remove( order );
+      cleanup_and_remove_limit_order( order );
       return true;
    }
-   else
+
+   // This order is partially filled
+   if( new_take_profit_order_id.valid() ) // A new take profit order is created, link this order to it
    {
-      modify( order, [&pays]( limit_order_object& b ) {
-                             b.for_sale -= pays.amount;
-                             b.deferred_fee = 0;
-                             b.deferred_paid_fee.amount = 0;
-                          });
-      if( cull_if_small )
-         return maybe_cull_small_order( *this, order );
-      return false;
+      modify( (*new_take_profit_order_id)(*this), [&order]( limit_order_object& loo ) {
+         loo.take_profit_order_id = order.get_id();
+      });
    }
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+   modify( order, [&pays,&new_take_profit_order_id]( limit_order_object& b ) {
+      b.for_sale -= pays.amount;
+      b.filled_amount += pays.amount.value;
+      b.deferred_fee = 0;
+      b.deferred_paid_fee.amount = 0;
+      if( new_take_profit_order_id.valid() ) // A new take profit order is created, link it to this order
+         b.take_profit_order_id = *new_take_profit_order_id;
+   });
+   if( cull_if_small )
+      return maybe_cull_small_order( *this, order );
+   return false;
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /***
  * @brief fill a call order in the specified amounts
@@ -1649,7 +1983,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
       remove( order );
 
    return collateral_freed.valid();
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /***
  * @brief fullfill a settle order in the specified amounts
@@ -1722,7 +2056,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 
    return filled;
 
-} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (pays)(receives) ) } // GCOVR_EXCL_LINE
 
 /**
  *  Starting with the least collateralized orders, fill them if their
@@ -1855,14 +2189,17 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     {
       // check for blackswan first // TODO perhaps improve performance by passing in iterators
       bool settled_some = check_for_blackswan( mia, enable_black_swan, &bitasset );
-      if( bitasset.has_settlement() )
+      if( bitasset.is_globally_settled() )
          return margin_called;
 
       if( settled_some ) // which implies that BSRM is individual settlement to fund or to order
       {
          call_collateral_itr = call_collateral_index.lower_bound( call_min );
-         if( call_collateral_itr == call_collateral_end )
+         if( call_collateral_itr == call_collateral_end ) // no call order left
+         {
+            check_settled_debt_order( bitasset );
             return true;
+         }
          margin_called = true;
          if( bsrm_type::individual_settlement_to_fund == bsrm )
             limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
@@ -1876,7 +2213,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
                             ( after_hardfork_436 && bitasset.current_feed.settlement_price > ~call_order.call_price )
                           : ( bitasset.current_maintenance_collateralization < call_order.collateralization() );
       if( feed_protected )
+      {
+         check_settled_debt_order( bitasset );
          return margin_called;
+      }
 
       // match call orders with limit orders
       if( limit_itr != limit_end )
@@ -2064,6 +2404,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
          return margin_called;
 
       // If no force settlements, we return
+      // Note: there is no matching limit order due to MSSR, or no limit order at all,
+      //       in either case, the settled debt order can't be matched
       auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
       if( settle_itr == settlement_index.end() || settle_itr->balance.asset_id != bitasset.asset_id )
          return margin_called;
@@ -2085,17 +2427,21 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
       }
       // else : no more force settlements, or feed protected, both will be handled in the next loop
    } // while there exists a call order
+   check_settled_debt_order( bitasset );
    return margin_called;
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 bool database::match_force_settlements( const asset_bitasset_data_object& bitasset )
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   // GCOVR_EXCL_START
+   // Defensive code, normally none of these should fail
    FC_ASSERT( HARDFORK_CORE_2481_PASSED( maint_time ), "Internal error: hard fork core-2481 not passed" );
    FC_ASSERT( !bitasset.is_prediction_market, "Internal error: asset is a prediction market" );
-   FC_ASSERT( !bitasset.has_settlement(), "Internal error: asset is globally settled already" );
+   FC_ASSERT( !bitasset.is_globally_settled(), "Internal error: asset is globally settled already" );
    FC_ASSERT( !bitasset.current_feed.settlement_price.is_null(), "Internal error: no sufficient price feeds" );
+   // GCOVR_EXCL_STOP
 
    auto head_time = head_block_time();
    bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
@@ -2153,6 +2499,47 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
       call_itr = call_collateral_index.lower_bound( call_min );
    }
    return false;
+}
+
+void database::check_settled_debt_order( const asset_bitasset_data_object& bitasset )
+{
+   const auto& head_time = head_block_time();
+   bool after_core_hardfork_2591 = HARDFORK_CORE_2591_PASSED( head_time ); // Tighter peg (fill debt order at MCOP)
+   if( !after_core_hardfork_2591 )
+      return;
+
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   const auto bsrm = bitasset.get_black_swan_response_method();
+   if( bsrm_type::individual_settlement_to_order != bsrm )
+      return;
+
+   const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
+   if( !limit_ptr )
+      return;
+
+   const limit_order_index& limit_index = get_index_type<limit_order_index>();
+   const auto& limit_price_index = limit_index.indices().get<by_price>();
+
+   // Looking for limit orders selling the most USD for the least CORE.
+   auto max_price = price::max( bitasset.asset_id, bitasset.options.short_backing_asset );
+   // Stop when limit orders are selling too little USD for too much CORE.
+   auto min_price = ~limit_ptr->sell_price;
+
+   // NOTE limit_price_index is sorted from greatest to least
+   auto limit_itr = limit_price_index.lower_bound( max_price );
+   auto limit_end = limit_price_index.upper_bound( min_price );
+
+   bool finished = false; // whether the settled debt order is gone
+   while( !finished && limit_itr != limit_end )
+   {
+      const limit_order_object& matching_limit_order = *limit_itr;
+      ++limit_itr;
+      price old_price = limit_ptr->sell_price;
+      finished = ( match_settled_debt_limit( *limit_ptr, matching_limit_order, matching_limit_order.sell_price )
+                   != match_result_type::only_maker_filled );
+      if( !finished && old_price != limit_ptr->sell_price )
+         limit_end = limit_price_index.upper_bound( ~limit_ptr->sell_price );
+   }
 }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )

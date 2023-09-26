@@ -222,6 +222,7 @@ struct database_fixture_base {
    bool hf2467 = false; // Note: used by hf core-2281 too, assuming hf core-2281 and core-2467 occur at the same time
    bool hf2481 = false;
    bool bsip77 = false;
+   bool hf2595 = false;
 
    string es_index_prefix; ///< Index prefix for elasticsearch plugin
    string es_obj_index_prefix; ///< Index prefix for es_objects plugin
@@ -410,12 +411,37 @@ struct database_fixture_base {
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
-   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
+   limit_order_create_operation make_limit_order_create_op(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} ) const;
+   const limit_order_object* create_sell_order( const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
+                                                const time_point_sec& order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price(),
+                                                const optional< vector< limit_order_auto_action > >& on_fill = {} );
+   limit_order_update_operation make_limit_order_update_op(
+                           const account_id_type& seller_id,
+                           const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} )const;
+   void update_limit_order(const limit_order_object& order,
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price(),
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} );
+   void update_limit_order(const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price = {},
+                           const fc::optional<asset>& delta_amount = {},
+                           const fc::optional<time_point_sec>& new_expiration = {},
+                           const price& fee_core_exchange_rate = price::unit_price(),
+                           const optional< vector< limit_order_auto_action > >& on_fill = {} );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
@@ -440,6 +466,13 @@ struct database_fixture_base {
    liquidity_pool_delete_operation make_liquidity_pool_delete_op( account_id_type account,
                                                   liquidity_pool_id_type pool )const;
    generic_operation_result delete_liquidity_pool( account_id_type account, liquidity_pool_id_type pool );
+   liquidity_pool_update_operation make_liquidity_pool_update_op( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )const;
+   void update_liquidity_pool( account_id_type account, liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent );
    liquidity_pool_deposit_operation make_liquidity_pool_deposit_op( account_id_type account,
                                                   liquidity_pool_id_type pool, const asset& amount_a,
                                                   const asset& amount_b )const;
@@ -519,17 +552,22 @@ struct database_fixture_base {
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
                                        uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
-                                       uint32_t min_duration = 0 )const;
+                                       uint32_t min_duration = 0, const optional<uint8_t>& auto_repay = {} )const;
    const credit_deal_object& borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
                                        uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
-                                       uint32_t min_duration = 0 );
+                                       uint32_t min_duration = 0, const optional<uint8_t>& auto_repay = {} );
    credit_deal_repay_operation make_credit_deal_repay_op(
                                        account_id_type account, credit_deal_id_type deal_id,
                                        const asset& repay_amount, const asset& credit_fee )const;
    extendable_operation_result_dtl repay_credit_deal( account_id_type account, credit_deal_id_type deal_id,
                                        const asset& repay_amount, const asset& credit_fee );
+   credit_deal_update_operation make_credit_deal_update_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )const;
+   void update_credit_deal( account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay );
 
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you

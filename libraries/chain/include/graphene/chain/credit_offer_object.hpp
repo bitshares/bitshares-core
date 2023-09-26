@@ -113,6 +113,7 @@ class credit_deal_object : public abstract_object<credit_deal_object, protocol_i
       share_type           collateral_amount;  ///< How much funds in collateral
       uint32_t             fee_rate = 0;       ///< Fee rate, the demominator is GRAPHENE_FEE_RATE_DENOM
       time_point_sec       latest_repay_time;  ///< The deadline when the debt should be repaid
+      uint8_t              auto_repay;         ///< The specified automatic repayment type
 };
 
 struct by_latest_repay_time; // for protocol

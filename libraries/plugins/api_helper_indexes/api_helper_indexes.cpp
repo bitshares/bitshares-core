@@ -50,7 +50,7 @@ void amount_in_collateral_index::object_inserted( const object& objct )
          itr->second += o.collateral;
    }
 
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 void amount_in_collateral_index::object_removed( const object& objct )
 { try {
@@ -68,31 +68,31 @@ void amount_in_collateral_index::object_removed( const object& objct )
          itr->second -= o.collateral;
    }
 
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 void amount_in_collateral_index::about_to_modify( const object& objct )
 { try {
    object_removed( objct );
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 void amount_in_collateral_index::object_modified( const object& objct )
 { try {
    object_inserted( objct );
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 share_type amount_in_collateral_index::get_amount_in_collateral( const asset_id_type& asst )const
 { try {
    auto itr = in_collateral.find( asst );
    if( itr == in_collateral.end() ) return 0;
    return itr->second;
-} FC_CAPTURE_AND_RETHROW( (asst) ) }
+} FC_CAPTURE_AND_RETHROW( (asst) ) } // GCOVR_EXCL_LINE
 
 share_type amount_in_collateral_index::get_backing_collateral( const asset_id_type& asst )const
 { try {
    auto itr = backing_collateral.find( asst );
    if( itr == backing_collateral.end() ) return 0;
    return itr->second;
-} FC_CAPTURE_AND_RETHROW( (asst) ) }
+} FC_CAPTURE_AND_RETHROW( (asst) ) } // GCOVR_EXCL_LINE
 
 void asset_in_liquidity_pools_index::object_inserted( const object& objct )
 { try {
@@ -100,7 +100,7 @@ void asset_in_liquidity_pools_index::object_inserted( const object& objct )
    const liquidity_pool_id_type pool_id = o.get_id();
    asset_in_pools_map[ o.asset_a ].insert( pool_id ); // Note: [] operator will create an entry if not found
    asset_in_pools_map[ o.asset_b ].insert( pool_id );
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 void asset_in_liquidity_pools_index::object_removed( const object& objct )
 { try {
@@ -109,7 +109,7 @@ void asset_in_liquidity_pools_index::object_removed( const object& objct )
    asset_in_pools_map[ o.asset_a ].erase( pool_id );
    asset_in_pools_map[ o.asset_b ].erase( pool_id );
    // Note: do not erase entries with an empty set from the map in order to avoid read/write race conditions
-} FC_CAPTURE_AND_RETHROW( (objct) ) }
+} FC_CAPTURE_AND_RETHROW( (objct) ) } // GCOVR_EXCL_LINE
 
 void asset_in_liquidity_pools_index::about_to_modify( const object& objct )
 {
@@ -250,6 +250,6 @@ void api_helper_indexes::refresh_next_ids()
 object_id_type next_object_ids_index::get_next_id( uint8_t space_id, uint8_t type_id ) const
 { try {
    return _next_ids.at( std::make_pair( space_id, type_id ) );
-} FC_CAPTURE_AND_RETHROW( (space_id)(type_id) ) }
+} FC_CAPTURE_AND_RETHROW( (space_id)(type_id) ) } // GCOVR_EXCL_LINE
 
 } }
