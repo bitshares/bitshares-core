@@ -190,7 +190,7 @@ Use `gethelp <COMMAND>` to see more info about individual commands. E.G.
     >>> gethelp get_order_book
 
 The definition of all commands is available in the
-[wallet.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/wallet/include/graphene/wallet/wallet.hpp) souce code file.
+[wallet.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/wallet/include/graphene/wallet/wallet.hpp) source code file.
 Corresponding documentation can be found in the [Doxygen documentation](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
 
 You can run the program with `--help` parameter to see more info:
@@ -304,7 +304,7 @@ Note: the `login` API set is always accessible.
 
 Passwords are stored in `base64` as salted `sha256` hashes.  A simple Python script,
 [`saltpass.py`](https://github.com/bitshares/bitshares-core/blob/master/programs/witness_node/saltpass.py)
-is avaliable to obtain hash and salt values from a password.
+is available to obtain hash and salt values from a password.
 A single asterisk `"*"` may be specified as username or password hash to accept any value.
 
 With the above configuration, here is an example of how to call the `add_node` API from the `network_node` API set:
