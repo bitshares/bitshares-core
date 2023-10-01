@@ -191,7 +191,7 @@ Use `gethelp <COMMAND>` to see more info about individual commands. E.G.
 
 The definition of all commands is available in the
 [wallet.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/wallet/include/graphene/wallet/wallet.hpp) souce code file.
-Corresponding documentation can be found in the [Doxygen documentation](https://doxygen.bitshares.org/classgraphene_1_1wallet_1_1wallet__api.html).
+Corresponding documentation can be found in the [Doxygen documentation](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
 
 You can run the program with `--help` parameter to see more info:
 
@@ -211,7 +211,7 @@ Questions can be posted in [Github Discussions](https://github.com/bitshares/bit
 
 BitShares UI bugs should be reported to the [UI issue tracker](https://github.com/bitshares/bitshares-ui/issues).
 
-Up to date online Doxygen documentation can be found at [Doxygen.BitShares.org](https://doxygen.bitshares.org/hierarchy.html).
+Up to date online Doxygen documentation can be found at [https://bitshares.github.io/doxygen](https://bitshares.github.io/doxygen/hierarchy.html).
 
 
 Using Built-In APIs
@@ -246,8 +246,8 @@ The definition of all node APIs is available in the source code files including
 [database_api.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/app/include/graphene/app/database_api.hpp)
 and [api.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/app/include/graphene/app/api.hpp).
 Corresponding documentation can be found in Doxygen:
-* [database API](https://doxygen.bitshares.org/classgraphene_1_1app_1_1database__api.html)
-* [other APIs](https://doxygen.bitshares.org/namespacegraphene_1_1app.html)
+* [database API](https://bitshares.github.io/doxygen/classgraphene_1_1app_1_1database__api.html)
+* [other APIs](https://bitshares.github.io/doxygen/namespacegraphene_1_1app.html)
 
 
 ### Wallet API
@@ -320,8 +320,8 @@ The restricted API sets are accessible via HTTP too using *basic access authenti
     $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": ["network_node", "add_node", ["127.0.0.1:9090"]], "id": 1}' http://bytemaster:supersecret@127.0.0.1:8090/
 
 Our `doxygen` documentation contains the most up-to-date information
-about APIs for the [node](https://doxygen.bitshares.org/namespacegraphene_1_1app.html) and the
-[wallet](https://doxygen.bitshares.org/classgraphene_1_1wallet_1_1wallet__api.html).
+about APIs for the [node](https://bitshares.github.io/doxygen/namespacegraphene_1_1app.html) and the
+[wallet](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
 
 
 FAQ
