@@ -575,14 +575,17 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       if( for_sale.asset_id == asset_id_type() && !o.is_settled_debt )
          // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
          core_in_orders += for_sale.amount;
-      total_balances[for_sale.asset_id] += for_sale.amount;
       total_balances[asset_id_type()] += o.deferred_fee;
       total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
       if( o.is_settled_debt )
       {
-         total_debts[o.receive_asset_id()] += o.sell_price.quote.amount;
-         BOOST_CHECK_EQUAL( o.sell_price.base.amount.value, for_sale.amount.value );
+         const auto& bitasset = o.receive_asset_id()(db).bitasset_data(db);
+         BOOST_CHECK_LE( o.for_sale.value, bitasset.individual_settlement_fund.value );
+         auto settled_debt = asset( bitasset.individual_settlement_debt, o.receive_asset_id() );
+         BOOST_CHECK_EQUAL( settled_debt.multiply_and_round_up( o.sell_price ).amount.value, o.for_sale.value );
       }
+      else
+         total_balances[for_sale.asset_id] += for_sale.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -602,7 +605,7 @@ void database_fixture_base::verify_asset_supplies( const database& db )
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
          total_balances[bad.options.short_backing_asset] += bad.individual_settlement_fund;
          total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
-         if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
+         if( !bad.is_globally_settled() ) // Note: if asset has been globally settled, do not check total debt
             total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
       total_balances[asset_obj.get_id()] += dasset_obj.confidential_supply.value;
@@ -1160,34 +1163,92 @@ digest_type database_fixture_base::digest( const transaction& tx )
    return tx.digest();
 }
 
-const limit_order_object* database_fixture_base::create_sell_order(account_id_type user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration,
-                                                const price& fee_core_exchange_rate )
+limit_order_create_operation database_fixture_base::make_limit_order_create_op(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const optional< vector< limit_order_auto_action > >& on_fill ) const
 {
-   auto r =  create_sell_order( user(db), amount, recv, order_expiration, fee_core_exchange_rate );
-   verify_asset_supplies(db);
-   return r;
+   limit_order_create_operation buy_order;
+   buy_order.seller = user;
+   buy_order.amount_to_sell = amount;
+   buy_order.min_to_receive = recv;
+   buy_order.expiration = order_expiration;
+   buy_order.extensions.value.on_fill = on_fill;
+   return buy_order;
 }
 
-const limit_order_object* database_fixture_base::create_sell_order( const account_object& user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration,
-                                                const price& fee_core_exchange_rate )
+const limit_order_object* database_fixture_base::create_sell_order(
+                                                const account_id_type& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const price& fee_core_exchange_rate,
+                                                const optional< vector< limit_order_auto_action > >& on_fill )
 {
    set_expiration( db, trx );
    trx.operations.clear();
 
-   limit_order_create_operation buy_order;
-   buy_order.seller = user.id;
-   buy_order.amount_to_sell = amount;
-   buy_order.min_to_receive = recv;
-   buy_order.expiration = order_expiration;
-   trx.operations.push_back(buy_order);
+   limit_order_create_operation buy_order = make_limit_order_create_op( user, amount, recv, order_expiration,
+                                                                        on_fill );
+   trx.operations = {buy_order};
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
    auto processed = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
+}
+
+const limit_order_object* database_fixture_base::create_sell_order(
+                                                const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec& order_expiration,
+                                                const price& fee_core_exchange_rate,
+                                                const optional< vector< limit_order_auto_action > >& on_fill )
+{
+   return create_sell_order( user.get_id(), amount, recv, order_expiration, fee_core_exchange_rate );
+}
+
+limit_order_update_operation database_fixture_base::make_limit_order_update_op(
+                           const account_id_type& seller_id,
+                           const limit_order_id_type& order_id,
+                           const fc::optional<price>& new_price,
+                           const fc::optional<asset>& delta_amount,
+                           const fc::optional<time_point_sec>& new_expiration,
+                           const optional< vector< limit_order_auto_action > >& on_fill )const
+{
+   limit_order_update_operation update_order;
+   update_order.seller = seller_id;
+   update_order.order = order_id;
+   update_order.new_price = new_price;
+   update_order.delta_amount_to_sell = delta_amount;
+   update_order.new_expiration = new_expiration;
+   update_order.on_fill = on_fill;
+   return update_order;
+}
+
+void database_fixture_base::update_limit_order(const limit_order_object& order,
+                                          const fc::optional<price>& new_price,
+                                          const fc::optional<asset>& delta_amount,
+                                          const fc::optional<time_point_sec>& new_expiration,
+                                          const price& fee_core_exchange_rate,
+                                          const optional< vector< limit_order_auto_action > >& on_fill )
+{
+   limit_order_update_operation update_order = make_limit_order_update_op( order.seller, order.get_id(), new_price,
+                                                                           delta_amount, new_expiration, on_fill );
+   trx.operations = {update_order};
+   for(auto& op : trx.operations) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
+   trx.validate();
+   auto processed = PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+}
+
+void database_fixture_base::update_limit_order(const limit_order_id_type& order_id,
+                                          const fc::optional<price>& new_price,
+                                          const fc::optional<asset>& delta_amount,
+                                          const fc::optional<time_point_sec>& new_expiration,
+                                          const price& fee_core_exchange_rate,
+                                          const optional< vector< limit_order_auto_action > >& on_fill )
+{
+   update_limit_order( order_id(db), new_price, delta_amount, new_expiration, fee_core_exchange_rate, on_fill );
 }
 
 asset database_fixture_base::cancel_limit_order( const limit_order_object& order )
@@ -1201,7 +1262,7 @@ asset database_fixture_base::cancel_limit_order( const limit_order_object& order
   trx.validate();
   auto processed = PUSH_TX(db, trx, ~0);
   trx.operations.clear();
-   verify_asset_supplies(db);
+  verify_asset_supplies(db);
   return processed.operation_results[0].get<asset>();
 }
 
@@ -1531,6 +1592,35 @@ generic_operation_result database_fixture_base::delete_liquidity_pool( account_i
    trx.operations.clear();
    verify_asset_supplies(db);
    return op_result.get<generic_operation_result>();
+}
+
+liquidity_pool_update_operation database_fixture_base::make_liquidity_pool_update_op( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )const
+{
+   liquidity_pool_update_operation op;
+   op.account = account;
+   op.pool = pool;
+   op.taker_fee_percent = taker_fee_percent;
+   op.withdrawal_fee_percent = withdrawal_fee_percent;
+   return op;
+}
+
+void database_fixture_base::update_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool,
+                                                  optional<uint16_t> taker_fee_percent,
+                                                  optional<uint16_t> withdrawal_fee_percent )
+{
+   liquidity_pool_update_operation op = make_liquidity_pool_update_op( account, pool, taker_fee_percent,
+                                                                       withdrawal_fee_percent );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
 }
 
 liquidity_pool_deposit_operation database_fixture_base::make_liquidity_pool_deposit_op( account_id_type account,
@@ -1888,7 +1978,8 @@ void database_fixture_base::update_credit_offer( account_id_type account, credit
 credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )const
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )const
 {
    credit_offer_accept_operation op;
    op.borrower = account;
@@ -1897,16 +1988,18 @@ credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op
    op.collateral = collateral;
    op.max_fee_rate = max_fee_rate;
    op.min_duration_seconds = min_duration;
+   op.extensions.value.auto_repay = auto_repay;
    return op;
 }
 
 const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
                                        const asset& borrow_amount, const asset& collateral,
-                                       uint32_t max_fee_rate, uint32_t min_duration )
+                                       uint32_t max_fee_rate, uint32_t min_duration,
+                                       const optional<uint8_t>& auto_repay )
 {
    credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral,
-                                                                   max_fee_rate, min_duration );
+                                                                   max_fee_rate, min_duration, auto_repay );
    trx.operations.clear();
    trx.operations.push_back( op );
 
@@ -1953,6 +2046,33 @@ extendable_operation_result_dtl database_fixture_base::repay_credit_deal(
    trx.operations.clear();
    verify_asset_supplies(db);
    return op_result.get<extendable_operation_result>().value;
+}
+
+credit_deal_update_operation database_fixture_base::make_credit_deal_update_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )const
+{
+   credit_deal_update_operation op;
+   op.account = account;
+   op.deal_id = deal_id;
+   op.auto_repay = auto_repay;
+   return op;
+}
+
+void database_fixture_base::update_credit_deal(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       uint8_t auto_repay )
+{
+   credit_deal_update_operation op = make_credit_deal_update_op( account, deal_id, auto_repay );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
 }
 
 
@@ -2162,24 +2282,24 @@ flat_map< uint64_t, graphene::chain::fee_parameters > database_fixture_base::get
 {
    flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
 
-   htlc_create_operation::fee_parameters_type create_param;
+   htlc_create_operation::fee_params_t create_param;
    create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_create_operation()).which()] = create_param;
 
-   htlc_redeem_operation::fee_parameters_type redeem_param;
+   htlc_redeem_operation::fee_params_t redeem_param;
    redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
 
-   htlc_extend_operation::fee_parameters_type extend_param;
+   htlc_extend_operation::fee_params_t extend_param;
    extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
 
    // set the transfer kb fee to something other than default, to verify we're looking
    // at the correct fee
-   transfer_operation::fee_parameters_type transfer_param;
+   transfer_operation::fee_params_t transfer_param;
    transfer_param.price_per_kbyte *= 2;
    ret_val[ ((operation)transfer_operation()).which() ] = transfer_param;
 

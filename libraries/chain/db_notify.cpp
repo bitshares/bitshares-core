@@ -56,6 +56,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // seller
    }
+   void operator()(const limit_order_update_operation& op)
+   {
+      _impacted.insert(op.fee_payer()); // seller
+   }
    void operator()( const limit_order_cancel_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // fee_paying_account
@@ -326,6 +330,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const liquidity_pool_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
    void operator()( const liquidity_pool_deposit_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // account
@@ -382,6 +390,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.offer_owner );
       _impacted.insert( op.borrower );
+   }
+   void operator()( const credit_deal_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
    }
 };
 
@@ -644,6 +656,6 @@ void database::notify_changed_objects()
 } catch( const graphene::chain::plugin_exception& e ) {
    elog( "Caught plugin exception: ${e}", ("e", e.to_detail_string() ) );
    throw;
-} FC_CAPTURE_AND_LOG( (0) ) }
+} FC_CAPTURE_AND_LOG( (0) ) } // GCOVR_EXCL_LINE
 
 } } // namespace graphene::chain

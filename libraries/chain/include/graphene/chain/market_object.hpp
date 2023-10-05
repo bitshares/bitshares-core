@@ -26,6 +26,7 @@
 #include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/asset.hpp>
+#include <graphene/protocol/market.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -44,13 +45,27 @@ using namespace graphene::db;
 class limit_order_object : public abstract_object<limit_order_object, protocol_ids, limit_order_object_type>
 {
    public:
-      time_point_sec   expiration;
-      account_id_type  seller;
-      share_type       for_sale; ///< asset id is sell_price.base.asset_id
-      price            sell_price;
+      time_point_sec   expiration; ///< When this limit order will expire
+      account_id_type  seller; ///< Who is selling
+      share_type       for_sale; ///< The amount for sale, asset id is sell_price.base.asset_id
+      price            sell_price; ///< The seller's asking price
+      fc::uint128_t    filled_amount = 0; ///< The amount that has been sold, asset id is sell_price.base.asset_id
       share_type       deferred_fee; ///< fee converted to CORE
       asset            deferred_paid_fee; ///< originally paid fee
       bool             is_settled_debt = false; ///< Whether this order is an individual settlement fund
+
+      /// Automatic actions when the limit order is filled or partially filled
+      vector< limit_order_auto_action > on_fill;
+
+      /// ID of the take profit limit order linked to this limit order
+      optional<limit_order_id_type> take_profit_order_id;
+
+      /// Returns the configured automatic action that will create a take profit order when this limit order is filled
+      const create_take_profit_order_action& get_take_profit_action() const
+      {
+         FC_ASSERT( !on_fill.empty() ); // Normally it should not fail // GCOVR_EXCL_LINE
+         return on_fill.front().get<create_take_profit_order_action>();
+      }
 
       pair<asset_id_type,asset_id_type> get_market()const
       {

@@ -49,7 +49,7 @@ void ticket_update_operation::validate()const
 
 } } // graphene::protocol
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ticket_update_operation )

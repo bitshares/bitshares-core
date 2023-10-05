@@ -230,6 +230,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       // The head block number is 1
       BOOST_CHECK_EQUAL( db.head_block_num(), 1u );
 
+      generate_blocks( HARDFORK_CORE_2535_TIME ); // For Order-Sends-Take-Profit-Order
+      generate_block();
+      set_expiration( db, trx );
+
       // delete all first, this will delete genesis data and data inserted at block 1
       auto delete_objects = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_objects); // require successful deletion
@@ -272,9 +276,13 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          auto bitasset_object_id = j["hits"]["hits"][size_t(0)]["_source"]["object_id"].as_string();
          BOOST_CHECK_EQUAL(bitasset_object_id, bitasset_data_id);
 
+         //                                           fee_asset, spread,  size,   expiration, repeat
+         create_take_profit_order_action tpa1 { asset_id_type(),    300,  9900,        86400, true };
+         vector<limit_order_auto_action> on_fill_1 { tpa1 };
          // create a limit order that expires at the next maintenance time
          create_sell_order( account_id_type(), asset(1), asset(1, usd_id),
-                            db.get_dynamic_global_properties().next_maintenance_time );
+                            db.get_dynamic_global_properties().next_maintenance_time,
+                            price::unit_price(), on_fill_1 );
          generate_block();
 
          es.endpoint = es.index_prefix + "limitorder/_count";
@@ -341,6 +349,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
       es.curl = curl;
       es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_index_prefix;
+
+      generate_blocks( HARDFORK_CORE_2535_TIME ); // For Order-Sends-Take-Profit-Order
+      generate_block();
+      set_expiration( db, trx );
 
       auto delete_account_history = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_account_history); // require successful deletion
@@ -673,8 +685,12 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // Prepare funds
          transfer( account_id_type()(db), alice_id(db), asset(100) );
+         //                                           fee_asset, spread,  size,   expiration, repeat
+         create_take_profit_order_action tpa1 { asset_id_type(),    100, 10000,        86400, false };
+         vector<limit_order_auto_action> on_fill_1 { tpa1 };
          // Create a limit order that expires in 300 seconds
-         create_sell_order( alice_id, asset(1), asset(1, asset_id_type(1)), db.head_block_time() + 300 );
+         create_sell_order( alice_id, asset(1), asset(1, asset_id_type(1)), db.head_block_time() + 300,
+                            price::unit_price(), on_fill_1 );
 
          generate_block();
 

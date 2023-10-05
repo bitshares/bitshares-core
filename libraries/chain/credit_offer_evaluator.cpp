@@ -66,7 +66,7 @@ void_result credit_offer_create_evaluator::do_evaluate(const credit_offer_create
               "The account is unauthorized by the asset" );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 object_id_type credit_offer_create_evaluator::do_apply(const credit_offer_create_operation& op) const
 { try {
@@ -88,7 +88,7 @@ object_id_type credit_offer_create_evaluator::do_apply(const credit_offer_create
       obj.acceptable_borrowers = op.acceptable_borrowers;
    });
    return new_credit_offer_object.id;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result credit_offer_delete_evaluator::do_evaluate(const credit_offer_delete_operation& op)
 { try {
@@ -104,7 +104,7 @@ void_result credit_offer_delete_evaluator::do_evaluate(const credit_offer_delete
    // Note: no asset authorization check here, allow funds to be moved to account balance
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 asset credit_offer_delete_evaluator::do_apply(const credit_offer_delete_operation& op) const
 { try {
@@ -120,7 +120,7 @@ asset credit_offer_delete_evaluator::do_apply(const credit_offer_delete_operatio
    d.remove( *_offer );
 
    return released;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result credit_offer_update_evaluator::do_evaluate(const credit_offer_update_operation& op)
 { try {
@@ -180,7 +180,7 @@ void_result credit_offer_update_evaluator::do_evaluate(const credit_offer_update
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result credit_offer_update_evaluator::do_apply( const credit_offer_update_operation& op) const
 { try {
@@ -224,11 +224,18 @@ void_result credit_offer_update_evaluator::do_apply( const credit_offer_update_o
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result credit_offer_accept_evaluator::do_evaluate(const credit_offer_accept_operation& op)
 { try {
    const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   if( !HARDFORK_CORE_2595_PASSED(block_time) )
+   {
+      FC_ASSERT( !op.extensions.value.auto_repay.valid(),
+                 "auto_repay unavailable until the core-2595 hardfork");
+   }
 
    _offer = &op.offer_id(d);
 
@@ -297,7 +304,7 @@ void_result credit_offer_accept_evaluator::do_evaluate(const credit_offer_accept
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 extendable_operation_result credit_offer_accept_evaluator::do_apply( const credit_offer_accept_operation& op) const
 { try {
@@ -325,6 +332,7 @@ extendable_operation_result credit_offer_accept_evaluator::do_apply( const credi
       obj.collateral_amount = op.collateral.amount;
       obj.fee_rate = _offer->fee_rate;
       obj.latest_repay_time = repay_time;
+      obj.auto_repay = ( op.extensions.value.auto_repay.valid() ? *op.extensions.value.auto_repay : 0 );
    });
 
    if( _deal_summary != nullptr )
@@ -360,7 +368,7 @@ extendable_operation_result credit_offer_accept_evaluator::do_apply( const credi
    result.value.impacted_accounts = flat_set<account_id_type>({ _offer->owner_account });
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 void_result credit_deal_repay_evaluator::do_evaluate(const credit_deal_repay_operation& op)
 { try {
@@ -377,7 +385,7 @@ void_result credit_deal_repay_evaluator::do_evaluate(const credit_deal_repay_ope
 
    // Note: the result can be larger than 64 bit, but since we don't store it, it is allowed
    auto required_fee = ( ( ( fc::uint128_t( op.repay_amount.amount.value ) * _deal->fee_rate )
-                         + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
+                           + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
 
    FC_ASSERT( fc::uint128_t(op.credit_fee.amount.value) >= required_fee,
               "Insuffient credit fee, requires ${r}, offered ${p}",
@@ -392,7 +400,7 @@ void_result credit_deal_repay_evaluator::do_evaluate(const credit_deal_repay_ope
               "The owner of the credit offer is unauthorized by the repaying asset" );
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_deal_repay_operation& op) const
 { try {
@@ -442,6 +450,9 @@ extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_
    }
    else // to partially repay
    {
+      // Note:
+      // Due to rounding, it is possible that the account is paying too much debt asset for too little collateral,
+      // in extreme cases, the amount to release can be zero.
       auto amount_to_release = ( fc::uint128_t( op.repay_amount.amount.value ) * _deal->collateral_amount.value )
                                  / _deal->debt_amount.value; // Round down
       FC_ASSERT( amount_to_release < fc::uint128_t( _deal->collateral_amount.value ), "Internal error" );
@@ -459,6 +470,33 @@ extendable_operation_result credit_deal_repay_evaluator::do_apply( const credit_
    result.value.received = vector<asset>({ collateral_released });
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (op) ) }
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+void_result credit_deal_update_evaluator::do_evaluate(const credit_deal_update_operation& op)
+{ try {
+   const database& d = db();
+   const auto block_time = d.head_block_time();
+
+   FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
+
+   _deal = &op.deal_id(d);
+
+   FC_ASSERT( _deal->borrower == op.account, "A credit deal can only be updated by the borrower" );
+
+   FC_ASSERT( _deal->auto_repay != op.auto_repay, "The automatic repayment type does not change" );
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+void_result credit_deal_update_evaluator::do_apply( const credit_deal_update_operation& op) const
+{ try {
+   database& d = db();
+
+   d.modify( *_deal, [&op]( credit_deal_object& obj ){
+      obj.auto_repay = op.auto_repay;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
 } } // graphene::chain

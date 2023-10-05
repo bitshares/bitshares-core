@@ -183,7 +183,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -234,7 +234,7 @@ void application_impl::reset_websocket_server()
    ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
    _websocket_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-endpoint").as<string>()) );
    _websocket_server->start_accept();
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void application_impl::reset_websocket_tls_server()
 { try {
@@ -259,7 +259,7 @@ void application_impl::reset_websocket_tls_server()
    ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
    _websocket_tls_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-tls-endpoint").as<string>()) );
    _websocket_tls_server->start_accept();
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
 void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::program_options::variables_map> options)
 {
@@ -526,7 +526,7 @@ graphene::chain::genesis_state_type application_impl::initialize_genesis_state()
          genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
          return genesis;
       }
-   } FC_CAPTURE_AND_RETHROW()
+   } FC_CAPTURE_AND_RETHROW() // GCOVR_EXCL_LINE
 }
 
 void application_impl::open_chain_database() const
@@ -634,7 +634,7 @@ bool application_impl::is_plugin_enabled(const string& name) const
    return !(_active_plugins.find(name) == _active_plugins.end());
 }
 
-/**
+/*
  * If delegate has the item, the network has no need to fetch it.
  */
 bool application_impl::has_item(const net::item_id& id)
@@ -646,10 +646,10 @@ bool application_impl::has_item(const net::item_id& id)
       else
          return _chain_db->is_known_transaction(id.item_hash);
    }
-   FC_CAPTURE_AND_RETHROW( (id) )
+   FC_CAPTURE_AND_RETHROW( (id) ) // GCOVR_EXCL_LINE
 }
 
-/**
+/*
  * @brief allows the application to validate an item prior to broadcasting to peers.
  *
  * @param sync_mode true if the message was fetched through the sync process, false during normal operation
@@ -728,7 +728,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       _is_finished_syncing = true;
       _self.syncing_finished();
    }
-} FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
+} FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; } // GCOVR_EXCL_LINE
 
 void application_impl::handle_transaction(const graphene::net::trx_message& transaction_message)
 { try {
@@ -744,7 +744,7 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
 
    _chain_db->precompute_parallel( transaction_message.trx ).wait();
    _chain_db->push_transaction( transaction_message.trx );
-} FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
+} FC_CAPTURE_AND_RETHROW( (transaction_message) ) } // GCOVR_EXCL_LINE
 
 void application_impl::handle_message(const message& message_to_process)
 {
@@ -759,7 +759,7 @@ bool application_impl::is_included_block(const block_id_type& block_id)
   return block_id == block_id_in_preferred_chain;
 }
 
-/**
+/*
  * Assuming all data elements are ordered in some way, this method should
  * return up to limit ids that occur *after* the last ID in synopsis that
  * we recognize.
@@ -814,9 +814,9 @@ std::vector<item_hash_t> application_impl::get_block_ids(const std::vector<item_
       remaining_item_count = _chain_db->head_block_num() - block_header::num_from_id(result.back());
 
    return result;
-} FC_CAPTURE_AND_RETHROW( (blockchain_synopsis)(remaining_item_count)(limit) ) }
+} FC_CAPTURE_AND_RETHROW( (blockchain_synopsis)(remaining_item_count)(limit) ) } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Given the hash of the requested data, fetch the body.
  */
 message application_impl::get_item(const item_id& id)
@@ -833,14 +833,14 @@ message application_impl::get_item(const item_id& id)
       return block_message(std::move(*opt_block));
    }
    return trx_message( _chain_db->get_recent_transaction( id.item_hash ) );
-} FC_CAPTURE_AND_RETHROW( (id) ) }
+} FC_CAPTURE_AND_RETHROW( (id) ) } // GCOVR_EXCL_LINE
 
 chain_id_type application_impl::get_chain_id() const
 {
    return _chain_db->get_chain_id();
 }
 
-/**
+/*
  * Returns a synopsis of the blockchain used for syncing.  This consists of a list of
  * block hashes at intervals exponentially increasing towards the genesis block.
  * When syncing to a peer, the peer uses this data to determine if we're on the same
@@ -1016,9 +1016,9 @@ std::vector<item_hash_t> application_impl::get_blockchain_synopsis(const item_ha
 
     //idump((synopsis));
     return synopsis;
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Call this after the call to handle_message succeeds.
  *
  * @param item_type the type of the item we're synchronizing, will be the same as item passed to the sync_from() call
@@ -1030,7 +1030,7 @@ void application_impl::sync_status(uint32_t item_type, uint32_t item_count)
    // any status reports to GUI go here
 }
 
-/**
+/*
  * Call any time the number of connected peers changes.
  */
 void application_impl::connection_count_changed(uint32_t c)
@@ -1041,9 +1041,9 @@ void application_impl::connection_count_changed(uint32_t c)
 uint32_t application_impl::get_block_number(const item_hash_t& block_id)
 { try {
    return block_header::num_from_id(block_id);
-} FC_CAPTURE_AND_RETHROW( (block_id) ) }
+} FC_CAPTURE_AND_RETHROW( (block_id) ) } // GCOVR_EXCL_LINE
 
-/**
+/*
  * Returns the time a block was produced (if block_id = 0, returns genesis time).
  * If we don't know about the block, returns time_point_sec::min()
  */
@@ -1052,7 +1052,7 @@ fc::time_point_sec application_impl::get_block_time(const item_hash_t& block_id)
    auto opt_block = _chain_db->fetch_block_by_id( block_id );
    if( opt_block.valid() ) return opt_block->timestamp;
    return fc::time_point_sec::min();
-} FC_CAPTURE_AND_RETHROW( (block_id) ) }
+} FC_CAPTURE_AND_RETHROW( (block_id) ) } // GCOVR_EXCL_LINE
 
 item_hash_t application_impl::get_head_block_id() const
 {

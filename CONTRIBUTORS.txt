@@ -69,6 +69,7 @@ Jose Marcial Vieira Bisneto <marcial.vieirab@gmail.com>
 Jozef Knaperek <jknaperek@gmail.com>
 Ken Code <ken@BitShares-Munich.de>
 Krzysztof Szumny <krzysztof.szumny@stxnext.pl>
+Massimo Paladin <massimo.paladin@gmail.com>
 Paul Brossier <piem@piem.org>
 Roelandp <dnaleor@gmail.com>
 Semen Martynov <semen.martynov@gmail.com>
@@ -80,5 +81,6 @@ bitcube <root@seed.cubeconnex.com>
 hammadsherwani <83015346+hammadsherwani@users.noreply.github.com>
 lafona <lafona@protonmail.com>
 liondani <liondani@gmx.com>
+litepresence <finitestate@tutamail.com>
 lososeg <ya.lososeg@gmail.com>
 sinetek <pitwuu@gmail.com>

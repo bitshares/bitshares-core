@@ -2,7 +2,7 @@
 
 The bitshares programs are a collection of binaries to run the blockchain, interact with it or utilities.
 
-The main program is the `witness_node`, used to run a bitshares block producer, API or plugin node. The second in importance is the `cli_wallet`, used to interact with the blockchain. This 2 programs are the most used by the community and updated by the developers, rest of the programs are utilities.
+The main program is the `witness_node`, used to run a bitshares block producer, API or plugin node. The second in importance is the `cli_wallet`, used to interact with the blockchain. These 2 programs are the most used by the community and updated by the developers, rest of the programs are utilities.
 
 Programs in here are part of the **bitshares-core** project and are maintained by the bitshares core team and contributors.
 

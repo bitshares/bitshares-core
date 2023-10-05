@@ -27,7 +27,7 @@
 
 namespace graphene { namespace protocol {
 
-share_type transfer_operation::calculate_fee( const fee_parameters_type& schedule )const
+share_type transfer_operation::calculate_fee( const fee_params_t& schedule )const
 {
    share_type core_fee_required = schedule.fee;
    if( memo )
@@ -45,7 +45,7 @@ void transfer_operation::validate()const
 
 
 
-share_type override_transfer_operation::calculate_fee( const fee_parameters_type& schedule )const
+share_type override_transfer_operation::calculate_fee( const fee_params_t& schedule )const
 {
    share_type core_fee_required = schedule.fee;
    if( memo )
@@ -64,7 +64,7 @@ void override_transfer_operation::validate()const
 
 } } // graphene::protocol
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation::fee_parameters_type )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation::fee_params_t )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::override_transfer_operation )

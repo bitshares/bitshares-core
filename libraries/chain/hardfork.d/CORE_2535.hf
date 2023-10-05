@@ -1,0 +1,5 @@
+// bitshares-core issue #2535 Simple Order-Sends-Order (OSO)
+#ifndef HARDFORK_CORE_2535_TIME
+#define HARDFORK_CORE_2535_TIME (fc::time_point_sec( 1700143200 )) // Thursday, November 16, 2023 14:00:00 UTC
+#define HARDFORK_CORE_2535_PASSED(head_block_time) (head_block_time >= HARDFORK_CORE_2535_TIME)
+#endif

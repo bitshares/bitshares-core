@@ -296,12 +296,15 @@ namespace graphene { namespace chain {
          share_type max_force_settlement_volume(share_type current_supply)const;
 
          /// @return true if the bitasset has been globally settled, false otherwise
-         bool has_settlement()const { return !settlement_price.is_null(); }
+         bool is_globally_settled()const { return !settlement_price.is_null(); }
 
          /**
           *  In the event of global settlement, all margin positions
           *  are settled with the siezed collateral being moved into the settlement fund. From this
           *  point on forced settlement occurs immediately when requested, using the settlement price and fund.
+          *
+          *  @note After the core-2591 hardfork, forced settlements may be paid at the margin call order price (MCOP)
+          *        when applicable, but are not limited to the settlement price stated here.
           */
          ///@{
          /// Price at which force settlements of a globally settled asset will occur
@@ -311,17 +314,29 @@ namespace graphene { namespace chain {
          ///@}
 
          /// The individual settlement pool.
-         /// In the event of individual settlements to fund, debt and collateral of the margin positions which got
-         /// settled are moved here.
+         /// In the event of individual settlements (to fund or to order), debt and collateral of the margin positions
+         /// which got settled are moved here.
+         /// * For individual settlement to fund, collateral assets in the pool can only be retrieved through
+         ///     forced settlements.
+         /// * For individual settlement to order, collateral assets in the pool can only be retrieved through
+         ///     limit orders.
          ///@{
          /// Amount of debt due to individual settlements
          share_type individual_settlement_debt;
-         /// Amount of collateral which is available for force settlement due to individual settlements
+         /// Amount of collateral due to individual settlements
          share_type individual_settlement_fund;
          ///@}
 
-         /// @return true if the individual settlement pool is not empty, false otherwise
-         bool has_individual_settlement()const { return ( individual_settlement_debt != 0 ); }
+         /// @return true if the individual settlement pool is not empty and the bitasset's black swan response method
+         ///              (BSRM) is @ref
+         ///            graphene::protocol::bitasset_options::black_swan_response_type::individual_settlement_to_fund,
+         ///         false otherwise
+         bool is_individually_settled_to_fund()const
+         {
+            using bsrm_type = bitasset_options::black_swan_response_type;
+            return ( ( individual_settlement_debt != 0 ) &&
+                     ( bsrm_type::individual_settlement_to_fund == get_black_swan_response_method() ) );
+         }
 
          /// Get the price of the individual settlement pool
          price get_individual_settlement_price() const
