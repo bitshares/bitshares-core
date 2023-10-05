@@ -328,7 +328,8 @@ namespace graphene { namespace chain {
          ///@}
 
          /// @return true if the individual settlement pool is not empty and the bitasset's black swan response method
-         ///              (BSRM) is @ref bitasset_options::black_swan_response_type::individual_settlement_to_fund,
+         ///              (BSRM) is @ref
+         ///            graphene::protocol::bitasset_options::black_swan_response_type::individual_settlement_to_fund,
          ///         false otherwise
          bool is_individually_settled_to_fund()const
          {

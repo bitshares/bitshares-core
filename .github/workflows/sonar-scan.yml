@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch8:
-        image: elastic/elasticsearch:8.8.1
+        image: elastic/elasticsearch:8.10.2
         options: >-
           --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
