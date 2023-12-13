@@ -549,7 +549,7 @@ namespace graphene { namespace net { namespace detail {
         if (!_suspend_fetching_sync_blocks)
         {
           std::map<peer_connection_ptr, std::vector<item_hash_t> > sync_item_requests_to_send;
-
+         try {
           {
             std::set<item_hash_t> sync_items_to_request;
 
@@ -591,6 +591,7 @@ namespace graphene { namespace net { namespace detail {
           // make all the requests we scheduled in the loop above
           for( auto sync_item_request : sync_item_requests_to_send )
             request_sync_items_from_peer( sync_item_request.first, sync_item_request.second );
+         } FC_CAPTURE_LOG_AND_RETHROW( (sync_item_requests_to_send.size()) )
           sync_item_requests_to_send.clear();
         }
         else
@@ -605,6 +606,7 @@ namespace graphene { namespace net { namespace detail {
           _retrigger_fetch_sync_items_loop_promise.reset();
         }
       } // while( !canceled )
+      ilog( "_fetch_sync_items_loop_done canceled" );
     }
 
     void node_impl::trigger_fetch_sync_items_loop()
