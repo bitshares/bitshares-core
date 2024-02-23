@@ -262,6 +262,7 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::ticket_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+      FC_ASSERT( !SOFTFORK_20240223_PASSED(block_time), "Temporarily disabled" );
    }
    void operator()(const graphene::chain::ticket_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );

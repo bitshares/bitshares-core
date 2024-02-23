@@ -39,6 +39,7 @@ void_result ticket_create_evaluator::do_evaluate(const ticket_create_operation& 
    const auto block_time = d.head_block_time();
 
    FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+   FC_ASSERT( !SOFTFORK_20240223_PASSED(block_time), "Temporarily disabled" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }

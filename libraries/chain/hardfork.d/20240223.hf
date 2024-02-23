@@ -1,0 +1,5 @@
+// Ticket issues
+#ifndef SOFTFORK_20240223_TIME
+#define SOFTFORK_20240223_TIME (fc::time_point_sec( 1708660800 )) // Friday, February 23, 2024 4:00:00 UTC
+#define SOFTFORK_20240223_PASSED(head_block_time) (head_block_time >= SOFTFORK_20240223_TIME)
+#endif
