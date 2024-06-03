@@ -25,6 +25,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/hardfork.hpp>
 
@@ -1180,6 +1181,196 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
    edump((e.to_detail_string()));
    throw;
  }
+}
+
+/***
+ * This will create market history. But due to the way 
+ * the server handles it, it will take to long to generate
+ * the data needed. This test should normally be commented
+ * out and used when needed.
+ */
+BOOST_AUTO_TEST_CASE( market_history )
+{
+   class simple_tx
+   {
+      public:
+      simple_tx() {}
+      simple_tx(
+         const graphene::chain::account_object& from, 
+         const graphene::chain::account_object& to, 
+         const graphene::chain::price& amount)
+         : from(from), to(to), amount(amount) {}
+      const graphene::chain::account_object from;
+      const graphene::chain::account_object to;
+      const graphene::chain::price amount;
+   };
+   try {
+      app.enable_plugin("market_history");
+      graphene::app::history_api hist_api( app );
+
+      // create the needed things on the chain
+      ACTORS( (bob) (alice) );
+      transfer( committee_account, alice.id, asset(10000000000) );
+      transfer( committee_account, bob.id  , asset(10000000000) );
+      const graphene::chain::asset_object& usd = create_bitasset( "USD", account_id_type() );
+      // set up feed producers
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = usd.id;
+         op.issuer = committee_account;
+         op.new_feed_producers = { committee_account, alice.id, bob.id };
+         trx.operations.push_back( op );
+         PUSH_TX( db, trx, ~0 );
+         generate_block();
+         trx.clear();
+         publish_feed( committee_account, asset_id_type(), 2, usd.id, 1, asset_id_type() );
+         publish_feed( alice.id, asset_id_type(), 1, usd.id, 2, asset_id_type() );
+         publish_feed( bob.id, asset_id_type(), 2, usd.id, 1, asset_id_type() );
+      }
+      const graphene::chain::asset_object& cny = create_bitasset( "CNY", account_id_type() );
+      // set up feed producers
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = cny.id;
+         op.issuer = committee_account;
+         op.new_feed_producers = { committee_account, alice.id, bob.id };
+         trx.operations.push_back( op );
+         PUSH_TX( db, trx, ~0 );
+         generate_block();
+         trx.clear();
+         publish_feed( committee_account, asset_id_type(), 1, cny.id, 2, asset_id_type() );
+         publish_feed( alice.id, asset_id_type(), 1, cny.id, 2, asset_id_type() );
+         publish_feed( bob.id, asset_id_type(), 2, cny.id, 1, asset_id_type() );
+      }
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      borrow( alice, asset(1000000, usd.id), asset(10000000) );
+      borrow( bob  , asset(1000000, usd.id), asset(10000000) );
+      borrow( alice, asset(1000000, cny.id), asset(10000000) );
+      borrow( bob  , asset(1000000, cny.id), asset(10000000) );
+
+      // get bucket size
+      boost::container::flat_set<uint32_t> bucket_sizes = hist_api.get_market_history_buckets();
+      uint32_t bucket_size = *bucket_sizes.begin(); // 15 secs when I checked.
+      BOOST_TEST_MESSAGE( "Creating transaction data. This will take some time. Bucket size: " + std::to_string(bucket_size) );
+
+      // a function to transmit a transaction
+      auto transmit_tx = [this, alice, bob, alice_private_key, bob_private_key](const simple_tx& tx) {
+         const auto seller_private_key = ( tx.from.id == alice.id ? alice_private_key : bob_private_key );
+         const auto buyer_private_key  = ( tx.from.id == alice.id ? bob_private_key : alice_private_key );
+         // create an order
+         graphene::chain::limit_order_create_operation limit;
+         limit.amount_to_sell = tx.amount.base;
+         limit.min_to_receive = tx.amount.quote;
+         limit.fill_or_kill = false;
+         limit.seller = tx.from.id;
+         limit.expiration = fc::time_point_sec( fc::time_point::now().sec_since_epoch() + 60 );
+         // send the order
+         set_expiration( db, trx );
+         trx.operations.push_back( limit );
+         PUSH_TX( db,  trx, ~0 );
+         trx.clear();
+         // send a second order that will fill the first
+         graphene::chain::limit_order_create_operation buy;
+         buy.amount_to_sell = tx.amount.quote;
+         buy.min_to_receive = tx.amount.base;
+         buy.fill_or_kill = false;
+         buy.seller = tx.to.id;
+         buy.expiration = limit.expiration;
+         set_expiration( db, trx );
+         trx.operations.push_back( buy );
+         PUSH_TX( db,  trx, ~0 );
+         trx.clear();
+      };
+
+      generate_blocks( HARDFORK_CORE_625_TIME );
+
+      // make some transaction data
+      uint32_t current_price = 500;
+      uint32_t num_estimated_bars = 800;
+
+      std::vector<simple_tx> trxs;
+      // make a dead spot 15 blocks in for 4 blocks
+      for( uint32_t i = 0; i < num_estimated_bars; ++i )  // each (hopeful) bar
+      {
+         if ( i >= 15 && i < 19 )
+         {
+            // put something in the block so it is not empty
+            transfer( committee_account, bob.id  , asset(1 * GRAPHENE_BLOCKCHAIN_PRECISION) );
+         }
+         else
+         {
+            uint32_t num_transactions = std::rand() % 100;
+            for( uint32_t tx_num = 0; tx_num < num_transactions; ++tx_num )
+            {
+               bool alice_buys = std::rand() % 2;
+               bool buy_usd = std::rand() % 2;
+               current_price = ( current_price + ( std::rand() % 2 ? 1 : -1) );
+               simple_tx stx(
+                  ( alice_buys ? alice : bob ),
+                  ( alice_buys ? bob : alice ),
+                  graphene::chain::price( 
+                     graphene::chain::asset( 1, (buy_usd ? cny.id : usd.id ) ), 
+                     graphene::chain::asset( current_price, (buy_usd ? usd.id : cny.id ) )
+                  )
+                  );
+               trxs.push_back( stx );
+               // send matching buy and sell to the server
+               transmit_tx( stx );
+            }
+         }
+         
+         graphene::chain::signed_block blk = generate_block();
+      }
+      // grab history
+      auto server_history = hist_api.get_market_history( 
+            static_cast<std::string>( usd.id ), // asset_id_type
+            static_cast<std::string>( cny.id ), // asset_id_type
+            bucket_size, // bucket_seconds
+            fc::time_point_sec( 0 ), // start
+            fc::time_point_sec( db.head_block_time() ) ); // end
+      BOOST_CHECK_EQUAL( server_history.size(), 200 );
+      // grab the last traunch of history
+      auto last_date = (*(--server_history.end())).key.open;
+      auto server_history2 = hist_api.get_market_history( 
+            static_cast<std::string>(usd.id ), // asset_id_type
+            static_cast<std::string>(cny.id ), // asset_id_type
+            bucket_size, // bucket_seconds
+            fc::time_point_sec( last_date + bucket_size ), // start
+            fc::time_point_sec( db.head_block_time() ) ); // end
+      BOOST_CHECK_EQUAL( server_history2.size(), 67 );
+      // combine the two buckets
+      server_history.insert( server_history.end(), server_history2.begin(), server_history2.end() );
+      // now match up the data to ensure it is correct.
+      size_t starting_trx_number = 0;
+      for(size_t bucket_number = 0; bucket_number < server_history.size(); ++bucket_number)
+      {
+         bucket_object current_bucket = server_history[bucket_number];
+         int64_t cny_volume_total = 0;
+         for( size_t trx_number = starting_trx_number; trx_number < trxs.size(); ++trx_number )
+         {
+            starting_trx_number = trx_number + 1;
+            auto tx = trxs[trx_number];
+            if ( tx.amount.base.asset_id == usd.id )
+               cny_volume_total += tx.amount.quote.amount.value;
+            else
+               cny_volume_total += tx.amount.base.amount.value;
+            if ( cny_volume_total > current_bucket.quote_volume.value )
+            {
+               BOOST_FAIL( "Volume mismatch. Series volume: " + std::to_string(cny_volume_total)
+                     + " Transaction number: " + std::to_string( trx_number )
+                     + " Bucket quote volume: " + std::to_string( current_bucket.quote_volume.value)
+                     + " Bucket base volume: " + std::to_string( current_bucket.base_volume.value) 
+                     + " Bucket number: " + std::to_string( bucket_number ) );
+            }
+            if ( cny_volume_total == current_bucket.quote_volume.value )
+            {
+               break;
+            }
+         }  // transaction loop
+      } // server_history loop
+   } catch ( fc::exception &e ) {
+      BOOST_FAIL( e.to_detail_string() );
+   }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
