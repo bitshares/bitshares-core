@@ -1,0 +1,15 @@
+[NAME]
+cli_wallet - Start the bitshares command line wallet.
+
+[SYNOPSIS]
+\fBcli_wallet\fR [OPTIONS]...
+
+[AUTHOR]
+The BitShares Core Team and contributors.
+
+[REPORTING BUGS]
+https://github.com/bitshares/bitshares-core/issues/
+
+[COPYRIGHT]
+
+The MIT license.
