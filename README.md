@@ -6,7 +6,7 @@ For UI reference wallet software (browser-based wallet and desktop wallet) visit
 
 Visit [BitShares.github.io](https://bitshares.github.io/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
-Information for developers can be found in the [Wiki](https://github.com/bitshares/bitshares-core/wiki) and the [BitShares Developer Portal](https://dev.bitshares.works/). Users interested in how BitShares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
+Information for developers can be found in the [Wiki](https://github.com/bitshares/bitshares-core/wiki) and the [BitShares Developer Documentation Portal](https://docs.bitshares.dev/). Users interested in how BitShares works can go to the [BitShares Documentation](https://docs.bitshares.eu/) site.
 
 Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more resources and links E.G. chat groups, client libraries and extended APIs.
 
