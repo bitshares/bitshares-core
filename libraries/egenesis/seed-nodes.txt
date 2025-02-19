@@ -3,6 +3,4 @@
 "seed1.xbts.io:1776",                // xbts.io        (Germany)
 "seed2.xbts.io:1776",                // xbts.io        (Germany)
 "seed4.xbts.io:1776",                // xbts.io        (Germany)
-"seed1.bitshares.im:1776",           // clone          (USA)
-"seed2.bitshares.im:1776",           // clone          (Japan)
 "seeds.btsnodes.com:1776",           // Community

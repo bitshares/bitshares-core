@@ -1872,8 +1872,8 @@ blind_receipt wallet_api::receive_blind_transfer( const string& confirmation_rec
    result.memo = opt_memo;
 
    // confirm the amount matches the commitment (verify the blinding factor)
-   auto commtiment_test = fc::ecc::blind( memo.blinding_factor, memo.amount.amount.value );
-   FC_ASSERT( fc::ecc::verify_sum( {commtiment_test}, {memo.commitment}, 0 ) );
+   auto commitment_test = fc::ecc::blind( memo.blinding_factor, memo.amount.amount.value );
+   FC_ASSERT( fc::ecc::verify_sum( {commitment_test}, {memo.commitment}, 0 ) );
 
    blind_balance bal;
    bal.amount = memo.amount;
