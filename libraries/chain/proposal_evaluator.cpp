@@ -262,9 +262,16 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::ticket_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+      if( SOFTFORK_20250518_PASSED(block_time) ) {
+         FC_ASSERT( false, "Temporarily disabled" );
+      }
    }
-   void operator()(const graphene::chain::ticket_update_operation&) const {
+   void operator()(const graphene::chain::ticket_update_operation& op) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+      if( SOFTFORK_20250518_PASSED(block_time)
+          && op.target_type == static_cast<uint64_t>(ticket_type::lock_forever) ) {
+         FC_ASSERT( false, "Temporarily disabled" );
+      }
    }
    void operator()(const graphene::chain::liquidity_pool_create_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );

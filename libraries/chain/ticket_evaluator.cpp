@@ -33,12 +33,52 @@
 
 namespace graphene { namespace chain {
 
+namespace detail {
+
+   void check_ticket_params_sf250518(const database& d, const ticket_create_operation& op)
+   {
+      const auto& idx = d.get_index_type<ticket_index>().indices().get<by_account>();
+      auto itr = idx.lower_bound( op.account );
+      auto itr_end = idx.upper_bound( op.account );
+      share_type total_forever_amount;
+      share_type total_other_amount;
+      for( ; itr != itr_end; ++itr )
+      {
+         const auto& t = *itr;
+         if( t.target_type == ticket_type::lock_forever )
+            total_forever_amount += t.amount.amount;
+         else
+            total_other_amount += t.amount.amount;
+      }
+
+      if( op.target_type == static_cast<uint64_t>(ticket_type::lock_forever) )
+      {
+         const share_type max_forever_amount( GRAPHENE_BLOCKCHAIN_PRECISION );
+         if ( total_forever_amount + op.amount.amount > max_forever_amount )
+            FC_ASSERT( false, "Temporarily unacceptable" );
+      }
+      else
+      {
+         const asset_id_type a(6623);
+         const auto b = d.get_balance( op.account, a );
+         const share_type max_other_amount = b.amount;
+         if ( total_other_amount + op.amount.amount > max_other_amount )
+            FC_ASSERT( false, "Temporarily unacceptable" );
+      }
+   }
+
+};
+
 void_result ticket_create_evaluator::do_evaluate(const ticket_create_operation& op)
 { try {
    const database& d = db();
    const auto block_time = d.head_block_time();
 
    FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+
+   if( SOFTFORK_20250518_PASSED(block_time) ) {
+      detail::check_ticket_params_sf250518( d, op );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -69,6 +109,12 @@ object_id_type ticket_create_evaluator::do_apply(const ticket_create_operation& 
 void_result ticket_update_evaluator::do_evaluate(const ticket_update_operation& op)
 { try {
    database& d = db();
+
+   const auto block_time = d.head_block_time();
+   if( SOFTFORK_20250518_PASSED(block_time)
+       && op.target_type == static_cast<uint64_t>(ticket_type::lock_forever) ) {
+      FC_ASSERT( false, "Temporarily disabled" );
+   }
 
    _ticket = &op.ticket(d);
 
