@@ -28,11 +28,35 @@
 namespace graphene { namespace protocol {
 
    /**
+    * @brief The pricing curve a liquidity pool uses
+    * @ingroup operations
+    */
+   enum class liquidity_pool_curve_type : uint8_t
+   {
+      /// Constant-product curve x*y=k (the original, default behaviour)
+      constant_product = 0,
+      /// Curve/StableSwap curve, for assets expected to trade near parity
+      stable = 1,
+      /// Total number of defined curve types
+      LP_CURVE_TYPE_COUNT = 2
+   };
+
+   /**
     * @brief Create a new liquidity pool
     * @ingroup operations
     */
    struct liquidity_pool_create_operation : public base_operation
    {
+      /// Options that were added after the original operation shipped. Carried inside the
+      /// operation's typed @c extensions field so the binary format stays backward compatible.
+      struct ext
+      {
+         /// Pricing curve for the pool. Absent => constant_product. Requires the StableSwap hardfork.
+         fc::optional<uint8_t>  pool_type;
+         /// Amplification coefficient A. Required for, and only valid with, a stable pool_type.
+         fc::optional<uint64_t> amplification;
+      };
+
       struct fee_params_t { uint64_t fee = 50 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;                         ///< Operation fee
@@ -43,7 +67,7 @@ namespace graphene { namespace protocol {
       uint16_t        taker_fee_percent = 0;       ///< Taker fee percent
       uint16_t        withdrawal_fee_percent = 0;  ///< Withdrawal fee percent
 
-      extensions_type extensions;  ///< Unused. Reserved for future use.
+      extension<ext>  extensions;  ///< Extensions
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -152,6 +176,12 @@ namespace graphene { namespace protocol {
    };
 
 } } // graphene::protocol
+
+FC_REFLECT_ENUM( graphene::protocol::liquidity_pool_curve_type,
+                 (constant_product)(stable)(LP_CURVE_TYPE_COUNT) )
+
+FC_REFLECT( graphene::protocol::liquidity_pool_create_operation::ext,
+            (pool_type)(amplification) )
 
 FC_REFLECT( graphene::protocol::liquidity_pool_create_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::liquidity_pool_delete_operation::fee_params_t, (fee) )

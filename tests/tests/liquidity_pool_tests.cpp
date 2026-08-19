@@ -27,6 +27,7 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/stableswap.hpp>
 
 #include <graphene/app/api.hpp>
 
@@ -1659,5 +1660,148 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
       BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
 } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+BOOST_AUTO_TEST_CASE( stableswap_create_test )
+{
+   try {
+
+      // Before the StableSwap hard fork, creating a stable pool should fail even though
+      // ordinary (constant-product) pools already work at this point in time.
+      generate_blocks( HARDFORK_CORE_2604_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      // Two assets that share precision (4), plus a mismatched-precision one (2)
+      const asset_object& usd4 = create_user_issued_asset( "STUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& eur4 = create_user_issued_asset( "STEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& cny2 = create_user_issued_asset( "STCNY", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 2 );
+      const asset_object& lpa  = create_user_issued_asset( "STLPA", sam, 0 );
+
+      // Order the pool assets by id as the operation requires asset_a < asset_b
+      asset_id_type a = std::min( usd4.get_id(), eur4.get_id() );
+      asset_id_type b = std::max( usd4.get_id(), eur4.get_id() );
+      // Capture plain ids up front rather than holding the asset_object references across
+      // generate_blocks( HARDFORK_STABLESWAP_TIME ) below: that call jumps the chain clock
+      // ~15 years forward in one step, crossing a huge number of maintenance intervals, which
+      // was observed (via gdb) to leave previously-obtained const asset_object& references
+      // pointing at stale/reused storage -- e.g. usd4's reference read back a garbage id, and
+      // cny2's read back eur4's symbol. asset_id_type is a plain small value type and stays
+      // valid regardless of what happens to the underlying object storage.
+      asset_id_type cny2_id = cny2.get_id();
+      asset_id_type lpa_id = lpa.get_id();
+
+      // Stable pool not yet allowed
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0, 100 ),
+                         fc::exception );
+
+      // Move past the StableSwap hard fork
+      generate_blocks( HARDFORK_STABLESWAP_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      // Mismatched precision is rejected
+      asset_id_type ma = std::min( a, cny2_id );
+      asset_id_type mb = std::max( a, cny2_id );
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, ma, mb, lpa_id, 0, 0, 100 ),
+                         fc::exception );
+
+      // Amplification out of range is rejected
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0,
+                                                       STABLESWAP_AMP_MAX + 1 ),
+                         fc::exception );
+
+      // A valid stable pool is created and carries the new fields
+      const liquidity_pool_object& lpo = create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0, 100 );
+      BOOST_CHECK( lpo.is_stable() );
+      BOOST_CHECK( lpo.pool_type == liquidity_pool_curve_type::stable );
+      BOOST_CHECK_EQUAL( lpo.amplification, 100u );
+      BOOST_CHECK( lpo.virtual_value == 0 ); // empty pool
+
+   } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+BOOST_AUTO_TEST_CASE( stableswap_exchange_test )
+{
+   try {
+
+      generate_blocks( HARDFORK_STABLESWAP_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      // Two equal-precision, fee-free assets so we can compare curves cleanly
+      const asset_object& usd = create_user_issued_asset( "SXUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& eur = create_user_issued_asset( "SXEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& slp = create_user_issued_asset( "SXSLP", sam, 0 ); // stable pool share asset
+      const asset_object& clp = create_user_issued_asset( "SXCLP", sam, 0 ); // constant-product share asset
+
+      asset_id_type usd_id = usd.get_id();
+      asset_id_type eur_id = eur.get_id();
+      asset_id_type a = std::min( usd_id, eur_id );
+      asset_id_type b = std::max( usd_id, eur_id );
+
+      issue_uia( sam, usd.amount( init_amount ) );
+      issue_uia( sam, eur.amount( init_amount ) );
+      issue_uia( ted, usd.amount( init_amount ) );
+      issue_uia( ted, eur.amount( init_amount ) );
+
+      const int64_t liq = 1000000; // balanced liquidity on each side
+
+      // Stable pool, A = 100, no fees
+      const liquidity_pool_object& s_lpo = create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );
+      liquidity_pool_id_type s_id = s_lpo.get_id();
+      deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+      // The stored invariant is D, not k. At perfect balance D == x + y.
+      BOOST_CHECK( s_id(db).virtual_value
+                   == stableswap::compute_d( fc::uint128_t(liq), fc::uint128_t(liq), 100 ) );
+      BOOST_CHECK( s_id(db).virtual_value == fc::uint128_t( 2 * liq ) );
+
+      // Constant-product pool with identical balances for comparison
+      const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 0, 0 );
+      liquidity_pool_id_type c_id = c_lpo.get_id();
+      deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+      BOOST_CHECK( c_id(db).virtual_value == fc::uint128_t(liq) * liq );
+
+      // ~10% of the pool: large enough that the curve advantage clearly exceeds the
+      // integer rounding the evaluator applies in the pool's favour.
+      const int64_t sell = 100000;
+
+      const auto d_before = s_id(db).virtual_value;
+
+      generic_exchange_operation_result s_res =
+            exchange_with_liquidity_pool( ted_id, s_id, asset( sell, a ), asset( 1, b ) );
+      generic_exchange_operation_result c_res =
+            exchange_with_liquidity_pool( ted_id, c_id, asset( sell, a ), asset( 1, b ) );
+
+      int64_t stable_out = s_res.received.front().amount.value;
+      int64_t cp_out     = c_res.received.front().amount.value;
+
+      // StableSwap gives materially less slippage than constant-product for a
+      // like-valued pair, while still never returning more than the input.
+      BOOST_CHECK_GT( stable_out, cp_out );
+      BOOST_CHECK_GT( stable_out - cp_out, 1000 ); // a real curve advantage, not rounding
+      BOOST_CHECK_LE( stable_out, sell );
+
+      // The invariant D must never decrease across a swap (fees would only raise it).
+      BOOST_CHECK( s_id(db).virtual_value >= d_before );
+
+      // A swap in the other direction also executes and preserves the invariant.
+      const auto d_before2 = s_id(db).virtual_value;
+      generic_exchange_operation_result s_res2 =
+            exchange_with_liquidity_pool( ted_id, s_id, asset( sell, b ), asset( 1, a ) );
+      BOOST_CHECK_GT( s_res2.received.front().amount.value, 0 );
+      BOOST_CHECK( s_id(db).virtual_value >= d_before2 );
+
+   } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_SUITE_END()
