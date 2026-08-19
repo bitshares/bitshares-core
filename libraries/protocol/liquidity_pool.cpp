@@ -35,6 +35,18 @@ void liquidity_pool_create_operation::validate()const
               "Share asset can not be the same as one of the assets in the pool" );
    FC_ASSERT( taker_fee_percent <= GRAPHENE_100_PERCENT, "Taker fee percent should not exceed 100%" );
    FC_ASSERT( withdrawal_fee_percent <= GRAPHENE_100_PERCENT, "Withdrawal fee percent should not exceed 100%" );
+
+   const auto& opt_pool_type = extensions.value.pool_type;
+   if( opt_pool_type.valid() )
+      FC_ASSERT( *opt_pool_type < static_cast<uint8_t>( liquidity_pool_curve_type::LP_CURVE_TYPE_COUNT ),
+                 "Invalid pool_type" );
+
+   const bool is_stable = opt_pool_type.valid()
+                          && *opt_pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   FC_ASSERT( is_stable == extensions.value.amplification.valid(),
+              "amplification must be specified for, and only for, a stable pool" );
+   if( extensions.value.amplification.valid() )
+      FC_ASSERT( *extensions.value.amplification > 0, "amplification must be positive" );
 }
 
 void liquidity_pool_delete_operation::validate()const

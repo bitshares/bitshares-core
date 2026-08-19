@@ -42,9 +42,32 @@ void_result liquidity_pool_create_evaluator::do_evaluate(const liquidity_pool_cr
 
    FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
 
-   op.asset_a(d); // Make sure it exists
-   op.asset_b(d); // Make sure it exists
+   const asset_object& asset_a_obj = op.asset_a(d); // Make sure it exists
+   const asset_object& asset_b_obj = op.asset_b(d); // Make sure it exists
    _share_asset = &op.share_asset(d);
+
+   // StableSwap pools: validate the new options and the equal-precision requirement.
+   const auto& opt_pool_type = op.extensions.value.pool_type;
+   if( ( opt_pool_type.valid() && *opt_pool_type != static_cast<uint8_t>( liquidity_pool_curve_type::constant_product ) )
+       || op.extensions.value.amplification.valid() )
+   {
+      FC_ASSERT( HARDFORK_STABLESWAP_PASSED(block_time), "Not allowed until the StableSwap hardfork" );
+      FC_ASSERT( opt_pool_type.valid()
+                 && *opt_pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable ),
+                 "amplification can only be specified for a stable pool" );
+      FC_ASSERT( op.extensions.value.amplification.valid(),
+                 "amplification must be specified for a stable pool" );
+
+      const uint64_t amp = *op.extensions.value.amplification;
+      FC_ASSERT( amp >= STABLESWAP_AMP_MIN && amp <= STABLESWAP_AMP_MAX,
+                 "amplification must be in range [${lo}, ${hi}]",
+                 ("lo", STABLESWAP_AMP_MIN)("hi", STABLESWAP_AMP_MAX) );
+
+      // v1 keeps the on-chain integer math simple by requiring the two assets to share a
+      // precision, so the raw balances are directly comparable on a 1:1 curve.
+      FC_ASSERT( asset_a_obj.precision == asset_b_obj.precision,
+                 "A stable pool requires both assets to have the same precision" );
+   }
 
    FC_ASSERT( _share_asset->issuer == op.account,
               "Only the asset owner can set an asset as the share asset of a liquidity pool" );
@@ -72,6 +95,12 @@ generic_operation_result liquidity_pool_create_evaluator::do_apply(const liquidi
       obj.share_asset = op.share_asset;
       obj.taker_fee_percent = op.taker_fee_percent;
       obj.withdrawal_fee_percent = op.withdrawal_fee_percent;
+      if( op.extensions.value.pool_type.valid()
+          && *op.extensions.value.pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable ) )
+      {
+         obj.pool_type = liquidity_pool_curve_type::stable;
+         obj.amplification = *op.extensions.value.amplification;
+      }
    });
    result.new_objects.insert( new_liquidity_pool_object.id );
 
@@ -400,25 +429,39 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
               "Aborting since the maker market fee of the selling asset is too high" );
    _pool_receives = op.amount_to_sell - _maker_market_fee;
 
-   fc::uint128_t delta;
-   if( op.amount_to_sell.asset_id == _pool->asset_a )
+   const bool selling_a = ( op.amount_to_sell.asset_id == _pool->asset_a );
+   const share_type in_balance  = selling_a ? _pool->balance_a : _pool->balance_b;
+   const share_type out_balance = selling_a ? _pool->balance_b : _pool->balance_a;
+   _pool_pays_asset = selling_a ? &asset_obj_b : &asset_obj_a;
+
+   const share_type new_in_balance = in_balance + _pool_receives.amount;
+
+   fc::uint128_t new_out_balance;
+   if( _pool->is_stable() )
    {
-      share_type new_balance_a = _pool->balance_a + _pool_receives.amount;
-      // round up
-      fc::uint128_t new_balance_b = ( _pool->virtual_value + new_balance_a.value - 1 ) / new_balance_a.value;
-      FC_ASSERT( new_balance_b <= _pool->balance_b, "Internal error" );
-      delta = fc::uint128_t( _pool->balance_b.value ) - new_balance_b;
-      _pool_pays_asset = &asset_obj_b;
+      // Hold the StableSwap invariant D constant and solve for the new out-asset balance.
+      // Precision is guaranteed equal at creation time, so raw balances are comparable.
+      new_out_balance = stableswap::compute_new_y( fc::uint128_t( new_in_balance.value ),
+                                                   _pool->virtual_value,
+                                                   _pool->amplification );
+      // Newton converges from above; nudge up by one unit if needed so the pool never
+      // pays out more than the invariant allows (rounding stays in the pool's favour).
+      if( new_out_balance < fc::uint128_t( out_balance.value ) )
+      {
+         const fc::uint128_t d_check = stableswap::compute_d( fc::uint128_t( new_in_balance.value ),
+                                                              new_out_balance, _pool->amplification );
+         if( d_check < _pool->virtual_value )
+            new_out_balance += 1;
+      }
    }
    else
    {
-      share_type new_balance_b = _pool->balance_b + _pool_receives.amount;
-      // round up
-      fc::uint128_t new_balance_a = ( _pool->virtual_value + new_balance_b.value - 1 ) / new_balance_b.value;
-      FC_ASSERT( new_balance_a <= _pool->balance_a, "Internal error" );
-      delta = fc::uint128_t( _pool->balance_a.value ) - new_balance_a;
-      _pool_pays_asset = &asset_obj_a;
+      // Constant product: new_out = k / new_in, rounded up in the pool's favour.
+      new_out_balance = ( _pool->virtual_value + new_in_balance.value - 1 ) / new_in_balance.value;
    }
+
+   FC_ASSERT( new_out_balance <= fc::uint128_t( out_balance.value ), "Internal error" );
+   const fc::uint128_t delta = fc::uint128_t( out_balance.value ) - new_out_balance;
 
    fc::uint128_t pool_taker_fee = delta * _pool->taker_fee_percent / GRAPHENE_100_PERCENT;
    FC_ASSERT( pool_taker_fee <= delta, "Taker fee percent of the pool is too high" );

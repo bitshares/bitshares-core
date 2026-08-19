@@ -1568,6 +1568,29 @@ const liquidity_pool_object& database_fixture_base::create_liquidity_pool( accou
    return db.get<liquidity_pool_object>( *op_result.get<generic_operation_result>().new_objects.begin() );
 }
 
+const liquidity_pool_object& database_fixture_base::create_stable_liquidity_pool(
+                                                  account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
+                                                  uint64_t amplification )
+{
+   liquidity_pool_create_operation op = make_liquidity_pool_create_op( account, asset_a, asset_b, share_asset,
+                                                                       taker_fee_percent, withdrawal_fee_percent );
+   op.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   op.extensions.value.amplification = amplification;
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return db.get<liquidity_pool_object>( *op_result.get<generic_operation_result>().new_objects.begin() );
+}
+
 liquidity_pool_delete_operation database_fixture_base::make_liquidity_pool_delete_op( account_id_type account,
                                                   liquidity_pool_id_type pool )const
 {
