@@ -4,5 +4,10 @@
     ignore = dirty
 [submodule "libraries/fc"]
     path = libraries/fc
-    url = https://github.com/bitshares/bitshares-fc.git
+    # Points at the fork for a build fix only, no feature work: upstream fc does not
+    # compile against OpenSSL 1.1+/3.x, which every current distribution ships. The
+    # pinned commit is upstream plus that one patch. Revert to the upstream URL once
+    # the fix is merged there.
+    url = https://github.com/pi314x/bitshares-fc.git
+    branch = openssl3-build-fix
     ignore = dirty
