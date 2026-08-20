@@ -44,6 +44,10 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork_visitor.hpp>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include <fc/crypto/digest.hpp>
 
 #include <iomanip>
@@ -201,10 +205,40 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       {
          fc::set_option( options, "enable-p2p-network", true );
       }
-      fc::ip::endpoint ep;
-      ep.set_port( rand() % 20000 + 5000 );
-      idump( (ep)(std::string(ep)) );
-      fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+      // Pick a port nothing else is listening on. The range below overlaps plenty of
+      // everyday services (6379 redis, 11434 ollama, ...), and graphene's p2p node retries
+      // an occupied listen port forever rather than failing, so an unlucky draw hangs the
+      // whole suite instead of failing one case. Probe first and redraw.
+      int port = 0;
+      for( int attempt = 0; attempt < 50 && 0 == port; ++attempt )
+      {
+         const int candidate = rand() % 20000 + 5000;
+         const int probe = ::socket( AF_INET, SOCK_STREAM, 0 );
+         if( probe < 0 )
+            continue;
+         const int reuse = 1;
+         ::setsockopt( probe, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse) );
+         sockaddr_in addr {};
+         addr.sin_family = AF_INET;
+         addr.sin_addr.s_addr = htonl( INADDR_ANY );
+         addr.sin_port = htons( static_cast<uint16_t>( candidate ) );
+         if( 0 == ::bind( probe, reinterpret_cast<sockaddr*>( &addr ), sizeof(addr) ) )
+            port = candidate;
+         ::close( probe );
+      }
+
+      if( 0 == port )
+      {
+         // Nothing free after 50 tries is not worth hanging over.
+         fc::set_option( options, "enable-p2p-network", false );
+      }
+      else
+      {
+         fc::ip::endpoint ep;
+         ep.set_port( static_cast<uint16_t>( port ) );
+         idump( (ep)(std::string(ep)) );
+         fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+      }
    }
 
    if (fixture.current_test_name == "min_blocks_to_keep_test")
