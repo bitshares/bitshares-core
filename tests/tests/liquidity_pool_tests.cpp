@@ -1805,3 +1805,126 @@ BOOST_AUTO_TEST_CASE( stableswap_exchange_test )
    } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE( stableswap_differential_tests )
+
+/**
+ * The constant-product swap path was REFACTORED when StableSwap was added: the two per-asset
+ * branches became one, with the curve chosen by pool type. The arithmetic was meant to be
+ * untouched, but "meant to be" is not evidence, and this is live consensus code that prices
+ * every existing pool on the chain.
+ *
+ * A mainnet replay cannot settle it -- liquidity pools postdate the block log available here,
+ * and the replay only checks serialisation anyway, never running an evaluator. So this
+ * compares the REAL evaluator against the formula as it stood before the refactor, over a
+ * wide spread of balances and trade sizes including the awkward corners: one-unit trades,
+ * trades that dwarf the pool, and extreme imbalance where the rounding decides the outcome.
+ *
+ * The reference below is master's expression, transcribed literally:
+ *
+ *     new_balance_b = ( virtual_value + new_balance_a - 1 ) / new_balance_a     // round up
+ *     delta         = balance_b - new_balance_b
+ */
+// No FC_LOG_AND_RETHROW here on purpose: its catch(...) turns a Boost REQUIRE failure into
+// "unknown type" with no indication of which case failed.
+BOOST_FIXTURE_TEST_CASE( constant_product_matches_the_pre_refactor_formula, database_fixture )
+{
+   // Liquidity pools do not exist before their hardfork; without this the very first
+   // create_liquidity_pool throws and the whole comparison never runs.
+   generate_blocks( HARDFORK_LIQUIDITY_POOL_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   // the historical expression, kept verbatim so a future edit to the evaluator has something
+   // independent to disagree with
+   auto reference_out = []( int64_t balance_in, int64_t balance_out, int64_t sold ) -> int64_t
+   {
+      const fc::uint128_t virtual_value = fc::uint128_t( balance_in ) * balance_out;
+      const int64_t new_in = balance_in + sold;
+      const fc::uint128_t new_out = ( virtual_value + new_in - 1 ) / new_in;   // round up
+      return static_cast<int64_t>( fc::uint128_t( balance_out ) - new_out );
+   };
+
+   struct { int64_t a, b, sell; } cases[] = {
+      {      1000,      1000,       1 },   // one unit in
+      {      1000,      1000,      10 },
+      {      1000,      1000,     999 },
+      {      1000,      1000,    5000 },   // trade dwarfs the pool
+      {         2,         2,       1 },   // smallest meaningful pool
+      {   1000000,         3,       1 },   // extreme imbalance, rounding decides
+      {         3,   1000000,       1 },
+      {   1000000,   1000000,       7 },
+      {  99999999,      1234,   45678 },   // nothing round about any of it
+      { 123456789, 987654321,       1 },
+      { 123456789, 987654321, 1000000 },
+   };
+
+   int checked = 0;
+   for( const auto& c : cases )
+   {
+      BOOST_TEST_MESSAGE( "case " + std::to_string( checked ) + ": a=" + std::to_string( c.a )
+                          + " b=" + std::to_string( c.b ) + " sell=" + std::to_string( c.sell ) );
+      // a fresh pool per case, so one case cannot contaminate the next
+      const std::string suffix = std::to_string( checked );
+      const asset_object& coin_a = create_user_issued_asset( "COINA" + suffix );
+      const asset_object& coin_b = create_user_issued_asset( "COINB" + suffix );
+      // the share asset must belong to the pool's creator, or create_liquidity_pool refuses it
+      const asset_object& share  = create_user_issued_asset( "SHARE" + suffix, sam,
+                                                             charge_market_fee );
+      const auto a_id = coin_a.get_id();
+      const auto b_id = coin_b.get_id();
+
+      issue_uia( sam, coin_a.amount( c.a ) );
+      issue_uia( sam, coin_b.amount( c.b ) );
+      issue_uia( ted, coin_a.amount( c.sell ) );
+
+      const auto& pool = create_liquidity_pool( sam_id, a_id, b_id, share.get_id(), 0, 0 );
+      const auto pool_id = pool.get_id();
+      deposit_to_liquidity_pool( sam_id, pool_id, coin_a.amount( c.a ), coin_b.amount( c.b ) );
+
+      // a taker fee of zero keeps this about the curve and nothing else
+      BOOST_REQUIRE_EQUAL( pool_id(db).balance_a.value, c.a );
+      BOOST_REQUIRE_EQUAL( pool_id(db).balance_b.value, c.b );
+
+      const int64_t expected = reference_out( c.a, c.b, c.sell );
+
+      if( expected <= 0 || expected >= c.b )
+      {
+         // the pre-refactor formula would drain or return nothing; the evaluator refuses such
+         // a trade, and agreeing that it is refused is itself the comparison
+         GRAPHENE_REQUIRE_THROW(
+            exchange_with_liquidity_pool( ted_id, pool_id, coin_a.amount( c.sell ),
+                                          coin_b.amount( 1 ) ), fc::exception );
+      }
+      else
+      {
+         auto result = exchange_with_liquidity_pool( ted_id, pool_id, coin_a.amount( c.sell ),
+                                                     coin_b.amount( 1 ) );
+         const int64_t got = ( c.b - pool_id(db).balance_b.value );
+         BOOST_CHECK_MESSAGE( got == expected,
+            "balances (" + std::to_string(c.a) + "," + std::to_string(c.b) + ") selling "
+            + std::to_string(c.sell) + ": evaluator paid " + std::to_string(got)
+            + ", pre-refactor formula says " + std::to_string(expected) );
+
+         // and the invariant may only ever grow, never shrink: that is what stops a sequence
+         // of small trades extracting value the curve did not intend to give
+         const fc::uint128_t before = fc::uint128_t( c.a ) * c.b;
+         const fc::uint128_t after  = fc::uint128_t( pool_id(db).balance_a.value )
+                                    * pool_id(db).balance_b.value;
+         BOOST_CHECK_MESSAGE( after >= before,
+            "invariant shrank for balances (" + std::to_string(c.a) + ","
+            + std::to_string(c.b) + ")" );
+      }
+      ++checked;
+   }
+   BOOST_CHECK_EQUAL( checked, 11 );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
