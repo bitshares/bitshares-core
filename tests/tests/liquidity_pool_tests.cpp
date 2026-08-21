@@ -33,6 +33,9 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <limits>
+#include <random>
+
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
@@ -1925,6 +1928,483 @@ BOOST_FIXTURE_TEST_CASE( constant_product_matches_the_pre_refactor_formula, data
       ++checked;
    }
    BOOST_CHECK_EQUAL( checked, 11 );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE( stableswap_fuzz_tests )
+
+/**
+ * The StableSwap curve is solved by Newton's method over integers, and integer Newton has two
+ * ways to hurt a chain that the hand-picked cases elsewhere in this file cannot rule out:
+ *
+ *   1. it fails to converge for some balance/amplification combination, permanently bricking
+ *      a pool that was legal to create; and
+ *   2. it converges, but rounds the wrong way often enough that a trader can grind value out
+ *      of the pool one unit at a time.
+ *
+ * Both are properties of the whole input space, not of any one case, so these tests sweep it
+ * pseudo-randomly with a FIXED seed -- a failure here reproduces exactly rather than being a
+ * story about a build that once went red.
+ *
+ * These operate on the header's pure functions, mirroring the evaluator's arithmetic, so they
+ * can run hundreds of thousands of cases. The evaluator-level behaviour is covered by
+ * stableswap_exchange_test; what is under test here is the maths beneath it.
+ */
+namespace {
+
+/// The evaluator's stable-pool swap, fees removed so that only rounding decides the result.
+/// Kept deliberately parallel to liquidity_pool_evaluator.cpp -- if that rounding changes,
+/// this must change with it, and the tests below say what the change is allowed to cost.
+/// Returns the amount paid out, or -1 for a trade the evaluator would have rejected.
+int64_t ss_swap_out( int64_t y, uint64_t amp, int64_t new_x, const fc::uint128_t& d )
+{
+   const fc::uint128_t new_x128( new_x );
+   fc::uint128_t new_y = stableswap::compute_new_y( new_x128, d, amp );
+   new_y += 1;                                     // unconditionally in the pool's favour
+   if( new_y > fc::uint128_t( y ) )
+      new_y = fc::uint128_t( y );
+   return static_cast<int64_t>( fc::uint128_t( y ) - new_y );
+}
+
+} // namespace
+
+/**
+ * D must exist for every pool the protocol allows, and must sit between the two curves it
+ * interpolates: the constant-product invariant 2*sqrt(x*y) at A -> 0, and the constant-sum
+ * invariant x+y at A -> infinity. A D outside that band is not a rounding wobble, it means
+ * the solver converged on the wrong root.
+ */
+BOOST_AUTO_TEST_CASE( d_converges_and_stays_between_the_two_curves )
+{
+   std::mt19937_64 rng( 20260821 );               // fixed seed: failures must reproduce
+   const int64_t max_balance = GRAPHENE_MAX_SHARE_SUPPLY;
+
+   int checked = 0;
+   for( int i = 0; i < 200000; ++i )
+   {
+      // Log-uniform over the whole legal range, so tiny pools are sampled as densely as
+      // huge ones; uniform sampling would spend every case in the top decade.
+      auto log_uniform = [&]( int64_t hi ) -> int64_t
+      {
+         const int bits = 1 + static_cast<int>( rng() % 62 );
+         int64_t v = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1;
+         return v > hi ? hi : v;
+      };
+
+      const int64_t x = log_uniform( max_balance );
+      const int64_t y = log_uniform( max_balance );
+      const uint64_t amp = 1 + rng() % 1000000;
+
+      fc::uint128_t d;
+      BOOST_REQUIRE_NO_THROW( d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp ) );
+
+      const boost::multiprecision::uint256_t prod =
+            boost::multiprecision::uint256_t( x ) * boost::multiprecision::uint256_t( y );
+      const boost::multiprecision::uint256_t lower = 2 * boost::multiprecision::sqrt( prod );
+      const boost::multiprecision::uint256_t upper =
+            boost::multiprecision::uint256_t( x ) + boost::multiprecision::uint256_t( y );
+      const boost::multiprecision::uint256_t d256( d );
+
+      // One unit of slack at each end: Newton stops at a difference of <= 1.
+      BOOST_REQUIRE_MESSAGE( d256 + 1 >= lower && d256 <= upper + 1,
+                             "D out of band for x=" << x << " y=" << y << " amp=" << amp
+                             << ": D=" << d256 << " not in [" << lower << ", " << upper << "]" );
+      ++checked;
+   }
+   BOOST_CHECK_EQUAL( checked, 200000 );
+}
+
+/**
+ * The safety property the whole pool rests on: a swap may never lower D. D is what every
+ * liquidity provider's share is denominated in, so a swap that reduces it takes value from
+ * the providers and hands it to the trader. Rounding must always fall the pool's way.
+ */
+BOOST_AUTO_TEST_CASE( a_swap_never_lowers_d )
+{
+   std::mt19937_64 rng( 20260822 );
+
+   int checked = 0, rejected = 0;
+   for( int i = 0; i < 100000; ++i )
+   {
+      const int bits_x = 4 + static_cast<int>( rng() % 50 );
+      const int bits_y = 4 + static_cast<int>( rng() % 50 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits_x ) ) + 2;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits_y ) ) + 2;
+      const uint64_t amp = 1 + rng() % 100000;
+
+      // Trade sizes from a single unit (where rounding dominates) up to several times the
+      // pool (where the curve is at its most extreme).
+      const int64_t dx = 1 + static_cast<int64_t>( rng() % static_cast<uint64_t>( 4 * x ) );
+      if( x > GRAPHENE_MAX_SHARE_SUPPLY - dx )
+         continue;
+
+      const int64_t new_x = x + dx;
+
+      // Every solver call stays inside this guard on purpose: fc::exception does not derive
+      // from std::exception, so one escaping here is reported by Boost as a bare "unknown
+      // type" with none of the inputs echoed, which is the least useful failure possible.
+      fc::uint128_t d, d_after;
+      int64_t out;
+      try
+      {
+         d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+         out = ss_swap_out( y, amp, new_x, d );
+         if( out < 0 )
+         {
+            ++rejected;
+            continue;
+         }
+         BOOST_REQUIRE_MESSAGE( out <= y - 1,
+                                "swap drained the pool: x=" << x << " y=" << y << " amp=" << amp
+                                << " dx=" << dx << " out=" << out );
+         d_after = stableswap::compute_d( fc::uint128_t( new_x ), fc::uint128_t( y - out ), amp );
+      }
+      catch( const fc::exception& )
+      {
+         ++rejected;                               // a trade the chain refuses is not a loss
+         continue;
+      }
+
+      BOOST_REQUIRE_MESSAGE( d_after >= d,
+                             "D fell across a swap: x=" << x << " y=" << y << " amp=" << amp
+                             << " dx=" << dx << " out=" << out
+                             << " D=" << boost::multiprecision::uint256_t( d )
+                             << " -> " << boost::multiprecision::uint256_t( d_after ) );
+      ++checked;
+   }
+   BOOST_TEST_MESSAGE( "a_swap_never_lowers_d: " << checked << " swaps checked, "
+                       << rejected << " rejected by the evaluator's own guards" );
+   BOOST_CHECK_GT( checked, 50000 );
+}
+
+/**
+ * The grind attack, stated directly: swap one way, swap straight back, and you must not come
+ * out ahead. Rounding errors that individually look like a single unit are only harmless if
+ * they cannot be repeated, so this also runs the round trip in a loop against one pool and
+ * checks the attacker's balance never rises above where it started.
+ */
+BOOST_AUTO_TEST_CASE( round_trips_cannot_extract_value )
+{
+   std::mt19937_64 rng( 20260823 );
+
+   // --- single round trips across a wide spread of pools -------------------------------
+   int checked = 0;
+   for( int i = 0; i < 50000; ++i )
+   {
+      const int bits = 8 + static_cast<int>( rng() % 44 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 100;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 100;
+      const uint64_t amp = 1 + rng() % 100000;
+      const int64_t dx = 1 + static_cast<int64_t>( rng() % static_cast<uint64_t>( x ) );
+
+      try
+      {
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+         const int64_t out = ss_swap_out( y, amp, x + dx, d );
+         if( out <= 0 )
+            continue;
+
+         // Sell the proceeds straight back into the pool it just came from.
+         const int64_t x2 = x + dx, y2 = y - out;
+         const fc::uint128_t d2 = stableswap::compute_d( fc::uint128_t( x2 ), fc::uint128_t( y2 ), amp );
+         const int64_t back = ss_swap_out( x2, amp, y2 + out, d2 );
+         if( back < 0 )
+            continue;
+
+         // Exactly, not approximately: the evaluator rounds every payout in the pool's
+         // favour, so a round trip can never return more than it cost. This assertion is
+         // the reason that rule exists -- before it, this line caught a trader coming back
+         // a unit up on x=159 y=141 amp=72554 dx=103, which repeated into a real drain.
+         BOOST_REQUIRE_MESSAGE( back <= dx,
+                                "round trip returned more than it cost: x=" << x
+                                << " y=" << y << " amp=" << amp << " dx=" << dx
+                                << " back=" << back );
+         ++checked;
+      }
+      catch( const fc::exception& )
+      {
+         continue;
+      }
+   }
+   BOOST_CHECK_GT( checked, 20000 );
+
+   // --- the same pool, ground repeatedly ------------------------------------------------
+   // A one-unit-per-trip leak only matters if it can be repeated, so repeat it.
+   struct { int64_t x, y; uint64_t amp; int64_t trade; } grinds[] = {
+      {      1000000,      1000000,     100,      1 },   // minimum trade, balanced pool
+      {      1000000,      1000000,   10000,      1 },   // high amplification, flattest curve
+      {      1000000,      1000000,       1,      1 },   // amplification floor
+      {      1000000,       999999,     100,      1 },   // barely imbalanced
+      {   1000000000,         1000,     100,      1 },   // extreme imbalance
+      {      1000000,      1000000,     100,   1000 },
+   };
+
+   for( const auto& g : grinds )
+   {
+      int64_t x = g.x, y = g.y;
+      int64_t attacker_a = 1000000000, attacker_b = 0;
+      const int64_t start_a = attacker_a;
+
+      for( int round = 0; round < 500; ++round )
+      {
+         if( g.trade > attacker_a )
+            break;
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), g.amp );
+         const int64_t out = ss_swap_out( y, g.amp, x + g.trade, d );
+         if( out <= 0 )
+            break;
+         attacker_a -= g.trade; attacker_b += out;
+         x += g.trade;          y -= out;
+
+         const fc::uint128_t d2 = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), g.amp );
+         const int64_t back = ss_swap_out( x, g.amp, y + attacker_b, d2 );
+         if( back <= 0 )
+            break;
+         y += attacker_b;       x -= back;
+         attacker_a += back;    attacker_b = 0;
+
+         BOOST_REQUIRE_MESSAGE( attacker_a <= start_a,
+                                "grind profited after " << round << " rounds: pool began x="
+                                << g.x << " y=" << g.y << " amp=" << g.amp << " trade=" << g.trade
+                                << "; attacker " << start_a << " -> " << attacker_a );
+      }
+   }
+}
+
+/**
+ * Selling more must never pay out less. A non-monotonic curve would let a trader improve
+ * their fill by splitting or padding an order, which is both a mispricing and a way to
+ * probe for the rounding steps the test above is guarding.
+ */
+BOOST_AUTO_TEST_CASE( output_is_monotonic_in_input )
+{
+   std::mt19937_64 rng( 20260824 );
+
+   int checked = 0;
+   for( int i = 0; i < 20000; ++i )
+   {
+      const int bits = 10 + static_cast<int>( rng() % 40 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1000;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1000;
+      const uint64_t amp = 1 + rng() % 100000;
+
+      try
+      {
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+
+         int64_t prev_out = -1;
+         for( int step = 0; step < 12; ++step )
+         {
+            const int64_t dx = ( 1LL << step );
+            if( x > GRAPHENE_MAX_SHARE_SUPPLY - dx )
+               break;
+            const int64_t out = ss_swap_out( y, amp, x + dx, d );
+            if( out < 0 )
+               break;
+            BOOST_REQUIRE_MESSAGE( out >= prev_out,
+                                   "output fell as input rose: x=" << x << " y=" << y
+                                   << " amp=" << amp << " dx=" << dx
+                                   << " out=" << out << " < previous " << prev_out );
+            prev_out = out;
+         }
+         ++checked;
+      }
+      catch( const fc::exception& )
+      {
+         continue;
+      }
+   }
+   BOOST_CHECK_GT( checked, 10000 );
+}
+
+/**
+ * validate() accepts any amplification above zero, so a pool can be created with one far
+ * outside the range StableSwap is normally parameterised for. Whatever the solver does with
+ * those, it must be a clean rejection and not a hang, a wrap, or a wrong answer -- a pool
+ * that cannot be traded is bad, but a pool that prices wrongly is worse.
+ */
+BOOST_AUTO_TEST_CASE( extreme_amplification_is_handled_cleanly )
+{
+   const uint64_t amps[] = {
+      1, 2, 1000000, 1000000000ULL, 1000000000000ULL,
+      uint64_t( 1 ) << 40, uint64_t( 1 ) << 50, uint64_t( 1 ) << 60,
+      std::numeric_limits<uint64_t>::max() / 4,
+      std::numeric_limits<uint64_t>::max()
+   };
+   const int64_t balances[][2] = {
+      { 1000, 1000 }, { 1000000, 1000000 }, { 1, 1 },
+      { GRAPHENE_MAX_SHARE_SUPPLY, GRAPHENE_MAX_SHARE_SUPPLY },
+      { GRAPHENE_MAX_SHARE_SUPPLY, 1 }
+   };
+
+   int converged = 0, refused = 0;
+   for( uint64_t amp : amps )
+      for( const auto& b : balances )
+      {
+         fc::uint128_t d;
+         bool ok = true;
+         try
+         {
+            d = stableswap::compute_d( fc::uint128_t( b[0] ), fc::uint128_t( b[1] ), amp );
+         }
+         catch( const fc::exception& )
+         {
+            ok = false;                            // refusing is acceptable; wrapping is not
+         }
+         if( !ok )
+         {
+            ++refused;
+            continue;
+         }
+         // If it did converge, the answer still has to be in band.
+         const boost::multiprecision::uint256_t upper =
+               boost::multiprecision::uint256_t( b[0] ) + boost::multiprecision::uint256_t( b[1] );
+         BOOST_CHECK_MESSAGE( boost::multiprecision::uint256_t( d ) <= upper + 1,
+                              "D exceeded x+y at amp=" << amp
+                              << " for x=" << b[0] << " y=" << b[1] );
+         ++converged;
+      }
+   BOOST_TEST_MESSAGE( "extreme_amplification: " << converged << " converged, "
+                       << refused << " refused" );
+   BOOST_CHECK_GT( converged, 0 );
+}
+
+/**
+ * Regression: heavily imbalanced pools used to make Newton cycle rather than converge, and
+ * compute_d threw "StableSwap D did not converge" for balances that are entirely legal. The
+ * iterates in those cycles sit within about one part in 10^10 of each other -- the answer was
+ * there, the stop condition just could not see it.
+ *
+ * Every case below was produced by the fuzzers above and threw before limit-cycle detection
+ * was added. They are pinned here by value so the failure cannot come back quietly: the
+ * fuzzers would find it again, but only as a random case with no history attached.
+ */
+BOOST_AUTO_TEST_CASE( imbalanced_pools_that_used_to_cycle_forever )
+{
+   struct { int64_t x, y; uint64_t amp; } cases[] = {
+      {  22081886358008,     6, 145046 },   // cycle length 2
+      { 698095958805215,     2, 685479 },   // cycle length 4
+      {    276344005464,   130, 903521 },
+      {  44459310978557,    21, 329861 },
+      {  21069301701155, 93099,  38032 },
+      {     45312411853,     6, 868284 },
+      {  12906206037633,    30, 955141 },
+      {  95887410913181,   184, 211893 },
+      {  34322364307006,     3, 976389 },   // cycle length 9
+      { 420124979824210,    43, 390570 },   // cycle length 11
+      {   3505223116620,     2, 198009 },
+      { 120775533911346,   962, 723402 },
+      { 256155875671515,    15, 530124 },
+   };
+
+   for( const auto& c : cases )
+   {
+      fc::uint128_t d;
+      BOOST_REQUIRE_NO_THROW(
+         d = stableswap::compute_d( fc::uint128_t( c.x ), fc::uint128_t( c.y ), c.amp ) );
+
+      const boost::multiprecision::uint256_t prod =
+            boost::multiprecision::uint256_t( c.x ) * boost::multiprecision::uint256_t( c.y );
+      const boost::multiprecision::uint256_t lower = 2 * boost::multiprecision::sqrt( prod );
+      const boost::multiprecision::uint256_t upper =
+            boost::multiprecision::uint256_t( c.x ) + boost::multiprecision::uint256_t( c.y );
+      const boost::multiprecision::uint256_t d256( d );
+      BOOST_REQUIRE_MESSAGE( d256 + 1 >= lower && d256 <= upper + 1,
+                             "resolved D out of band for x=" << c.x << " y=" << c.y
+                             << " amp=" << c.amp << ": " << d256 );
+
+      // Deterministic: consensus needs every node to pick the same member of the cycle.
+      const fc::uint128_t again =
+            stableswap::compute_d( fc::uint128_t( c.x ), fc::uint128_t( c.y ), c.amp );
+      BOOST_REQUIRE( again == d );
+   }
+}
+
+/**
+ * Pin the evaluator to the header maths, end to end.
+ *
+ * The existing stableswap_exchange_test asserts only relations -- the stable curve pays more
+ * than constant product, D does not fall -- so a change of one unit in the payout slips
+ * straight through it. That is not hypothetical: the pool-favouring rounding rule this test
+ * exists to pin was introduced precisely because the alternative leaked a unit per round
+ * trip, and the relational test could not tell the two rules apart.
+ *
+ * So compute the expected payout independently, from the header's own solver plus the rule
+ * as stated, and require the real exchange operation to match it exactly.
+ */
+BOOST_FIXTURE_TEST_CASE( evaluator_payout_matches_the_pool_favouring_rule, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+
+   const int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   fund( sam, asset( init_amount ) );
+   fund( ted, asset( init_amount ) );
+
+   const asset_object& usd = create_user_issued_asset( "SXRUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "SXREUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "SXRSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+
+   issue_uia( sam, usd.amount( init_amount ) );
+   issue_uia( sam, eur.amount( init_amount ) );
+   issue_uia( ted, usd.amount( init_amount ) );
+   issue_uia( ted, eur.amount( init_amount ) );
+
+   const uint64_t amp = 100;
+   const int64_t liq = 1000000;
+
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, amp );
+   const liquidity_pool_id_type pool = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pool, asset( liq, a ), asset( liq, b ) );
+
+   // A spread of trade sizes, including the one-unit case where the rounding rule is the
+   // entire answer, and sizes that leave the pool progressively more imbalanced.
+   const int64_t sells[] = { 1, 2, 7, 100, 4321, 100000, 250000 };
+
+   int exercised = 0;
+   for( int64_t sell : sells )
+   {
+      const share_type bal_a = pool( db ).balance_a;
+      const share_type bal_b = pool( db ).balance_b;
+      const fc::uint128_t d  = pool( db ).virtual_value;
+
+      // Selling asset a, so a is the in-asset and b is the out-asset.
+      const fc::uint128_t new_in( bal_a.value + sell );
+      fc::uint128_t expected_out_balance = stableswap::compute_new_y( new_in, d, amp );
+      expected_out_balance += 1;                        // the rule under test
+      if( expected_out_balance > fc::uint128_t( bal_b.value ) )
+         expected_out_balance = fc::uint128_t( bal_b.value );
+      const int64_t expected =
+            static_cast<int64_t>( fc::uint128_t( bal_b.value ) - expected_out_balance );
+
+      if( expected <= 0 )
+         continue;                                      // min_to_receive would reject it
+
+      const generic_exchange_operation_result res =
+            exchange_with_liquidity_pool( ted_id, pool, asset( sell, a ), asset( 1, b ) );
+      const int64_t got = res.received.front().amount.value;
+
+      BOOST_CHECK_MESSAGE( got == expected,
+                           "payout disagrees with the header maths for sell=" << sell
+                           << ": evaluator paid " << got << ", rule says " << expected );
+
+      // And the invariant it is all supposed to protect.
+      BOOST_CHECK( pool( db ).virtual_value >= d );
+      ++exercised;
+   }
+
+   // Guard against the whole loop quietly skipping: a test that checks nothing passes too.
+   BOOST_CHECK_GE( exercised, 4 );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

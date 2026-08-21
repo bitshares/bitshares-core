@@ -120,6 +120,20 @@ inline fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, 
    wide_uint d = s;       // initial guess
    wide_uint d_prev;
 
+   // Integer Newton does not always reach a fixed point here. For heavily imbalanced pools
+   // (one balance more than ~10^6 times the other) the iteration settles into a short limit
+   // cycle: the members differ from one another by about one part in 10^10 -- mathematically
+   // converged -- but never by <= 1, so the stop condition below is never met and the loop
+   // would run out of iterations and throw on a pool that is perfectly well defined. Observed
+   // cycles run to 19 iterations, so keep a window comfortably longer than that; on seeing a
+   // value repeat, stop and take the LARGEST member of the cycle. Largest is the right choice
+   // twice over: a bigger D makes compute_new_y hold more of the out-asset back, so rounding
+   // stays in the pool's favour, and taking a maximum is deterministic, which consensus
+   // requires of every node reaching this line.
+   constexpr size_t SS_CYCLE_WINDOW = 32;
+   wide_uint recent[SS_CYCLE_WINDOW] = {};
+   size_t filled = 0;
+
    for( int i = 0; i < SS_MAX_ITER; ++i )
    {
       // D_P = D^(n+1) / (n^n * prod(x_i)) ; for n=2: D_P = D^3 / (4 * x * y)
@@ -139,6 +153,26 @@ inline fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, 
       // Converged when successive iterates differ by at most one unit.
       if( ( d > d_prev ? ( d - d_prev ) : ( d_prev - d ) ) <= 1 )
          return detail::narrow( d, "D" );
+
+      // Not converging: check whether we have been at this exact value before, which means
+      // the iteration is cycling and will keep returning here for as long as we let it.
+      // The valid entries are the most recent `filled`, i.e. the tail of the window.
+      for( size_t k = SS_CYCLE_WINDOW - filled; k < SS_CYCLE_WINDOW; ++k )
+      {
+         if( recent[k] != d )
+            continue;
+         wide_uint best = d;
+         for( size_t j = k; j < SS_CYCLE_WINDOW; ++j )
+            if( recent[j] > best )
+               best = recent[j];
+         return detail::narrow( best, "D" );
+      }
+
+      for( size_t k = 1; k < SS_CYCLE_WINDOW; ++k )
+         recent[k - 1] = recent[k];
+      recent[SS_CYCLE_WINDOW - 1] = d;
+      if( filled < SS_CYCLE_WINDOW )
+         ++filled;
    }
 
    FC_THROW_EXCEPTION( fc::exception, "StableSwap D did not converge" );
