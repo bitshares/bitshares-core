@@ -2407,4 +2407,130 @@ BOOST_FIXTURE_TEST_CASE( evaluator_payout_matches_the_pool_favouring_rule, datab
    BOOST_CHECK_GE( exercised, 4 );
 }
 
+
+/**
+ * A stable pool takes liquidity in any proportion, and charges for the imbalance.
+ *
+ * This is the property that makes a StableSwap pool one as an LP venue rather than merely one
+ * as a pricing curve. The proportional path used for constant-product pools cannot express it:
+ * it takes the limiting side and quietly leaves the rest of the deposit with the depositor, so
+ * putting in 1,000,000 of one asset and a token amount of the other deposits almost nothing.
+ *
+ * The fee is what stops it being a free swap. Without it, depositing one side and withdrawing
+ * proportionally would trade around the pool's own trading fee -- so the second test here is
+ * the one that matters, and it is an economic assertion, not an arithmetic one.
+ *
+ * Note the one-unit floor on the thin side: liquidity_pool_deposit_operation::validate()
+ * requires both amounts positive, and relaxing that would make transactions that every existing
+ * node rejects suddenly valid, with no hardfork gate to hide behind. One unit is the smallest
+ * amount the operation admits and is indistinguishable from zero for any real deposit.
+ */
+BOOST_FIXTURE_TEST_CASE( a_stable_pool_accepts_an_imbalanced_deposit, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "IMBUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "IMBEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "IMBSLP", sam, 0 );
+   const asset_object& clp = create_user_issued_asset( "IMBCLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+
+   // 0.3% trading fee, so the imbalance fee is a real number rather than zero.
+   const liquidity_pool_object& s_lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto s_id = s_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+   const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 30, 0 );
+   const auto c_id = c_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+
+   // Heavily one-sided: a lot of A, the smallest admissible amount of B.
+   const int64_t lopsided = 100000;
+
+   const auto s_before_a = s_id(db).balance_a;
+   const auto s_res = deposit_to_liquidity_pool( ted_id, s_id, asset( lopsided, a ), asset( 1, b ) );
+   const int64_t s_shares = s_res.received.front().amount.value;
+
+   // The whole deposit was taken, not the limiting share of it.
+   BOOST_CHECK_EQUAL( ( s_id(db).balance_a - s_before_a ).value, lopsided );
+   BOOST_CHECK_GT( s_shares, 0 );
+
+   // The constant-product pool takes the limiting side, which for this deposit is almost
+   // nothing -- the contrast is the whole point.
+   const auto c_before_a = c_id(db).balance_a;
+   deposit_to_liquidity_pool( ted_id, c_id, asset( lopsided, a ), asset( 1, b ) );
+   BOOST_CHECK_MESSAGE( ( c_id(db).balance_a - c_before_a ).value < lopsided / 100,
+                        "the constant-product pool took "
+                        << ( c_id(db).balance_a - c_before_a ).value
+                        << " of a " << lopsided << " deposit, so there is nothing to contrast" );
+}
+
+/// The imbalance fee has to make a round trip cost something. Deposit one-sided, withdraw
+/// proportionally, and you must not come out ahead -- otherwise it is a swap that skips the
+/// pool's trading fee, which is the whole reason Curve charges for imbalance.
+BOOST_FIXTURE_TEST_CASE( an_imbalanced_deposit_is_not_a_free_swap, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "SWPUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "SWPEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "SWPSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const auto ted_a_before = get_balance( ted_id, a );
+   const auto ted_b_before = get_balance( ted_id, b );
+
+   const int64_t lopsided = 100000;
+   const auto res = deposit_to_liquidity_pool( ted_id, pid, asset( lopsided, a ), asset( 1, b ) );
+   const auto shares = res.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   withdraw_from_liquidity_pool( ted_id, pid, shares );
+
+   const auto gained_a = get_balance( ted_id, a ) - ted_a_before;
+   const auto gained_b = get_balance( ted_id, b ) - ted_b_before;
+
+   // Ted put in `lopsided` of A and 1 of B. Whatever mix he gets back, valuing the two sides
+   // one-for-one -- which is what a stable pool asserts they are worth -- he must be down.
+   const int64_t net = gained_a + gained_b;
+   BOOST_CHECK_MESSAGE( net < 0,
+                        "a one-sided deposit and proportional withdrawal netted "
+                        << net << ", which is a swap that skipped the trading fee" );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
