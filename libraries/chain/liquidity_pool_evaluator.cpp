@@ -225,6 +225,64 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
       _pool_receives_b = op.amount_b;
       _account_receives = asset( share_amount, _pool->share_asset );
    }
+   else if( _pool->is_stable() )
+   {
+      // A stable pool prices liquidity off the invariant, so it can take the two sides in any
+      // proportion -- including one side only. That is the defining property of the curve as an
+      // LP venue, and the proportional path below cannot express it: it takes the limiting side
+      // and silently leaves the rest of the deposit with the depositor.
+      //
+      // Shares are the growth in D, and an imbalanced deposit pays a fee on how far it pushes
+      // each side away from where the invariant says it should sit. Without that fee, depositing
+      // one side and withdrawing proportionally would be a free swap around the pool's own fee.
+      const fc::uint128_t supply128( _share_asset_dyn_data->current_supply.value );
+      const share_type max_new_supply =
+            share_asset_obj.options.max_supply - _share_asset_dyn_data->current_supply;
+
+      const fc::uint128_t d0 = stableswap::compute_d( fc::uint128_t( _pool->balance_a.value ),
+                                                      fc::uint128_t( _pool->balance_b.value ),
+                                                      _pool->amplification );
+
+      // The whole deposit is taken, not the limiting share of it.
+      const share_type new_a = _pool->balance_a + op.amount_a.amount;
+      const share_type new_b = _pool->balance_b + op.amount_b.amount;
+      const fc::uint128_t d1 = stableswap::compute_d( fc::uint128_t( new_a.value ),
+                                                      fc::uint128_t( new_b.value ),
+                                                      _pool->amplification );
+      FC_ASSERT( d1 > d0, "Aborting due to zero outcome" );
+
+      // Curve's imbalance fee, which for a two-coin pool is half the trading fee: the pool
+      // charges its swap fee on the portion of the deposit that behaves like a swap.
+      const uint64_t fee_ppm = uint64_t( _pool->taker_fee_percent ) * 100 / 2;
+
+      const auto after_fee = [&]( share_type actual, share_type old_balance ) -> fc::uint128_t
+      {
+         // Where this side would sit if the deposit had been perfectly balanced.
+         const fc::uint128_t ideal = d1 * old_balance.value / d0;
+         const fc::uint128_t act( actual.value );
+         const fc::uint128_t diff = act > ideal ? act - ideal : ideal - act;
+         // Rounded up, so the fee is never silently zero and always favours the pool.
+         const fc::uint128_t fee = ( diff * fee_ppm + 999999 ) / 1000000;
+         return act > fee ? act - fee : fc::uint128_t( 0 );
+      };
+
+      const fc::uint128_t adj_a = after_fee( new_a, _pool->balance_a );
+      const fc::uint128_t adj_b = after_fee( new_b, _pool->balance_b );
+      FC_ASSERT( adj_a > 0 && adj_b > 0, "Aborting due to zero outcome" );
+
+      const fc::uint128_t d2 = stableswap::compute_d( adj_a, adj_b, _pool->amplification );
+      FC_ASSERT( d2 > d0, "Aborting due to zero outcome" );
+
+      // The fee stays in the pool, so it accrues to the existing holders rather than to nobody.
+      fc::uint128_t new_supply = supply128 * ( d2 - d0 ) / d0;
+      FC_ASSERT( new_supply > 0, "Aborting due to zero outcome" );
+      FC_ASSERT( new_supply <= fc::uint128_t( max_new_supply.value ),
+                 "Would exceed the maximum supply of the share asset" );
+
+      _pool_receives_a  = op.amount_a;
+      _pool_receives_b  = op.amount_b;
+      _account_receives = asset( static_cast<int64_t>( new_supply ), _pool->share_asset );
+   }
    else
    {
       share_type max_new_supply = share_asset_obj.options.max_supply - _share_asset_dyn_data->current_supply;
