@@ -362,6 +362,79 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
    FC_ASSERT( _share_asset_dyn_data->current_supply >= op.share_amount.amount,
               "Can not withdraw an amount that is more than the current supply" );
 
+   const auto& one_asset = op.extensions.value.withdraw_one_asset;
+   if( one_asset.valid() )
+   {
+      // --- single-sided exit ------------------------------------------------------------
+      // Only a stable pool can quote this: the invariant is what says how much of ONE asset
+      // is worth the shares being burned. A constant-product pool has no such answer that is
+      // not simply a swap, and pretending otherwise would price it wrongly.
+      FC_ASSERT( _pool->is_stable(),
+                 "Only a stable pool can pay a withdrawal in a single asset" );
+      FC_ASSERT( *one_asset == _pool->asset_a || *one_asset == _pool->asset_b,
+                 "Asset ${a} is not in this pool", ("a", *one_asset) );
+      FC_ASSERT( _share_asset_dyn_data->current_supply > op.share_amount.amount,
+                 "The last shares cannot be withdrawn one-sided; the pool would be emptied "
+                 "on one side and the invariant is undefined there" );
+
+      const bool want_a = ( *one_asset == _pool->asset_a );
+      const share_type kept_balance  = want_a ? _pool->balance_b : _pool->balance_a;
+      const share_type taken_balance = want_a ? _pool->balance_a : _pool->balance_b;
+
+      const fc::uint128_t d0 = stableswap::compute_d( fc::uint128_t( _pool->balance_a.value ),
+                                                      fc::uint128_t( _pool->balance_b.value ),
+                                                      _pool->amplification );
+      // Burning shares shrinks the invariant in proportion.
+      const fc::uint128_t supply128( _share_asset_dyn_data->current_supply.value );
+      const fc::uint128_t burned( op.share_amount.amount.value );
+      const fc::uint128_t d1 = d0 - ( d0 * burned / supply128 );
+      FC_ASSERT( d1 > 0 && d1 < d0, "Aborting due to zero outcome" );
+
+      // Where the taken side must sit for the smaller invariant to hold with the other side
+      // untouched. compute_new_y solves exactly that.
+      const fc::uint128_t y_nofee = stableswap::compute_new_y( fc::uint128_t( kept_balance.value ),
+                                                               d1, _pool->amplification );
+      FC_ASSERT( fc::uint128_t( taken_balance.value ) > y_nofee, "Aborting due to zero outcome" );
+
+      // The same imbalance fee a one-sided deposit pays. Without it, depositing one side and
+      // withdrawing the other is a swap that never touched the trading fee.
+      const uint64_t fee_ppm = uint64_t( _pool->taker_fee_percent ) * 100 / 2;
+      const auto reduce = [&]( share_type balance, bool is_taken ) -> fc::uint128_t
+      {
+         const fc::uint128_t bal( balance.value );
+         const fc::uint128_t ideal = d1 * balance.value / d0;
+         const fc::uint128_t expected = is_taken
+               ? ( ideal > y_nofee ? ideal - y_nofee : fc::uint128_t( 0 ) )
+               : ( bal > ideal ? bal - ideal : fc::uint128_t( 0 ) );
+         const fc::uint128_t fee = ( expected * fee_ppm + 999999 ) / 1000000;
+         return bal > fee ? bal - fee : fc::uint128_t( 0 );
+      };
+      const fc::uint128_t taken_reduced = reduce( taken_balance, true );
+      const fc::uint128_t kept_reduced  = reduce( kept_balance, false );
+      FC_ASSERT( taken_reduced > 0 && kept_reduced > 0, "Aborting due to zero outcome" );
+
+      const fc::uint128_t y_fee = stableswap::compute_new_y( kept_reduced, d1,
+                                                            _pool->amplification );
+      FC_ASSERT( taken_reduced > y_fee, "Aborting due to zero outcome" );
+
+      // One unit back to the pool, as everywhere else here: rounding never favours the caller.
+      fc::uint128_t out = taken_reduced - y_fee;
+      out = out > 1 ? out - 1 : fc::uint128_t( 0 );
+      FC_ASSERT( out > 0, "Aborting due to zero outcome" );
+      FC_ASSERT( out < fc::uint128_t( taken_balance.value ), "Internal error" );
+
+      const share_type paid{ static_cast<int64_t>( out ) };
+      _pool_pays_a = asset( want_a ? paid : share_type( 0 ), _pool->asset_a );
+      _pool_pays_b = asset( want_a ? share_type( 0 ) : paid, _pool->asset_b );
+      // The imbalance fee is not taken out of the payout here -- it is already priced in,
+      // by being left in the pool before solving for what the shares are worth. Reporting it
+      // again as a withdrawal fee would double-count it in the operation result.
+      _fee_a = asset( 0, _pool->asset_a );
+      _fee_b = asset( 0, _pool->asset_b );
+
+      return void_result();
+   }
+
    if( _share_asset_dyn_data->current_supply == op.share_amount.amount )
    {
       _pool_pays_a = asset( _pool->balance_a, _pool->asset_a );

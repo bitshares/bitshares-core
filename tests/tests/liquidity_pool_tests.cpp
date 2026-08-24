@@ -2533,4 +2533,157 @@ BOOST_FIXTURE_TEST_CASE( an_imbalanced_deposit_is_not_a_free_swap, database_fixt
                         << net << ", which is a swap that skipped the trading fee" );
 }
 
+
+/**
+ * A stable pool can pay a withdrawal entirely in one asset.
+ *
+ * The invariant is what makes this answerable: burning shares shrinks D in proportion, and
+ * solving for where the taken side must sit at the smaller D -- with the other side untouched
+ * -- says exactly how much of one asset those shares are worth. A constant-product pool has no
+ * such answer that is not simply a swap, so it is refused rather than approximated.
+ *
+ * It pays the same imbalance fee a one-sided deposit does, and for the same reason: without it,
+ * depositing one side and withdrawing the other is a swap that never touched the trading fee.
+ * That round trip is the second test, and it is the one that matters.
+ */
+BOOST_FIXTURE_TEST_CASE( a_stable_pool_can_pay_a_withdrawal_in_one_asset, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "ONEUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "ONEEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "ONESLP", sam, 0 );
+   const asset_object& clp = create_user_issued_asset( "ONECLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& s_lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto s_id = s_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+   // Ted takes a balanced stake, then exits entirely into A.
+   const auto in = deposit_to_liquidity_pool( ted_id, s_id, asset( 100000, a ), asset( 100000, b ) );
+   const auto shares = in.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   const auto b_before = get_balance( ted_id, b );
+   const auto a_before = get_balance( ted_id, a );
+
+   liquidity_pool_withdraw_operation wop;
+   wop.account      = ted_id;
+   wop.pool         = s_id;
+   wop.share_amount = shares;
+   wop.extensions.value.withdraw_one_asset = a;
+   signed_transaction tx;
+   tx.operations.push_back( wop );
+   db.current_fee_schedule().set_fee( tx.operations.back() );
+   set_expiration( db, tx );
+   tx.sign( ted_private_key, db.get_chain_id() );
+   PUSH_TX( db, tx );
+
+   // Everything came back in A, and nothing in B.
+   BOOST_CHECK_EQUAL( get_balance( ted_id, b ) - b_before, 0 );
+   const auto got_a = get_balance( ted_id, a ) - a_before;
+   BOOST_CHECK_GT( got_a, 0 );
+
+   // He put in 100k of each and took it all out in A, so he should be near 200k of A but
+   // short of it: the pool charged him for pushing itself out of balance.
+   BOOST_CHECK_MESSAGE( got_a < 200000,
+                        "a one-sided exit returned " << got_a
+                        << " of A for a 100k+100k stake, which is not paying for the imbalance" );
+   BOOST_CHECK_MESSAGE( got_a > 190000,
+                        "a one-sided exit returned only " << got_a
+                        << " of A, which is far more than an imbalance fee" );
+
+   // A constant-product pool has no invariant to answer this with, so it must refuse.
+   const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 30, 0 );
+   const auto c_id = c_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+   const auto c_in = deposit_to_liquidity_pool( ted_id, c_id, asset( 1000, a ), asset( 1000, b ) );
+
+   liquidity_pool_withdraw_operation cop;
+   cop.account      = ted_id;
+   cop.pool         = c_id;
+   cop.share_amount = c_in.received.front();
+   cop.extensions.value.withdraw_one_asset = a;
+   signed_transaction ctx2;
+   ctx2.operations.push_back( cop );
+   db.current_fee_schedule().set_fee( ctx2.operations.back() );
+   set_expiration( db, ctx2 );
+   ctx2.sign( ted_private_key, db.get_chain_id() );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, ctx2 ), fc::exception );
+}
+
+/// Deposit one side, withdraw the other. If that came out ahead it would be a swap that never
+/// paid the trading fee, which is the entire reason both sides charge for imbalance.
+BOOST_FIXTURE_TEST_CASE( depositing_one_side_and_withdrawing_the_other_is_not_free,
+                         database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "RTUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "RTEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "RTSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const auto a_before = get_balance( ted_id, a );
+   const auto b_before = get_balance( ted_id, b );
+
+   // In on the A side...
+   const int64_t lopsided = 100000;
+   const auto in = deposit_to_liquidity_pool( ted_id, pid, asset( lopsided, a ), asset( 1, b ) );
+   const auto shares = in.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   // ...and out on the B side. This is a swap dressed as liquidity provision.
+   liquidity_pool_withdraw_operation wop;
+   wop.account      = ted_id;
+   wop.pool         = pid;
+   wop.share_amount = shares;
+   wop.extensions.value.withdraw_one_asset = b;
+   signed_transaction tx;
+   tx.operations.push_back( wop );
+   db.current_fee_schedule().set_fee( tx.operations.back() );
+   set_expiration( db, tx );
+   tx.sign( ted_private_key, db.get_chain_id() );
+   PUSH_TX( db, tx );
+
+   const int64_t net = ( get_balance( ted_id, a ) - a_before )
+                     + ( get_balance( ted_id, b ) - b_before );
+   BOOST_CHECK_MESSAGE( net < 0,
+                        "in on one side and out on the other netted " << net
+                        << ", so it is a swap that skipped the trading fee" );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
