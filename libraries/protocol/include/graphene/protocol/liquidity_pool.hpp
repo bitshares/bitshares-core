@@ -144,7 +144,23 @@ namespace graphene { namespace protocol {
       liquidity_pool_id_type   pool;               ///< ID of the liquidity pool
       asset                    share_amount;       ///< The amount of the share asset to use
 
-      extensions_type extensions;  ///< Unused. Reserved for future use.
+      /// Options added after the operation shipped, carried in the typed extension so the
+      /// binary format stays what it was for every withdrawal that does not use them.
+      struct ext
+      {
+         /**
+          * Take the whole withdrawal in ONE asset instead of both.
+          *
+          * Only meaningful for a stable pool: the invariant is what lets the pool quote a
+          * single-sided exit at all. Withdrawing one side moves the pool away from balance,
+          * so it pays the same imbalance fee a one-sided deposit does -- otherwise depositing
+          * one side and withdrawing the other would be a swap that skipped the trading fee,
+          * which is exactly what the deposit fee exists to prevent.
+          */
+         fc::optional<asset_id_type> withdraw_one_asset;
+      };
+
+      extension<ext> extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -199,6 +215,9 @@ FC_REFLECT( graphene::protocol::liquidity_pool_update_operation,
             (fee)(account)(pool)(taker_fee_percent)(withdrawal_fee_percent)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation,
             (fee)(account)(pool)(amount_a)(amount_b)(extensions) )
+FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext, (withdraw_one_asset) )
+FC_REFLECT_TYPENAME(
+      graphene::protocol::extension<graphene::protocol::liquidity_pool_withdraw_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,
             (fee)(account)(pool)(share_amount)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_exchange_operation,
