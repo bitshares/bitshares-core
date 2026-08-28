@@ -1807,6 +1807,90 @@ BOOST_AUTO_TEST_CASE( stableswap_exchange_test )
 
    } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
+/**
+ * OEKONOMIE: kann ein Haendler durch wiederholtes Hin- und Hertauschen Wert aus dem Pool
+ * ziehen?
+ *
+ * Jede Rundung im Pool muss zugunsten des Pools ausfallen, sonst sammelt ein Bot mit vielen
+ * kleinen Runden das Kapital der Liquiditaetsgeber ein. Der Test macht genau das: 200 Runden
+ * A->B->A ohne Gebuehren, und prueft danach, dass der Haendler nicht mehr hat als vorher.
+ *
+ * Ohne Gebuehren, weil eine Gebuehr den Effekt verdecken wuerde: sie macht jede Runde
+ * teuer genug, dass Rundungsgewinne darin untergehen. Der Angriff waere trotzdem da.
+ */
+BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS((sam)(ted));
+   const int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   fund( sam, asset(init_amount) );
+   fund( ted, asset(init_amount) );
+
+   const asset_object& usd = create_user_issued_asset(
+         "RTUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+   const asset_object& eur = create_user_issued_asset(
+         "RTEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+   const asset_object& slp = create_user_issued_asset( "RTSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( init_amount ) );
+   issue_uia( sam, eur.amount( init_amount ) );
+   issue_uia( ted, usd.amount( init_amount ) );
+   issue_uia( ted, eur.amount( init_amount ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );  // gebuehrenfrei
+   const liquidity_pool_id_type pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const int64_t ted_a0 = get_balance( ted_id, a );
+   const int64_t ted_b0 = get_balance( ted_id, b );
+   const fc::uint128_t d0 = pid(db).virtual_value;
+   BOOST_TEST_MESSAGE( "  Ted vorher: a=" << ted_a0 << " b=" << ted_b0 );
+
+   const int64_t step = 1000;
+   int rounds = 0;
+   for( ; rounds < 200; ++rounds )
+   {
+      const auto r1 = exchange_with_liquidity_pool(
+            ted_id, pid, asset( step, a ), asset( 1, b ) );
+      if( r1.received.empty() ) break;
+      const int64_t got_b = r1.received.front().amount.value;
+      if( got_b <= 0 ) break;
+      const auto r2 = exchange_with_liquidity_pool(
+            ted_id, pid, asset( got_b, b ), asset( 1, a ) );
+      if( r2.received.empty() ) break;
+      if( r2.received.front().amount.value <= 0 ) break;
+   }
+
+   const int64_t ted_a1 = get_balance( ted_id, a );
+   const int64_t ted_b1 = get_balance( ted_id, b );
+   BOOST_TEST_MESSAGE( "  Ted nachher (" << rounds << " Runden): a=" << ted_a1
+                       << " b=" << ted_b1 );
+   BOOST_TEST_MESSAGE( "  Veraenderung: a=" << ( ted_a1 - ted_a0 )
+                       << "  b=" << ( ted_b1 - ted_b0 ) );
+   // fc::uint128_t ist __int128 unsigned und hat weder Stringkonstruktor noch operator<<.
+   // Fuer die Anzeige reicht der 64-Bit-Anteil: D liegt hier bei rund 2 Millionen.
+   const uint64_t d0_disp = static_cast<uint64_t>( d0 );
+   const uint64_t d1_disp = static_cast<uint64_t>( pid(db).virtual_value );
+   BOOST_TEST_MESSAGE( "  D vorher " << d0_disp << "  nachher " << d1_disp );
+
+   // Der Haendler darf nach einer Rundreise nie mehr haben als vorher -- in keinem Asset.
+   BOOST_CHECK_MESSAGE( ted_a1 <= ted_a0,
+                        "Haendler gewann " + std::to_string( ted_a1 - ted_a0 ) + " von Asset a" );
+   BOOST_CHECK_MESSAGE( ted_b1 <= ted_b0,
+                        "Haendler gewann " + std::to_string( ted_b1 - ted_b0 ) + " von Asset b" );
+   // Und die Invariante darf durch Rundreisen nicht schrumpfen.
+   BOOST_CHECK_MESSAGE( pid(db).virtual_value >= d0,
+                        "D schrumpfte von " + std::to_string( d0_disp ) + " auf "
+                        + std::to_string( d1_disp ) );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
 
 
@@ -2684,6 +2768,57 @@ BOOST_FIXTURE_TEST_CASE( depositing_one_side_and_withdrawing_the_other_is_not_fr
    BOOST_CHECK_MESSAGE( net < 0,
                         "in on one side and out on the other netted " << net
                         << ", so it is a swap that skipped the trading fee" );
+}
+
+
+/**
+ * OEKONOMIE: wie bricht die Kurve, wenn ein Asset seinen Peg verliert?
+ *
+ * Der vorhandene Test deckt die numerische Robustheit von A bis uint64_t::max() ab. Was er
+ * nicht sagt, ist das wirtschaftliche Verhalten: eine Stable-Kurve haelt den Kurs flach,
+ * SOLANGE der Pool halbwegs ausgewogen ist, und faellt danach steil ab. Wo dieser Knick
+ * liegt, entscheidet daruber, ab wann Liquiditaetsgeber bei einem Depeg Geld verlieren --
+ * und das ist die Zahl, die eine Dimensionierung braucht.
+ *
+ * Gemessen an der reinen Funktion, nicht am Pool: so ist das Ergebnis frei von Gebuehren
+ * und Rundung der Evaluatoren und zeigt allein die Kurve.
+ */
+BOOST_AUTO_TEST_CASE( measure_how_the_stable_curve_degrades_under_depeg )
+{
+   const uint64_t amp = 100;
+   const int64_t start = 1000000;      // 1:1 ausgewogen
+
+   BOOST_TEST_MESSAGE( "  Pool 1.000.000 / 1.000.000, A = " << amp );
+   BOOST_TEST_MESSAGE( "  Ungleichgewicht -> was 10.000 des reichlichen Assets einbringen" );
+
+   int64_t x = start, y = start;
+   const fc::uint128_t d = stableswap::compute_d( fc::uint128_t(x), fc::uint128_t(y), amp );
+
+   int knee = 0;
+   for( int pct = 10; pct <= 90; pct += 10 )
+   {
+      // Pool auf pct% Ungleichgewicht bringen: x waechst, y schrumpft, D bleibt.
+      const int64_t xi = start + start * pct / 100;
+      const fc::uint128_t yi = stableswap::compute_new_y( fc::uint128_t(xi), d, amp );
+      if( yi == 0 ) { BOOST_TEST_MESSAGE( "  " << pct << "%  Pool erschoepft" ); break; }
+
+      // Was bringt ein Tausch von 10.000 x an dieser Stelle?
+      const fc::uint128_t y_after =
+            stableswap::compute_new_y( fc::uint128_t(xi + 10000), d, amp );
+      const int64_t out = static_cast<int64_t>( yi - y_after );
+
+      BOOST_TEST_MESSAGE( "  " << pct << "%  y=" << static_cast<int64_t>(yi)
+                          << "  10.000 x -> " << out << " y" );
+      // Der Knick: das erste Mal, dass ein Tausch weniger als 90% des Nennwerts bringt.
+      if( 0 == knee && out < 9000 ) knee = pct;
+   }
+
+   BOOST_TEST_MESSAGE( "  ==> unter 90% Auszahlung ab " << knee << "% Ungleichgewicht" );
+   // Der Zweck der flachen Kurve ist, das lange durchzuhalten. Bricht sie schon unter 30%,
+   // schuetzt A=100 nicht mehr als eine Constant-Product-Kurve und ist Etikettenschwindel.
+   BOOST_CHECK_MESSAGE( 0 == knee || knee >= 30,
+                        "Stable-Kurve faellt bereits bei " + std::to_string( knee )
+                        + "% Ungleichgewicht unter 90% Auszahlung" );
 }
 
 BOOST_AUTO_TEST_SUITE_END()
