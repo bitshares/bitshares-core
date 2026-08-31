@@ -1891,6 +1891,148 @@ BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
                         + std::to_string( d1_disp ) );
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * MMEV gegen eine einseitige Auszahlung, und was die Untergrenze daran aendert.
+ *
+ * Eine einseitige Auszahlung ist ein Swap -- der Kommentar an withdraw_one_asset sagt es
+ * selbst. Ihr Preis haengt an den Poolstaenden in dem Augenblick, in dem sie ausgefuehrt
+ * wird, und wer den Block baut, bestimmt was unmittelbar davor geschieht. Ein Witness kann
+ * also den Pool verschieben, die Auszahlung zum verschobenen Preis laufen lassen und
+ * anschliessend zurueckschieben. Innerhalb seines eigenen Blocks kann ihm dabei niemand
+ * dazwischenkommen.
+ *
+ * Gemessen wird dreimal derselbe Vorgang: unbehelligt, im Sandwich, und im Sandwich mit
+ * einer Untergrenze. Die dritte Variante muss scheitern statt zum verschobenen Preis
+ * auszufuehren -- das ist der ganze Zweck der Untergrenze.
+ */
+BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
+{ try {
+   // Ohne den Vorlauf lehnt der Evaluator schon die Poolerzeugung ab, und der Test
+   // stuerbe an der Infrastruktur statt am Gegenstand.
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+   fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "MYUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "MYEUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+
+   // Drei identische Pools, damit die drei Durchlaeufe sich nicht gegenseitig faerben.
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+
+   const auto stake = [&]( liquidity_pool_id_type pool ) {
+      const auto in = deposit_to_liquidity_pool( ted_id, pool,
+                                                 asset( 100000, a ), asset( 100000, b ) );
+      return in.received.front();
+   };
+
+   const auto exit_one_sided = [&]( liquidity_pool_id_type pool, asset shares,
+                                    fc::optional<asset> floor ) {
+      liquidity_pool_withdraw_operation wop;
+      wop.account      = ted_id;
+      wop.pool         = pool;
+      wop.share_amount = shares;
+      wop.extensions.value.withdraw_one_asset = a;
+      wop.extensions.value.min_to_receive = floor;
+      signed_transaction tx;
+      tx.operations.push_back( wop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      PUSH_TX( db, tx );
+   };
+
+   // --- 1. unbehelligt ------------------------------------------------------------------
+   const auto p1 = make_pool( "MYLP1" );
+   const auto sh1 = stake( p1 );
+   const auto before1 = get_balance( ted_id, a );
+   exit_one_sided( p1, sh1, fc::optional<asset>() );
+   const int64_t honest = get_balance( ted_id, a ) - before1;
+
+   // --- 2. im Sandwich ------------------------------------------------------------------
+   // Der Angreifer macht A im Pool KNAPP: er verkauft B hinein und zieht A heraus. Eine
+   // Auszahlung, die in A ausgezahlt wird, bekommt dann weniger Einheiten. Danach dreht er
+   // zurueck. (Andersherum -- A hineinverkaufen -- verbilligt A und zahlt dem Auszahler
+   // MEHR aus; ein erster Anlauf lief so und schadete nur dem Angreifer selbst.)
+   const auto p2 = make_pool( "MYLP2" );
+   const auto sh2 = stake( p2 );
+   const auto before2 = get_balance( ted_id, a );
+   const auto mal_a_before = get_balance( mal_id, a );
+   const auto mal_b_before = get_balance( mal_id, b );
+
+   const auto front = exchange_with_liquidity_pool( mal_id, p2, asset( 400000, b ),
+                                                    asset( 1, a ) );
+   exit_one_sided( p2, sh2, fc::optional<asset>() );
+   exchange_with_liquidity_pool( mal_id, p2, front.received.front(), asset( 1, b ) );
+
+   const int64_t sandwiched = get_balance( ted_id, a ) - before2;
+   const int64_t attacker_a = get_balance( mal_id, a ) - mal_a_before;
+   const int64_t attacker_b = get_balance( mal_id, b ) - mal_b_before;
+
+   BOOST_TEST_MESSAGE( "  einseitige Auszahlung unbehelligt : " << honest );
+   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched );
+   BOOST_TEST_MESSAGE( "  dem Auszahler entgangen           : " << ( honest - sandwiched ) );
+   BOOST_TEST_MESSAGE( "  beim Angreifer haengengeblieben   : " << attacker_a
+                       << " von A, " << attacker_b << " von B" );
+
+   BOOST_CHECK_MESSAGE( sandwiched < honest,
+                        "das Sandwich hat der Auszahlung nichts genommen: " << sandwiched
+                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+
+   // --- 3. im Sandwich, aber mit Untergrenze --------------------------------------------
+   // Ted verlangt fast so viel wie ohne Angriff. Die Auszahlung muss scheitern statt zum
+   // verschobenen Preis durchzugehen.
+   const auto p3 = make_pool( "MYLP3" );
+   const auto sh3 = stake( p3 );
+   const auto floor_amount = honest - honest / 1000;   // ein Promille Nachgiebigkeit
+
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, b ), asset( 1, a ) );
+   GRAPHENE_REQUIRE_THROW(
+         exit_one_sided( p3, sh3, asset( floor_amount, a ) ), fc::exception );
+
+   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_amount
+                       << " scheitert die Auszahlung, statt zum verschobenen Preis zu laufen." );
+
+   // Und ohne Angriff laesst dieselbe Untergrenze die Auszahlung durch -- sonst waere sie
+   // nur eine Blockade und keine Absicherung.
+   const auto p4 = make_pool( "MYLP4" );
+   const auto sh4 = stake( p4 );
+   const auto before4 = get_balance( ted_id, a );
+   exit_one_sided( p4, sh4, asset( floor_amount, a ) );
+   BOOST_CHECK_GT( get_balance( ted_id, a ) - before4, 0 );
+   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+   BOOST_TEST_MESSAGE( "" );
+   BOOST_TEST_MESSAGE( "  Einordnung: der entzogene Betrag faellt an den POOL, nicht an den" );
+   BOOST_TEST_MESSAGE( "  Angreifer -- der zahlt auf dem Hin- und Rueckweg zweimal die" );
+   BOOST_TEST_MESSAGE( "  Handelsgebuehr und geht hier mit Verlust heraus. Das ist" );
+   BOOST_TEST_MESSAGE( "  Schaedigung, nicht Abschoepfung, solange er nicht selbst Anteile" );
+   BOOST_TEST_MESSAGE( "  am Pool haelt. Die Untergrenze ist trotzdem richtig: wem der" );
+   BOOST_TEST_MESSAGE( "  Verlust zugutekommt, aendert nichts daran, dass der Auszahlende" );
+   BOOST_TEST_MESSAGE( "  ihn ungefragt traegt." );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
 
 

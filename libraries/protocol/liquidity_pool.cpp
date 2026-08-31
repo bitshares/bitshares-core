@@ -76,6 +76,17 @@ void liquidity_pool_withdraw_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0, "Fee should not be negative" );
    FC_ASSERT( share_amount.amount > 0, "Amount of the share asset should be positive" );
+
+   const auto& floor = extensions.value.min_to_receive;
+   if( floor.valid() )
+   {
+      FC_ASSERT( floor->amount > 0, "Minimum amount to receive should be positive" );
+      const auto& one = extensions.value.withdraw_one_asset;
+      // A floor on an asset the withdrawal will not pay out is not a weaker guard, it is a
+      // guard that can never fail -- which reads like protection and is not.
+      FC_ASSERT( !one.valid() || *one == floor->asset_id,
+                 "The minimum names a different asset than the one being withdrawn" );
+   }
 }
 
 void liquidity_pool_exchange_operation::validate()const

@@ -158,6 +158,23 @@ namespace graphene { namespace protocol {
           * which is exactly what the deposit fee exists to prevent.
           */
          fc::optional<asset_id_type> withdraw_one_asset;
+
+         /**
+          * The least the withdrawal may pay out, or the operation fails.
+          *
+          * A swap already has this -- liquidity_pool_exchange_operation::min_to_receive --
+          * and a withdrawal needs it for the same reason. A single-sided exit IS a swap;
+          * the comment on withdraw_one_asset above says as much. Its price depends on the
+          * pool balances at the moment it executes, and whoever builds the block decides
+          * what happens immediately before it. Without a floor the withdrawer has no way
+          * to say how much of that they will accept, and a block producer can move the
+          * pool, let the withdrawal execute at the moved price, and move it back.
+          *
+          * Names one of the pool's two assets and guards that leg. For a single-sided exit
+          * it must name the asset being withdrawn; for a proportional withdrawal it may
+          * name either.
+          */
+         fc::optional<asset> min_to_receive;
       };
 
       extension<ext> extensions;  ///< Unused. Reserved for future use.
@@ -215,7 +232,8 @@ FC_REFLECT( graphene::protocol::liquidity_pool_update_operation,
             (fee)(account)(pool)(taker_fee_percent)(withdrawal_fee_percent)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation,
             (fee)(account)(pool)(amount_a)(amount_b)(extensions) )
-FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext, (withdraw_one_asset) )
+FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext,
+            (withdraw_one_asset)(min_to_receive) )
 FC_REFLECT_TYPENAME(
       graphene::protocol::extension<graphene::protocol::liquidity_pool_withdraw_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,

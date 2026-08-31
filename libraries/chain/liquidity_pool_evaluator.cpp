@@ -432,6 +432,8 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
       _fee_a = asset( 0, _pool->asset_a );
       _fee_b = asset( 0, _pool->asset_b );
 
+      check_withdrawal_floor( d, op );
+
       return void_result();
    }
 
@@ -462,8 +464,39 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
       _fee_b = asset( static_cast<int64_t>( fee_b ), _pool->asset_b );
    }
 
+   check_withdrawal_floor( d, op );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
+
+/**
+ * Enforce the caller's floor on what the withdrawal pays out.
+ *
+ * Called from both exits of do_evaluate -- the single-sided branch returns early -- because
+ * a floor that only guards the proportional path would be worse than none: the single-sided
+ * exit is the one that prices off the pool balances and is therefore the one worth moving.
+ */
+void liquidity_pool_withdraw_evaluator::check_withdrawal_floor(
+      const database& d, const liquidity_pool_withdraw_operation& op )const
+{
+   const auto& floor = op.extensions.value.min_to_receive;
+   if( !floor.valid() )
+      return;
+
+   // The field did not exist before StableSwap. A proportional withdrawal from a
+   // constant-product pool is older than that, so unlike withdraw_one_asset this one is not
+   // gated transitively by the pool type and needs saying outright.
+   FC_ASSERT( HARDFORK_STABLESWAP_PASSED( d.head_block_time() ),
+              "Withdrawal minimums are not allowed until the StableSwap hardfork" );
+
+   FC_ASSERT( floor->asset_id == _pool->asset_a || floor->asset_id == _pool->asset_b,
+              "The minimum names an asset this pool does not hold" );
+
+   const asset& paid = ( floor->asset_id == _pool->asset_a ) ? _pool_pays_a : _pool_pays_b;
+   FC_ASSERT( paid.amount >= floor->amount,
+              "Withdrawal would pay ${p} but the minimum is ${m}",
+              ("p", paid.amount)("m", floor->amount) );
+}
 
 generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(
       const liquidity_pool_withdraw_operation& op)

@@ -94,6 +94,10 @@ namespace graphene { namespace chain {
          generic_exchange_operation_result do_apply( const liquidity_pool_withdraw_operation& op );
 
       private:
+         /// Enforces extensions.value.min_to_receive against what the withdrawal will pay.
+         void check_withdrawal_floor( const database& d,
+                                      const liquidity_pool_withdraw_operation& op )const;
+
          const liquidity_pool_object* _pool = nullptr;
          const asset_dynamic_data_object* _share_asset_dyn_data = nullptr;
          asset _pool_pays_a;
