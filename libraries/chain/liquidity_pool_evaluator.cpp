@@ -305,6 +305,22 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
       _account_receives = asset( static_cast<int64_t>( new_supply ), _pool->share_asset );
    }
 
+   // Untergrenze des Einzahlers durchsetzen. Eine unausgewogene Einzahlung zahlt eine
+   // Gebuehr, die am Poolstand im Augenblick der Ausfuehrung haengt -- und der steht dem
+   // frei, der den Block baut. Wie beim Swap und bei der Auszahlung darf der Einzahler
+   // sagen, wieviel Abweichung er hinnimmt.
+   const auto& floor = op.extensions.value.min_to_receive;
+   if( floor.valid() )
+   {
+      // Das Feld gab es vor StableSwap nicht, und eine Einzahlung in einen
+      // Konstantprodukt-Pool ist aelter als das.
+      FC_ASSERT( HARDFORK_STABLESWAP_PASSED( d.head_block_time() ),
+                 "Deposit minimums are not allowed until the StableSwap hardfork" );
+      FC_ASSERT( _account_receives.amount >= *floor,
+                 "Deposit would mint ${g} shares but the minimum is ${m}",
+                 ("g", _account_receives.amount)("m", *floor) );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 

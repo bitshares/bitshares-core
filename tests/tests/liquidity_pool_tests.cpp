@@ -1905,6 +1905,102 @@ BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
  * einer Untergrenze. Die dritte Variante muss scheitern statt zum verschobenen Preis
  * auszufuehren -- das ist der ganze Zweck der Untergrenze.
  */
+/**
+ * Dasselbe fuer die Einzahlung. Eine unausgewogene Einzahlung zahlt eine Gebuehr, die daran
+ * haengt, wie weit sie den Pool aus der Balance schiebt -- also am Poolstand im Augenblick
+ * der Ausfuehrung. Wer den Block baut, bestimmt was unmittelbar davor geschieht: schiebt er
+ * den Pool in dieselbe Richtung vor, schiebt die Einzahlung weiter und zahlt mehr.
+ */
+BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+   fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "DPUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "DPEUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+
+   // Einseitig einzahlen: nur A. Das schiebt den Pool aus der Balance und kostet die
+   // Ungleichgewichtsgebuehr -- genau der Betrag, den ein Sandwich vergroessern kann.
+   const auto deposit_one_sided = [&]( liquidity_pool_id_type pool,
+                                       fc::optional<share_type> floor ) {
+      liquidity_pool_deposit_operation dop;
+      dop.account  = ted_id;
+      dop.pool     = pool;
+      dop.amount_a = asset( 200000, a );
+      dop.amount_b = asset( 1, b );
+      dop.extensions.value.min_to_receive = floor;
+      signed_transaction tx;
+      tx.operations.push_back( dop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      return PUSH_TX( db, tx );
+   };
+
+   // --- unbehelligt ---------------------------------------------------------------------
+   const auto p1 = make_pool( "DPLP1" );
+   const auto r1 = deposit_one_sided( p1, fc::optional<share_type>() );
+   const int64_t honest =
+         r1.operation_results.front().get<generic_exchange_operation_result>()
+           .received.front().amount.value;
+
+   // --- im Sandwich ---------------------------------------------------------------------
+   // Der Angreifer schiebt A vorher schon hinein. Teds A-Einzahlung schiebt dann weiter aus
+   // der Balance und praegt weniger Anteile.
+   const auto p2 = make_pool( "DPLP2" );
+   exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
+   const auto r2 = deposit_one_sided( p2, fc::optional<share_type>() );
+   const int64_t sandwiched =
+         r2.operation_results.front().get<generic_exchange_operation_result>()
+           .received.front().amount.value;
+
+   BOOST_TEST_MESSAGE( "  einseitige Einzahlung unbehelligt : " << honest << " Anteile" );
+   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched << " Anteile" );
+   BOOST_TEST_MESSAGE( "  dem Einzahler entgangen           : " << ( honest - sandwiched ) );
+
+   BOOST_CHECK_MESSAGE( sandwiched < honest,
+                        "das Sandwich hat der Einzahlung nichts genommen: " << sandwiched
+                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+
+   // --- im Sandwich, mit Untergrenze ----------------------------------------------------
+   const auto p3 = make_pool( "DPLP3" );
+   const share_type floor_shares = honest - honest / 1000;
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
+   GRAPHENE_REQUIRE_THROW( deposit_one_sided( p3, floor_shares ), fc::exception );
+   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_shares.value
+                       << " scheitert die Einzahlung, statt weniger Anteile hinzunehmen." );
+
+   // Und ohne Angriff geht dieselbe Untergrenze durch.
+   const auto p4 = make_pool( "DPLP4" );
+   deposit_one_sided( p4, floor_shares );
+   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
 { try {
    // Ohne den Vorlauf lehnt der Evaluator schon die Poolerzeugung ab, und der Test
