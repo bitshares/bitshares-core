@@ -495,23 +495,37 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
 void liquidity_pool_withdraw_evaluator::check_withdrawal_floor(
       const database& d, const liquidity_pool_withdraw_operation& op )const
 {
-   const auto& floor = op.extensions.value.min_to_receive;
-   if( !floor.valid() )
+   const auto& min_a = op.extensions.value.min_a;
+   const auto& min_b = op.extensions.value.min_b;
+   if( !min_a.valid() && !min_b.valid() )
       return;
 
-   // The field did not exist before StableSwap. A proportional withdrawal from a
-   // constant-product pool is older than that, so unlike withdraw_one_asset this one is not
-   // gated transitively by the pool type and needs saying outright.
+   // The fields did not exist before StableSwap. A proportional withdrawal from a
+   // constant-product pool is older than that, so unlike withdraw_one_asset these are not
+   // gated transitively by the pool type and need saying outright.
    FC_ASSERT( HARDFORK_STABLESWAP_PASSED( d.head_block_time() ),
               "Withdrawal minimums are not allowed until the StableSwap hardfork" );
 
-   FC_ASSERT( floor->asset_id == _pool->asset_a || floor->asset_id == _pool->asset_b,
-              "The minimum names an asset this pool does not hold" );
+   // Eine Untergrenze auf der Seite, die bei einer einseitigen Auszahlung nichts auszahlt,
+   // koennte nie erfuellt werden. Das ist keine schwaechere Absicherung, sondern eine, die
+   // immer scheitert -- und sie liest sich wie Schutz. Also ablehnen statt hinnehmen.
+   const auto& one = op.extensions.value.withdraw_one_asset;
+   if( one.valid() )
+   {
+      FC_ASSERT( *one != _pool->asset_a || !min_b.valid(),
+                 "A minimum on asset B cannot be met: this withdrawal pays out only asset A" );
+      FC_ASSERT( *one != _pool->asset_b || !min_a.valid(),
+                 "A minimum on asset A cannot be met: this withdrawal pays out only asset B" );
+   }
 
-   const asset& paid = ( floor->asset_id == _pool->asset_a ) ? _pool_pays_a : _pool_pays_b;
-   FC_ASSERT( paid.amount >= floor->amount,
-              "Withdrawal would pay ${p} but the minimum is ${m}",
-              ("p", paid.amount)("m", floor->amount) );
+   if( min_a.valid() )
+      FC_ASSERT( _pool_pays_a.amount >= *min_a,
+                 "Withdrawal would pay ${p} of asset A but the minimum is ${m}",
+                 ("p", _pool_pays_a.amount)("m", *min_a) );
+   if( min_b.valid() )
+      FC_ASSERT( _pool_pays_b.amount >= *min_b,
+                 "Withdrawal would pay ${p} of asset B but the minimum is ${m}",
+                 ("p", _pool_pays_b.amount)("m", *min_b) );
 }
 
 generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(

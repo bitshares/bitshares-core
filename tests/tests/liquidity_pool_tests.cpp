@@ -1911,6 +1911,126 @@ BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
  * der Ausfuehrung. Wer den Block baut, bestimmt was unmittelbar davor geschieht: schiebt er
  * den Pool in dieselbe Richtung vor, schiebt die Einzahlung weiter und zahlt mehr.
  */
+/**
+ * Die andere Haelfte: eine proportionale Auszahlung zahlt BEIDE Seiten aus, und eine Grenze
+ * auf einem Bein sagt ueber das andere nichts.
+ *
+ * Hier geht es nicht um Abschoepfung. Anteile sind ein Bruchteil des Pools; wer den Pool
+ * verschiebt, aendert die MISCHUNG, die eine Auszahlung ausgibt, nicht ihren Wert -- die
+ * Handelsgebuehr laesst der Angreifer sogar drin. Aber wer ein bestimmtes Asset braucht,
+ * etwa um eine Schuld darin zu bedienen, dem hilft "der Wert stimmt schon" nicht. Genau das
+ * konnte er bisher nicht sagen.
+ */
+BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) ); fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "PRUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "PREUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+   const auto stake = [&]( liquidity_pool_id_type pool ) {
+      return deposit_to_liquidity_pool( ted_id, pool,
+                                        asset( 100000, a ), asset( 100000, b ) ).received.front();
+   };
+
+   // Proportional, also ohne withdraw_one_asset; beide Untergrenzen sind erlaubt.
+   const auto exit_proportional = [&]( liquidity_pool_id_type pool, asset shares,
+                                       fc::optional<share_type> fa,
+                                       fc::optional<share_type> fb ) {
+      liquidity_pool_withdraw_operation wop;
+      wop.account      = ted_id;
+      wop.pool         = pool;
+      wop.share_amount = shares;
+      wop.extensions.value.min_a = fa;
+      wop.extensions.value.min_b = fb;
+      signed_transaction tx;
+      tx.operations.push_back( wop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      PUSH_TX( db, tx );
+   };
+
+   // --- unbehelligt ---------------------------------------------------------------------
+   const auto p1 = make_pool( "PRLP1" );
+   const auto sh1 = stake( p1 );
+   const auto a1 = get_balance( ted_id, a ), b1 = get_balance( ted_id, b );
+   exit_proportional( p1, sh1, {}, {} );
+   const int64_t honest_a = get_balance( ted_id, a ) - a1;
+   const int64_t honest_b = get_balance( ted_id, b ) - b1;
+
+   // --- der Pool wird vorher verschoben --------------------------------------------------
+   // Der Angreifer kauft B heraus, also wird B im Pool knapp: die Auszahlung gibt weniger B
+   // und mehr A. Der Wert bleibt ungefaehr gleich, die Mischung nicht.
+   const auto p2 = make_pool( "PRLP2" );
+   const auto sh2 = stake( p2 );
+   exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
+   const auto a2 = get_balance( ted_id, a ), b2 = get_balance( ted_id, b );
+   exit_proportional( p2, sh2, {}, {} );
+   const int64_t shifted_a = get_balance( ted_id, a ) - a2;
+   const int64_t shifted_b = get_balance( ted_id, b ) - b2;
+
+   BOOST_TEST_MESSAGE( "  unbehelligt : " << honest_a << " A, " << honest_b << " B" );
+   BOOST_TEST_MESSAGE( "  verschoben  : " << shifted_a << " A, " << shifted_b << " B" );
+   BOOST_TEST_MESSAGE( "  B-Seite verliert: " << ( honest_b - shifted_b ) );
+
+   BOOST_CHECK_MESSAGE( shifted_b < honest_b,
+                        "die Verschiebung hat die B-Seite nicht getroffen: " << shifted_b
+                        << " gegen " << honest_b << " -- dann misst dieser Test nichts" );
+   BOOST_CHECK_MESSAGE( shifted_a > honest_a,
+                        "die A-Seite haette wachsen muessen: " << shifted_a
+                        << " gegen " << honest_a );
+
+   // --- eine Grenze auf A allein sieht davon nichts --------------------------------------
+   // Das ist der Punkt: die alte, einbeinige Fassung haette hier durchgewunken.
+   const auto p3 = make_pool( "PRLP3" );
+   const auto sh3 = stake( p3 );
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
+   exit_proportional( p3, sh3, share_type( honest_a ), {} );
+   BOOST_TEST_MESSAGE( "  Grenze nur auf A: geht durch, obwohl B einbricht" );
+
+   // --- eine Grenze auf B haelt ----------------------------------------------------------
+   const auto p4 = make_pool( "PRLP4" );
+   const auto sh4 = stake( p4 );
+   const share_type floor_b{ honest_b - honest_b / 1000 };
+   exchange_with_liquidity_pool( mal_id, p4, asset( 400000, a ), asset( 1, b ) );
+   GRAPHENE_REQUIRE_THROW( exit_proportional( p4, sh4, {}, floor_b ), fc::exception );
+   BOOST_TEST_MESSAGE( "  Grenze auf B (" << floor_b.value << "): abgelehnt" );
+
+   // Und ohne Verschiebung geht dieselbe Grenze durch.
+   const auto p5 = make_pool( "PRLP5" );
+   const auto sh5 = stake( p5 );
+   exit_proportional( p5, sh5, {}, floor_b );
+   BOOST_TEST_MESSAGE( "  dieselbe Grenze ohne Verschiebung: geht durch" );
+
+   BOOST_TEST_MESSAGE( "" );
+   BOOST_TEST_MESSAGE( "  Befund: der Wert bleibt, die Mischung nicht. Wer ein bestimmtes" );
+   BOOST_TEST_MESSAGE( "  Asset braucht, kann das jetzt sagen -- vorher nicht." );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
 { try {
    generate_blocks( HARDFORK_STABLESWAP_TIME );
@@ -2045,13 +2165,15 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
    };
 
    const auto exit_one_sided = [&]( liquidity_pool_id_type pool, asset shares,
-                                    fc::optional<asset> floor ) {
+                                    fc::optional<share_type> floor ) {
       liquidity_pool_withdraw_operation wop;
       wop.account      = ted_id;
       wop.pool         = pool;
       wop.share_amount = shares;
       wop.extensions.value.withdraw_one_asset = a;
-      wop.extensions.value.min_to_receive = floor;
+      // Ausgezahlt wird A, also gilt die Untergrenze der A-Seite. Eine auf B waere hier
+      // nie erfuellbar, und der Evaluator lehnt sie ausdruecklich ab.
+      wop.extensions.value.min_a = floor;
       signed_transaction tx;
       tx.operations.push_back( wop );
       db.current_fee_schedule().set_fee( tx.operations.back() );
@@ -2064,7 +2186,7 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
    const auto p1 = make_pool( "MYLP1" );
    const auto sh1 = stake( p1 );
    const auto before1 = get_balance( ted_id, a );
-   exit_one_sided( p1, sh1, fc::optional<asset>() );
+   exit_one_sided( p1, sh1, fc::optional<share_type>() );
    const int64_t honest = get_balance( ted_id, a ) - before1;
 
    // --- 2. im Sandwich ------------------------------------------------------------------
@@ -2080,7 +2202,7 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
 
    const auto front = exchange_with_liquidity_pool( mal_id, p2, asset( 400000, b ),
                                                     asset( 1, a ) );
-   exit_one_sided( p2, sh2, fc::optional<asset>() );
+   exit_one_sided( p2, sh2, fc::optional<share_type>() );
    exchange_with_liquidity_pool( mal_id, p2, front.received.front(), asset( 1, b ) );
 
    const int64_t sandwiched = get_balance( ted_id, a ) - before2;
@@ -2102,13 +2224,13 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
    // verschobenen Preis durchzugehen.
    const auto p3 = make_pool( "MYLP3" );
    const auto sh3 = stake( p3 );
-   const auto floor_amount = honest - honest / 1000;   // ein Promille Nachgiebigkeit
+   const share_type floor_amount{ honest - honest / 1000 };  // ein Promille Nachgiebigkeit
 
    exchange_with_liquidity_pool( mal_id, p3, asset( 400000, b ), asset( 1, a ) );
    GRAPHENE_REQUIRE_THROW(
-         exit_one_sided( p3, sh3, asset( floor_amount, a ) ), fc::exception );
+         exit_one_sided( p3, sh3, share_type( floor_amount ) ), fc::exception );
 
-   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_amount
+   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_amount.value
                        << " scheitert die Auszahlung, statt zum verschobenen Preis zu laufen." );
 
    // Und ohne Angriff laesst dieselbe Untergrenze die Auszahlung durch -- sonst waere sie
@@ -2116,7 +2238,7 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
    const auto p4 = make_pool( "MYLP4" );
    const auto sh4 = stake( p4 );
    const auto before4 = get_balance( ted_id, a );
-   exit_one_sided( p4, sh4, asset( floor_amount, a ) );
+   exit_one_sided( p4, sh4, share_type( floor_amount ) );
    BOOST_CHECK_GT( get_balance( ted_id, a ) - before4, 0 );
    BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
    BOOST_TEST_MESSAGE( "" );

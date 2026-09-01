@@ -178,7 +178,7 @@ namespace graphene { namespace protocol {
          fc::optional<asset_id_type> withdraw_one_asset;
 
          /**
-          * The least the withdrawal may pay out, or the operation fails.
+          * The least the withdrawal may pay out of each side, or the operation fails.
           *
           * A swap already has this -- liquidity_pool_exchange_operation::min_to_receive --
           * and a withdrawal needs it for the same reason. A single-sided exit IS a swap;
@@ -188,11 +188,19 @@ namespace graphene { namespace protocol {
           * to say how much of that they will accept, and a block producer can move the
           * pool, let the withdrawal execute at the moved price, and move it back.
           *
-          * Names one of the pool's two assets and guards that leg. For a single-sided exit
-          * it must name the asset being withdrawn; for a proportional withdrawal it may
-          * name either.
+          * Both sides get their own bound, denominated in the pool's asset_a and asset_b,
+          * because a proportional withdrawal pays out both and a bound on one leg says
+          * nothing about the other. That case is not about extraction -- shares are a
+          * fraction of the pool, and moving the pool changes the MIX a withdrawal pays out
+          * rather than its value -- but a withdrawer who needs a particular asset cares
+          * about the mix, and had no way to say so.
+          *
+          * For a single-sided exit only the bound on the asset being withdrawn is
+          * meaningful; the other side pays nothing, so a bound on it could never be met.
+          * The evaluator rejects that rather than letting it look like protection.
           */
-         fc::optional<asset> min_to_receive;
+         fc::optional<share_type> min_a;
+         fc::optional<share_type> min_b;
       };
 
       extension<ext> extensions;  ///< Unused. Reserved for future use.
@@ -254,7 +262,7 @@ FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation::ext, (min_to_r
 FC_REFLECT_TYPENAME(
       graphene::protocol::extension<graphene::protocol::liquidity_pool_deposit_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext,
-            (withdraw_one_asset)(min_to_receive) )
+            (withdraw_one_asset)(min_a)(min_b) )
 FC_REFLECT_TYPENAME(
       graphene::protocol::extension<graphene::protocol::liquidity_pool_withdraw_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,
