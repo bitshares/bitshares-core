@@ -70,6 +70,10 @@ void liquidity_pool_deposit_operation::validate()const
    FC_ASSERT( amount_a.amount > 0 && amount_b.amount > 0, "Both amounts of the assets should be positive" );
    FC_ASSERT( amount_a.asset_id < amount_b.asset_id,
               "ID of the first asset should be smaller than ID of the second asset" );
+
+   const auto& floor = extensions.value.min_to_receive;
+   if( floor.valid() )
+      FC_ASSERT( *floor > 0, "Minimum amount of shares to receive should be positive" );
 }
 
 void liquidity_pool_withdraw_operation::validate()const

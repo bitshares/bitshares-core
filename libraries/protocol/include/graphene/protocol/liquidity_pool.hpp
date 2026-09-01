@@ -125,7 +125,25 @@ namespace graphene { namespace protocol {
       asset                    amount_a;           ///< The amount of the first asset to deposit
       asset                    amount_b;           ///< The amount of the second asset to deposit
 
-      extensions_type extensions;  ///< Unused. Reserved for future use.
+      /// Options added after the operation shipped, carried in the typed extension so the
+      /// binary format stays what it was for every deposit that does not use them.
+      struct ext
+      {
+         /**
+          * The fewest share units the deposit may mint, or it fails.
+          *
+          * An imbalanced deposit pays a fee that depends on how far it pushes the pool from
+          * balance, so what it mints depends on the pool's state at the instant it executes
+          * -- and whoever builds the block decides what happens immediately before that.
+          * Without a floor the depositor cannot say how much of that they will accept.
+          *
+          * Denominated in the pool's share asset, which the operation does not name, so only
+          * the amount is given.
+          */
+         fc::optional<share_type> min_to_receive;
+      };
+
+      extension<ext> extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -232,6 +250,9 @@ FC_REFLECT( graphene::protocol::liquidity_pool_update_operation,
             (fee)(account)(pool)(taker_fee_percent)(withdrawal_fee_percent)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation,
             (fee)(account)(pool)(amount_a)(amount_b)(extensions) )
+FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation::ext, (min_to_receive) )
+FC_REFLECT_TYPENAME(
+      graphene::protocol::extension<graphene::protocol::liquidity_pool_deposit_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext,
             (withdraw_one_asset)(min_to_receive) )
 FC_REFLECT_TYPENAME(
