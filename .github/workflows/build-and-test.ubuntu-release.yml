@@ -76,7 +76,18 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
-        make -j 2 -C _build
+        # Die Ausgabe mitschreiben und bei einem Fehlschlag die Meldungen als Annotation
+        # ausgeben. Protokolle sind nur mit Admin-Rechten abrufbar, Annotationen dagegen
+        # ueber die Check-API -- ohne das steht am Ende nur "exit code 2" und niemand ohne
+        # Adminrechte kann sagen, woran es lag.
+        set -o pipefail
+        if ! make -j 2 -C _build 2>&1 | tee "$GITHUB_WORKSPACE/build.log"; then
+          echo "::group::Fehlermeldungen aus dem Bau"
+          grep -E "error:|Error [0-9]" "$GITHUB_WORKSPACE/build.log" \
+            | head -30 | while IFS= read -r zeile; do echo "::error::$zeile"; done
+          echo "::endgroup::"
+          exit 1
+        fi
         df -h
     - name: Unit-Tests
       timeout-minutes: 15
