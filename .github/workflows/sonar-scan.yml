@@ -63,7 +63,10 @@ jobs:
                      libboost-context-dev \
                      libboost-regex-dev \
                      libboost-coroutine-dev \
-                     libcurl4-openssl-dev
+                     libcurl4-openssl-dev \
+                     libzstd-dev \
+                     libbz2-dev \
+                     liblzma-dev
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
