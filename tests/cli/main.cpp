@@ -84,7 +84,12 @@ using std::cerr;
 /// @param server_port_number to be filled with the rpc endpoint port number
 /// @returns the application object
 //////////
-std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
+namespace {
+
+/// One attempt at starting the application. See start_application below for why it is
+/// worth separating the attempt from the retry.
+std::shared_ptr<graphene::app::application> start_application_once(
+      fc::temp_directory& app_dir, int& server_port_number ) {
    auto app1 = std::make_shared<graphene::app::application>();
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
@@ -106,6 +111,50 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->startup();
 
    return app1;
+}
+
+} // namespace
+
+///////////
+/// @brief Start the application, retrying if a port is taken from under it
+///
+/// get_available_port() has to close its probe socket before it can return the number, so
+/// between that and the bind inside startup() the port belongs to nobody and anything on
+/// the machine may take it. The window cannot be closed from here -- the application binds
+/// its own sockets -- and on a busy CI runner it is occasionally lost, which shows up as
+///
+///     bind: Address already in use
+///
+/// failing one test case. Every cli test case calls this, so a single unlucky draw in a
+/// long run turns the whole job red.
+///
+/// Choosing a quieter port range makes that rarer and was worth doing, but rarer is not
+/// the same as handled: a race that is merely unlikely still fires eventually, and it did.
+/// Retrying with fresh ports recovers from it instead.
+///
+/// Only this one error is retried. Anything else propagates unchanged, so a genuinely
+/// broken startup still fails on the first attempt rather than being masked five times
+/// over.
+//////////
+std::shared_ptr<graphene::app::application> start_application(
+      fc::temp_directory& app_dir, int& server_port_number ) {
+   constexpr int max_attempts = 5;
+   for( int attempt = 1; ; ++attempt )
+   {
+      try
+      {
+         return start_application_once( app_dir, server_port_number );
+      }
+      catch( const fc::exception& e )
+      {
+         const bool port_taken =
+            e.to_detail_string().find( "Address already in use" ) != std::string::npos;
+         if( !port_taken || attempt >= max_attempts )
+            throw;
+         wlog( "Port was taken between probe and bind, retrying (attempt ${a})",
+               ("a", attempt) );
+      }
+   }
 }
 
 ///////////
