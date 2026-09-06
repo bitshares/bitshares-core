@@ -59,6 +59,13 @@ namespace network {
    /////
    namespace detail {
       /// Probe one port: bind it, then let it go again. Returns false if it is taken.
+      ///
+      /// The probe binds INADDR_ANY rather than the loopback address on purpose. Callers
+      /// use these ports for both kinds of endpoint -- the CLI tests bind their RPC port on
+      /// 127.0.0.1 and their p2p port on 0.0.0.0 -- and a wildcard bind collides with
+      /// anything holding that port on any address, while a loopback bind only collides
+      /// with loopback. Probing the narrower one would report a port free that the wider
+      /// bind then rejects. This way the probe is at least as strict as any later use.
       inline bool port_is_free( int port )
       {
          int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -68,7 +75,7 @@ namespace network {
          memset( &sin, 0, sizeof(sin) );
          sin.sin_family = AF_INET;
          sin.sin_port = htons( static_cast<uint16_t>(port) );
-         sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+         sin.sin_addr.s_addr = htonl(INADDR_ANY);
          const bool ok = ::bind(socket_fd, (struct sockaddr*)&sin, sizeof(sin)) != -1;
       #ifdef _WIN32
          closesocket(socket_fd);
