@@ -41,6 +41,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/futures_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork_visitor.hpp>
 
@@ -97,6 +98,15 @@ database_fixture_base::database_fixture_base()
 
 database_fixture_base::~database_fixture_base()
 {
+   // If init() never got as far as releasing it -- a failed startup, a test that threw --
+   // the reserved probe socket would otherwise outlive the fixture and hold its port for
+   // the rest of the run.
+   if( p2p_probe_fd >= 0 )
+   {
+      ::close( p2p_probe_fd );
+      p2p_probe_fd = -1;
+   }
+
    // cleanup data in ES
    if( !es_index_prefix.empty() || !es_obj_index_prefix.empty() )
    {
@@ -223,8 +233,17 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
          addr.sin_addr.s_addr = htonl( INADDR_ANY );
          addr.sin_port = htons( static_cast<uint16_t>( candidate ) );
          if( 0 == ::bind( probe, reinterpret_cast<sockaddr*>( &addr ), sizeof(addr) ) )
+         {
             port = candidate;
-         ::close( probe );
+            // Keep this socket open. Closing it here would hand the port back before the
+            // node binds it, and on a busy machine something else takes it in between --
+            // the intermittent "bind: Address already in use" in CI. init() closes it
+            // immediately before app.startup(), which is as narrow as the window gets from
+            // out here.
+            fixture.p2p_probe_fd = probe;
+         }
+         else
+            ::close( probe );
       }
 
       if( 0 == port )
@@ -711,6 +730,22 @@ void database_fixture_base::verify_asset_supplies( const database& db )
    for( const auto& item : total_debts )
    {
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
+   }
+
+   // futures: collateral removed from balances lives in positions, resting orders and the
+   // market's insurance fund. If any of it were ever dropped, the supply check below is what
+   // would catch it.
+   for( const futures_position_object& o : db.get_index_type<futures_position_index>().indices() )
+   {
+      total_balances[ o.market_id(db).collateral_asset ] += o.margin;
+   }
+   for( const futures_order_object& o : db.get_index_type<futures_order_index>().indices() )
+   {
+      total_balances[ o.market_id(db).collateral_asset ] += o.deferred_margin;
+   }
+   for( const futures_market_object& o : db.get_index_type<futures_market_index>().indices() )
+   {
+      total_balances[ o.collateral_asset ] += o.insurance_fund;
    }
 
    // htlc
@@ -1589,29 +1624,6 @@ const liquidity_pool_object& database_fixture_base::create_liquidity_pool( accou
 {
    liquidity_pool_create_operation op = make_liquidity_pool_create_op( account, asset_a, asset_b, share_asset,
                                                                        taker_fee_percent, withdrawal_fee_percent );
-   trx.operations.clear();
-   trx.operations.push_back( op );
-
-   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
-   trx.validate();
-   set_expiration( db, trx );
-   processed_transaction ptx = PUSH_TX(db, trx, ~0);
-   const operation_result& op_result = ptx.operation_results.front();
-   trx.operations.clear();
-   verify_asset_supplies(db);
-   return db.get<liquidity_pool_object>( *op_result.get<generic_operation_result>().new_objects.begin() );
-}
-
-const liquidity_pool_object& database_fixture_base::create_stable_liquidity_pool(
-                                                  account_id_type account, asset_id_type asset_a,
-                                                  asset_id_type asset_b, asset_id_type share_asset,
-                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
-                                                  uint64_t amplification )
-{
-   liquidity_pool_create_operation op = make_liquidity_pool_create_op( account, asset_a, asset_b, share_asset,
-                                                                       taker_fee_percent, withdrawal_fee_percent );
-   op.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
-   op.extensions.value.amplification = amplification;
    trx.operations.clear();
    trx.operations.push_back( op );
 
