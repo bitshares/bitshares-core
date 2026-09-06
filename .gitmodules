@@ -4,14 +4,5 @@
     ignore = dirty
 [submodule "libraries/fc"]
     path = libraries/fc
-    # Points at the fork for a build fix only, no feature work: upstream fc still declares
-    # cmake_minimum_required(3.2), and CMake 4 refuses that outright -- the tree cannot even
-    # be configured on a runner image shipping CMake 4, which Ubuntu 26.04 does. The pinned
-    # commit is upstream master plus that one patch. Revert to the upstream URL once it is
-    # merged there.
-    #
-    # What used to be the reason is upstream now: the OpenSSL 1.1+/3.x fixes and the missing
-    # <cstdint> in string.hpp both landed in master.
-    url = https://github.com/pi314x/bitshares-fc.git
-    branch = cmake4-build-fix
+    url = https://github.com/bitshares/bitshares-fc.git
     ignore = dirty
