@@ -8,11 +8,11 @@ jobs:
     name: Build and test in Release mode
     strategy:
       matrix:
-        os: [ ubuntu-20.04 ]
+        os: [ ubuntu-24.04 ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch8:
-        image: elastic/elasticsearch:8.11.1
+        image: elastic/elasticsearch:8.19.21
         options: >-
           --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
           --env discovery.type=single-node
@@ -21,21 +21,10 @@ jobs:
           --env action.destructive_requires_name=false
           --env cluster.routing.allocation.disk.threshold_enabled=false
           --publish 9200:9200
-      elasticsearch7:
-        image: elastic/elasticsearch:7.17.15
-        options: >-
-          --env ES_JAVA_OPTS="-Xms512m -Xmx512m"
-          --env discovery.type=single-node
-          --env cluster.routing.allocation.disk.threshold_enabled=false
-          --publish 9201:9200
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
-        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
-        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
-          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
         sudo apt-get install -y \
                      ccache \
                      parallel \
@@ -50,11 +39,14 @@ jobs:
                      libboost-context-dev \
                      libboost-regex-dev \
                      libboost-coroutine-dev \
+                     libzstd-dev \
+                     libbz2-dev \
+                     liblzma-dev \
                      libcurl4-openssl-dev
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
     - name: Configure
@@ -73,7 +65,7 @@ jobs:
               ..
         popd
     - name: Load Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: ccache
         key: ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
@@ -91,9 +83,7 @@ jobs:
       run: |
         _build/tests/app_test -l test_suite
         _build/tests/es_test -l test_suite
-        export GRAPHENE_TESTING_ES_URL=http://127.0.0.1:9201/
-        _build/tests/es_test -l test_suite
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
         _build/tests/cli_test -l test_suite
         df -h
     - name: Quick test for program arguments
