@@ -112,7 +112,13 @@ namespace network {
    {
       for( int attempt = 0; attempt < 64; ++attempt )
       {
-         const int candidate = 10000 + ( std::rand() % 20000 );  // 10000-29999
+         // 25000-32700: clear of the ephemeral range (32768 upwards on Linux, where the
+         // kernel hands ports out on its own) and clear of 5000-24999, which the port
+         // picker in database_fixture.cpp draws from. Those two pickers used to be
+         // disjoint only by accident -- this one returned kernel-assigned ephemeral ports
+         // -- and giving this one a range that overlapped the fixture's turned one source
+         // of collisions into two.
+         const int candidate = 25000 + ( std::rand() % 7700 );
          if( detail::port_is_free( candidate ) )
             return candidate;
       }
