@@ -73,8 +73,12 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-        sudo du -hs /mnt/*
-        sudo ls -alr /mnt/
+        # Reine Platzdiagnose, aber als letztes Kommando des Schrittes toedlich: ist /mnt
+        # leer, expandiert der Platzhalter nicht, du scheitert an der Zeichenkette "/mnt/*"
+        # und `bash -e` beendet den Schritt. Im Debug-Workflow war das schon behoben, hier
+        # nicht -- ein Fix, der nur in einer von mehreren Dateien angebracht wurde.
+        sudo du -hs /mnt/* 2>/dev/null || true
+        sudo ls -alr /mnt/ || true
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
