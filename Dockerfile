@@ -1,5 +1,5 @@
 # The image for building
-FROM phusion/baseimage:focal-1.2.0 as build
+FROM phusion/baseimage:noble-1.0.2 as build
 ENV LANG=en_US.UTF-8
 
 # Install dependencies
@@ -13,6 +13,9 @@ RUN \
       cmake \
       git \
       libbz2-dev \
+      libzstd-dev \
+      liblzma-dev \
+      libz-dev \
       libcurl4-openssl-dev \
       libssl-dev \
       libncurses-dev \
@@ -64,7 +67,7 @@ RUN \
     rm -rf /bitshares-core
 
 # The final image
-FROM phusion/baseimage:focal-1.2.0
+FROM phusion/baseimage:noble-1.0.2
 LABEL maintainer="The bitshares decentralized organisation"
 ENV LANG=en_US.UTF-8
 
