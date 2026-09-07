@@ -1,5 +1,5 @@
 # The image for building
-FROM phusion/baseimage:noble-1.0.2 as build
+FROM phusion/baseimage:noble-1.0.2 AS build
 ENV LANG=en_US.UTF-8
 
 # Install dependencies
@@ -90,7 +90,7 @@ COPY --from=build /etc/bitshares/version /etc/bitshares/
 WORKDIR /
 RUN groupadd -g 10001 bitshares
 RUN useradd -u 10000 -g bitshares -s /bin/bash -m -d /var/lib/bitshares --no-log-init bitshares
-ENV HOME /var/lib/bitshares
+ENV HOME=/var/lib/bitshares
 RUN chown bitshares:bitshares -R /var/lib/bitshares
 
 # default exec/config files
