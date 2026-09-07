@@ -466,6 +466,12 @@ struct database_fixture_base {
    liquidity_pool_create_operation make_liquidity_pool_create_op( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent )const;
+
+   /// Creates a StableSwap pool with the given amplification coefficient.
+   const liquidity_pool_object& create_stable_liquidity_pool( account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
+                                                  uint64_t amplification );
    const liquidity_pool_object& create_liquidity_pool( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent );
@@ -650,16 +656,11 @@ struct database_fixture_init : database_fixture_base {
       fc::set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
       fixture.app.initialize( fixture.data_dir.path(), options );
 
-      // Release the reserved p2p port here and nowhere earlier. init_options probes a port
-      // and has to let go of it before the node can bind it -- SO_REUSEADDR does not let two
-      // live sockets share a port -- so there is a window in which anything on the machine
-      // can take it, and on CI something occasionally does:
-      //
-      //     bind: Address already in use
-      //
-      // Holding the probe open across initialize() shrinks that window from the whole
-      // initialisation down to the few instructions between this close and the bind inside
-      // startup(). It does not close it: that cannot be done from out here.
+      // Release the reserved p2p port here and nowhere earlier: init_options probes a port
+      // and must let go of it before the node can bind it, so anything on the machine can
+      // take it in between. Holding the probe across initialize() narrows that window to
+      // the few instructions between this close and the bind inside startup(). It cannot be
+      // held through startup(): SO_REUSEADDR does not let two live sockets share a port.
       if( fixture.p2p_probe_fd >= 0 )
       {
          ::close( fixture.p2p_probe_fd );
