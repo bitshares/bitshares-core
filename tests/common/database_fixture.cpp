@@ -220,7 +220,24 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       int port = 0;
       for( int attempt = 0; attempt < 50 && 0 == port; ++attempt )
       {
-         const int candidate = rand() % 20000 + 5000;
+         // Give each process its own stripe of the port range instead of letting them all
+         // draw from the same 20000 values. run-parallel-tests.sh runs several chain_test
+         // processes at once, each with its own fixture, and the CI failures are them
+         // colliding with each other: the port that failed to bind never appears in the
+         // listener dump taken right after, so whoever held it was another short-lived test
+         // process rather than a service on the machine.
+         //
+         // Probing alone cannot prevent that. The probe has to release the port before the
+         // node binds it, and in exactly that gap a sibling can probe the same number and
+         // find it free. Disjoint stripes remove the shared draw, which is the part that can
+         // be removed; the gap itself cannot be closed from out here.
+         //
+         // 16 stripes of 1200 ports over 5000-24199. Consecutive pids land in different
+         // stripes, which is how parallel spawns its workers. Two processes whose pids are
+         // congruent mod 16 still share one, so this lowers the collision rate rather than
+         // ruling it out.
+         const int stripe = static_cast<int>( ::getpid() % 16 );
+         const int candidate = 5000 + stripe * 1200 + ( rand() % 1200 );
          const int probe = ::socket( AF_INET, SOCK_STREAM, 0 );
          if( probe < 0 )
             continue;
