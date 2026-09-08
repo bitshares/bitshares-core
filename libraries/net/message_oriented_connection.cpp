@@ -172,6 +172,7 @@ namespace graphene { namespace net {
 
       fc::oexception exception_to_rethrow;
       bool call_on_connection_closed = false;
+      bool io_error = false;
 
       try
       {
@@ -179,7 +180,12 @@ namespace graphene { namespace net {
         char buffer[BUFFER_SIZE];
         while( true )
         {
-          _sock.read(buffer, BUFFER_SIZE);
+          try {
+            _sock.read(buffer, BUFFER_SIZE);
+          } catch ( const fc::canceled_exception& ) {
+            io_error = true;
+            throw;
+          }
           _bytes_received += BUFFER_SIZE;
           memcpy((char*)&m, buffer, sizeof(message_header));
           FC_ASSERT( m.size.value() <= MAX_MESSAGE_SIZE, "", ("m.size",m.size.value())("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
@@ -189,7 +195,12 @@ namespace graphene { namespace net {
           std::copy(buffer + sizeof(message_header), buffer + sizeof(buffer), m.data.begin());
           if (remaining_bytes_with_padding)
           {
-            _sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
+            try {
+              _sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
+            } catch ( const fc::canceled_exception& ) {
+              io_error = true;
+              throw;
+            }
             _bytes_received += remaining_bytes_with_padding;
           }
           m.data.resize(m.size.value()); // truncate off the padding bytes
@@ -214,8 +225,20 @@ namespace graphene { namespace net {
       }
       catch ( const fc::canceled_exception& e )
       {
-        wlog( "caught a canceled_exception in read_loop.  this should mean we're in the process of deleting this object already, so there's no need to notify the delegate: ${e}", ("e", e.to_detail_string() ) );
-        throw;
+        if( io_error )
+        {
+          wlog( "disconnected on io error ${e}", ("e", e.to_detail_string() ) );
+          call_on_connection_closed = true;
+          exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE(warn, "disconnected on io error: ${e}",
+                                                         ("e", e.to_detail_string())));
+        }
+        else
+        {
+          wlog( "caught a canceled_exception in read_loop.  this should mean we're in the process of deleting "
+                "this object already, so there's no need to notify the delegate: ${e}",
+                ("e", e.to_detail_string() ) );
+          throw;
+        }
       }
       catch ( const fc::eof_exception& e )
       {
