@@ -85,7 +85,7 @@ manually build your preferred version and use it with BitShares by specifying it
 
   Example: `cmake -DBOOST_ROOT=/path/to/boost ..`
 
-Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), the supported boost version is `1.58` to `1.74`.
+  Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), the supported boost version is `1.58` to `1.74`.
 
 * BitShares requires [OpenSSL](https://www.openssl.org/) libraries to build, supports version `1.0.2` to `1.1.1` and version `3.0.x`.
 If your system came pre-installed with a version of OpenSSL libraries that you do not wish to use, you may
@@ -93,7 +93,7 @@ manually build your preferred version and use it with BitShares by specifying it
 
   Example: `cmake -DOPENSSL_ROOT_DIR=/path/to/openssl ..`
 
-Note: a) some earlier version of OpenSSL 3 are incompatible due to the lack of the `RIPEMD160` provider, and b) for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), OpenSSL 3 is not supported.
+  Note: a) some earlier version of OpenSSL 3 are incompatible due to the lack of the `RIPEMD160` provider, and b) for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), OpenSSL 3 is not supported.
 
 ### Running and Stopping Node Software
 
