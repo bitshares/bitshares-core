@@ -80,16 +80,21 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
+        ccache --show-stats
         make -j 2 -C _build chain_test
         make -j 2 -C _build cli_test
         make -j 2 -C _build app_test
         make -j 2 -C _build es_test
+        ccache --show-stats
         make -j 2 -C _build cli_wallet
+        ccache --show-stats
         make -j 2 -C _build witness_node
+        ccache --show-stats
         make -j 2 -C _build
         df -h
         du -hs _build/libraries/* _build/programs/* _build/tests/*
         du -hs _build/*
+        ccache --show-stats
     - name: Unit-Tests
       timeout-minutes: 15
       run: |
