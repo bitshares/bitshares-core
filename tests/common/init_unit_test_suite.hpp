@@ -26,8 +26,32 @@
 #include <cstdlib>
 #include <iostream>
 #include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test_monitor.hpp>
 #include <chrono>
 #include <string>
+
+#include <fc/exception/exception.hpp>
+
+/**
+ * Report escaped fc exceptions instead of swallowing them.
+ *
+ * Boost.Test recognises exceptions derived from std::exception and reports their what().
+ * fc::exception derives from nothing, so anything escaping a test case falls into Boost's
+ * catch-all, which reports the bare placeholder:
+ *
+ *     unknown location(0): fatal error: in "<some test>": unknown type
+ *
+ * No code, no message, no location -- and the exception's own text is never written
+ * anywhere, so it cannot be recovered from the log afterwards either. Two entirely
+ * different causes produce that identical line, which makes the report misleading rather
+ * than merely thin.
+ *
+ * The translator turns it into the detail string: code, message and throw site.
+ */
+inline void translate_fc_exception( const fc::exception& e )
+{
+   BOOST_FAIL( "fc::exception: " + e.to_detail_string() );
+}
 
 uint32_t    GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000;
 std::string GRAPHENE_TESTING_ES_URL            = "http://127.0.0.1:9200/";
@@ -50,5 +74,7 @@ boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
          GRAPHENE_TESTING_ES_URL = tmp_es_url;
    }
    std::cout << "GRAPHENE_TESTING_ES_URL is " << GRAPHENE_TESTING_ES_URL << std::endl;
+   boost::unit_test::unit_test_monitor.register_exception_translator<fc::exception>(
+      &translate_fc_exception );
    return nullptr;
 }

@@ -8,7 +8,7 @@ jobs:
     name: Scan with SonarScanner
     strategy:
       matrix:
-        os: [ ubuntu-20.04 ]
+        os: [ ubuntu-24.04 ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch8:
@@ -28,13 +28,16 @@ jobs:
              https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
              2>/dev/null | cut -f8 -d'/'`
         SONAR_DOWNLOAD_PATH=https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
-        curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip \
-             $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+        # --fail so a 403 stops here. Without it curl writes the error page to the file
+        # and unzip fails afterwards, reporting a corrupt archive rather than a download
+        # that never happened.
+        curl --create-dirs --fail -sSLo $HOME/.sonar/sonar-scanner.zip \
+             $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux-x64.zip
         unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
         curl --create-dirs -sSLo $HOME/.sonar/build-wrapper-linux-x86.zip \
              https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
         unzip -o $HOME/.sonar/build-wrapper-linux-x86.zip -d $HOME/.sonar/
-        SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux
+        SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux-x64
         echo "SONAR_SCANNER_VERSION=$SONAR_SCANNER_VERSION" >> $GITHUB_ENV
         echo "SONAR_SCANNER_HOME=$SONAR_SCANNER_HOME" >> $GITHUB_ENV
         echo "SONAR_SCANNER_OPTS=-server" >> $GITHUB_ENV
@@ -63,12 +66,19 @@ jobs:
                      libboost-context-dev \
                      libboost-regex-dev \
                      libboost-coroutine-dev \
-                     libcurl4-openssl-dev
+                     libcurl4-openssl-dev \
+                     libzstd-dev \
+                     libbz2-dev \
+                     liblzma-dev
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-        sudo du -hs /mnt/*
-        sudo ls -alr /mnt/
+        # Reine Platzdiagnose, aber als letztes Kommando des Schrittes toedlich: ist /mnt
+        # leer, expandiert der Platzhalter nicht, du scheitert an der Zeichenkette "/mnt/*"
+        # und `bash -e` beendet den Schritt. Im Debug-Workflow war das schon behoben, hier
+        # nicht -- ein Fix, der nur in einer von mehreren Dateien angebracht wurde.
+        sudo du -hs /mnt/* 2>/dev/null || true
+        sudo ls -alr /mnt/ || true
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
@@ -185,14 +195,28 @@ jobs:
         df -h
     - name: Prepare for scanning with SonarScanner
       run: |
-        programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
-        pushd _build
-        gcovr --version
-        gcovr --exclude-unreachable-branches --exclude-throw-branches \
+        # Jeden Befehl einzeln pruefen und bei einem Fehlschlag die Ausgabe als Annotation
+        # zeigen. Ohne das meldet der Schritt nur seinen Exit-Code, und die Protokolle sind
+        # ohne Adminrechte am Repository nicht abrufbar -- dieser Schritt hat schon eine
+        # Runde gekostet, in der nur zu raten war, ob das Branch-Skript oder gcovr scheitert.
+        set -o pipefail
+        PROTOKOLL="$GITHUB_WORKSPACE/prepare.log"
+        : > "$PROTOKOLL"
+        lauf() {
+          if ! "$@" 2>&1 | tee -a "$PROTOKOLL"; then
+            echo "::error::gescheitert: $*"
+            tail -20 "$PROTOKOLL" | while IFS= read -r zeile; do echo "::error::$zeile"; done
+            exit 1
+          fi
+        }
+        lauf programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
+        cd _build
+        lauf gcovr --version
+        lauf gcovr --exclude-unreachable-branches --exclude-throw-branches \
               --exclude '\.\./programs/' \
               --exclude '\.\./tests/' \
               --sonarqube ../coverage.xml -r ..
-        popd
+        cd ..
     - name: Scan with SonarScanner
       env:
         # to get access to secrets.SONAR_TOKEN, provide GITHUB_TOKEN

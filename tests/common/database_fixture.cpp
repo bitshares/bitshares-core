@@ -44,6 +44,10 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork_visitor.hpp>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include <fc/crypto/digest.hpp>
 
 #include <iomanip>
@@ -93,6 +97,14 @@ database_fixture_base::database_fixture_base()
 
 database_fixture_base::~database_fixture_base()
 {
+   // In case init() never got as far as releasing it -- otherwise a test that threw would
+   // hold its port for the rest of the run.
+   if( p2p_probe_fd >= 0 )
+   {
+      ::close( p2p_probe_fd );
+      p2p_probe_fd = -1;
+   }
+
    // cleanup data in ES
    if( !es_index_prefix.empty() || !es_obj_index_prefix.empty() )
    {
@@ -201,10 +213,63 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       {
          fc::set_option( options, "enable-p2p-network", true );
       }
-      fc::ip::endpoint ep;
-      ep.set_port( rand() % 20000 + 5000 );
-      idump( (ep)(std::string(ep)) );
-      fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+      // Pick a port nothing else is listening on. The range below overlaps plenty of
+      // everyday services (6379 redis, 11434 ollama, ...), and graphene's p2p node retries
+      // an occupied listen port forever rather than failing, so an unlucky draw hangs the
+      // whole suite instead of failing one case. Probe first and redraw.
+      int port = 0;
+      for( int attempt = 0; attempt < 50 && 0 == port; ++attempt )
+      {
+         // Give each process its own stripe of the port range instead of letting them all
+         // draw from the same 20000 values. run-parallel-tests.sh runs several chain_test
+         // processes at once, each with its own fixture, and the CI failures are them
+         // colliding with each other: the port that failed to bind never appears in the
+         // listener dump taken right after, so whoever held it was another short-lived test
+         // process rather than a service on the machine.
+         //
+         // Probing alone cannot prevent that. The probe has to release the port before the
+         // node binds it, and in exactly that gap a sibling can probe the same number and
+         // find it free. Disjoint stripes remove the shared draw, which is the part that can
+         // be removed; the gap itself cannot be closed from out here.
+         //
+         // 16 stripes of 1200 ports over 5000-24199. Consecutive pids land in different
+         // stripes, which is how parallel spawns its workers. Two processes whose pids are
+         // congruent mod 16 still share one, so this lowers the collision rate rather than
+         // ruling it out.
+         const int stripe = static_cast<int>( ::getpid() % 16 );
+         const int candidate = 5000 + stripe * 1200 + ( rand() % 1200 );
+         const int probe = ::socket( AF_INET, SOCK_STREAM, 0 );
+         if( probe < 0 )
+            continue;
+         const int reuse = 1;
+         ::setsockopt( probe, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse) );
+         sockaddr_in addr {};
+         addr.sin_family = AF_INET;
+         addr.sin_addr.s_addr = htonl( INADDR_ANY );
+         addr.sin_port = htons( static_cast<uint16_t>( candidate ) );
+         if( 0 == ::bind( probe, reinterpret_cast<sockaddr*>( &addr ), sizeof(addr) ) )
+         {
+            port = candidate;
+            // Keep this socket open; init() closes it immediately before app.startup().
+            // Closing it here hands the port back before the node binds it.
+            fixture.p2p_probe_fd = probe;
+         }
+         else
+            ::close( probe );
+      }
+
+      if( 0 == port )
+      {
+         // Nothing free after 50 tries is not worth hanging over.
+         fc::set_option( options, "enable-p2p-network", false );
+      }
+      else
+      {
+         fc::ip::endpoint ep;
+         ep.set_port( static_cast<uint16_t>( port ) );
+         idump( (ep)(std::string(ep)) );
+         fc::set_option( options, "p2p-endpoint", std::string( ep ) );
+      }
    }
 
    if (fixture.current_test_name == "min_blocks_to_keep_test")
@@ -1555,6 +1620,29 @@ const liquidity_pool_object& database_fixture_base::create_liquidity_pool( accou
 {
    liquidity_pool_create_operation op = make_liquidity_pool_create_op( account, asset_a, asset_b, share_asset,
                                                                        taker_fee_percent, withdrawal_fee_percent );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return db.get<liquidity_pool_object>( *op_result.get<generic_operation_result>().new_objects.begin() );
+}
+
+const liquidity_pool_object& database_fixture_base::create_stable_liquidity_pool(
+                                                  account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
+                                                  uint64_t amplification )
+{
+   liquidity_pool_create_operation op = make_liquidity_pool_create_op( account, asset_a, asset_b, share_asset,
+                                                                       taker_fee_percent, withdrawal_fee_percent );
+   op.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   op.extensions.value.amplification = amplification;
    trx.operations.clear();
    trx.operations.push_back( op );
 

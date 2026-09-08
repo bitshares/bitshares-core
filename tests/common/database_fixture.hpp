@@ -23,6 +23,8 @@
  */
 #pragma once
 
+#include <unistd.h>   // ::close, for the reserved p2p probe socket
+
 #include <fc/io/json.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -206,6 +208,10 @@ struct database_fixture_base {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
    graphene::app::application app;
+
+   /// The probe socket from init_options, kept open until just before app.startup() so the
+   /// port cannot be taken in between. Closed by init(); -1 when no p2p port was reserved.
+   int p2p_probe_fd = -1;
    genesis_state_type genesis_state;
    chain::database &db;
    signed_transaction trx;
@@ -460,6 +466,12 @@ struct database_fixture_base {
    liquidity_pool_create_operation make_liquidity_pool_create_op( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent )const;
+
+   /// Creates a StableSwap pool with the given amplification coefficient.
+   const liquidity_pool_object& create_stable_liquidity_pool( account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
+                                                  uint64_t amplification );
    const liquidity_pool_object& create_liquidity_pool( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent );
@@ -643,6 +655,18 @@ struct database_fixture_init : database_fixture_base {
       auto options = F::init_options( fixture );
       fc::set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
       fixture.app.initialize( fixture.data_dir.path(), options );
+
+      // Release the reserved p2p port here and nowhere earlier: init_options probes a port
+      // and must let go of it before the node can bind it, so anything on the machine can
+      // take it in between. Holding the probe across initialize() narrows that window to
+      // the few instructions between this close and the bind inside startup(). It cannot be
+      // held through startup(): SO_REUSEADDR does not let two live sockets share a port.
+      if( fixture.p2p_probe_fd >= 0 )
+      {
+         ::close( fixture.p2p_probe_fd );
+         fixture.p2p_probe_fd = -1;
+      }
+
       fixture.app.startup();
 
       fixture.generate_block();

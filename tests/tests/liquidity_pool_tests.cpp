@@ -27,10 +27,14 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/stableswap.hpp>
 
 #include <graphene/app/api.hpp>
 
 #include <boost/test/unit_test.hpp>
+
+#include <limits>
+#include <random>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -1659,5 +1663,1522 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
       BOOST_CHECK( pools.back().id == ted_lpo3.get_id() );
 
 } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+BOOST_AUTO_TEST_CASE( stableswap_create_test )
+{
+   try {
+
+      // Before the StableSwap hard fork, creating a stable pool should fail even though
+      // ordinary (constant-product) pools already work at this point in time.
+      generate_blocks( HARDFORK_CORE_2604_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      // Two assets that share precision (4), plus a mismatched-precision one (2)
+      const asset_object& usd4 = create_user_issued_asset( "STUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& eur4 = create_user_issued_asset( "STEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& cny2 = create_user_issued_asset( "STCNY", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 2 );
+      const asset_object& lpa  = create_user_issued_asset( "STLPA", sam, 0 );
+
+      // Order the pool assets by id as the operation requires asset_a < asset_b
+      asset_id_type a = std::min( usd4.get_id(), eur4.get_id() );
+      asset_id_type b = std::max( usd4.get_id(), eur4.get_id() );
+      // Capture plain ids up front rather than holding the asset_object references across
+      // generate_blocks( HARDFORK_STABLESWAP_TIME ) below: that call jumps the chain clock
+      // ~15 years forward in one step, crossing a huge number of maintenance intervals, which
+      // was observed (via gdb) to leave previously-obtained const asset_object& references
+      // pointing at stale/reused storage -- e.g. usd4's reference read back a garbage id, and
+      // cny2's read back eur4's symbol. asset_id_type is a plain small value type and stays
+      // valid regardless of what happens to the underlying object storage.
+      asset_id_type cny2_id = cny2.get_id();
+      asset_id_type lpa_id = lpa.get_id();
+
+      // Stable pool not yet allowed
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0, 100 ),
+                         fc::exception );
+
+      // Move past the StableSwap hard fork
+      generate_blocks( HARDFORK_STABLESWAP_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      // Mismatched precision is rejected
+      asset_id_type ma = std::min( a, cny2_id );
+      asset_id_type mb = std::max( a, cny2_id );
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, ma, mb, lpa_id, 0, 0, 100 ),
+                         fc::exception );
+
+      // Amplification out of range is rejected
+      BOOST_CHECK_THROW( create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0,
+                                                       STABLESWAP_AMP_MAX + 1 ),
+                         fc::exception );
+
+      // A valid stable pool is created and carries the new fields
+      const liquidity_pool_object& lpo = create_stable_liquidity_pool( sam_id, a, b, lpa_id, 0, 0, 100 );
+      BOOST_CHECK( lpo.is_stable() );
+      BOOST_CHECK( lpo.pool_type == liquidity_pool_curve_type::stable );
+      BOOST_CHECK_EQUAL( lpo.amplification, 100u );
+      BOOST_CHECK( lpo.virtual_value == 0 ); // empty pool
+
+   } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+BOOST_AUTO_TEST_CASE( stableswap_exchange_test )
+{
+   try {
+
+      generate_blocks( HARDFORK_STABLESWAP_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      // Two equal-precision, fee-free assets so we can compare curves cleanly
+      const asset_object& usd = create_user_issued_asset( "SXUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& eur = create_user_issued_asset( "SXEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+      const asset_object& slp = create_user_issued_asset( "SXSLP", sam, 0 ); // stable pool share asset
+      const asset_object& clp = create_user_issued_asset( "SXCLP", sam, 0 ); // constant-product share asset
+
+      asset_id_type usd_id = usd.get_id();
+      asset_id_type eur_id = eur.get_id();
+      asset_id_type a = std::min( usd_id, eur_id );
+      asset_id_type b = std::max( usd_id, eur_id );
+
+      issue_uia( sam, usd.amount( init_amount ) );
+      issue_uia( sam, eur.amount( init_amount ) );
+      issue_uia( ted, usd.amount( init_amount ) );
+      issue_uia( ted, eur.amount( init_amount ) );
+
+      const int64_t liq = 1000000; // balanced liquidity on each side
+
+      // Stable pool, A = 100, no fees
+      const liquidity_pool_object& s_lpo = create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );
+      liquidity_pool_id_type s_id = s_lpo.get_id();
+      deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+      // The stored invariant is D, not k. At perfect balance D == x + y.
+      BOOST_CHECK( s_id(db).virtual_value
+                   == stableswap::compute_d( fc::uint128_t(liq), fc::uint128_t(liq), 100 ) );
+      BOOST_CHECK( s_id(db).virtual_value == fc::uint128_t( 2 * liq ) );
+
+      // Constant-product pool with identical balances for comparison
+      const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 0, 0 );
+      liquidity_pool_id_type c_id = c_lpo.get_id();
+      deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+      BOOST_CHECK( c_id(db).virtual_value == fc::uint128_t(liq) * liq );
+
+      // ~10% of the pool: large enough that the curve advantage clearly exceeds the
+      // integer rounding the evaluator applies in the pool's favour.
+      const int64_t sell = 100000;
+
+      const auto d_before = s_id(db).virtual_value;
+
+      generic_exchange_operation_result s_res =
+            exchange_with_liquidity_pool( ted_id, s_id, asset( sell, a ), asset( 1, b ) );
+      generic_exchange_operation_result c_res =
+            exchange_with_liquidity_pool( ted_id, c_id, asset( sell, a ), asset( 1, b ) );
+
+      int64_t stable_out = s_res.received.front().amount.value;
+      int64_t cp_out     = c_res.received.front().amount.value;
+
+      // StableSwap gives materially less slippage than constant-product for a
+      // like-valued pair, while still never returning more than the input.
+      BOOST_CHECK_GT( stable_out, cp_out );
+      BOOST_CHECK_GT( stable_out - cp_out, 1000 ); // a real curve advantage, not rounding
+      BOOST_CHECK_LE( stable_out, sell );
+
+      // The invariant D must never decrease across a swap (fees would only raise it).
+      BOOST_CHECK( s_id(db).virtual_value >= d_before );
+
+      // A swap in the other direction also executes and preserves the invariant.
+      const auto d_before2 = s_id(db).virtual_value;
+      generic_exchange_operation_result s_res2 =
+            exchange_with_liquidity_pool( ted_id, s_id, asset( sell, b ), asset( 1, a ) );
+      BOOST_CHECK_GT( s_res2.received.front().amount.value, 0 );
+      BOOST_CHECK( s_id(db).virtual_value >= d_before2 );
+
+   } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+/**
+ * OEKONOMIE: kann ein Haendler durch wiederholtes Hin- und Hertauschen Wert aus dem Pool
+ * ziehen?
+ *
+ * Jede Rundung im Pool muss zugunsten des Pools ausfallen, sonst sammelt ein Bot mit vielen
+ * kleinen Runden das Kapital der Liquiditaetsgeber ein. Der Test macht genau das: 200 Runden
+ * A->B->A ohne Gebuehren, und prueft danach, dass der Haendler nicht mehr hat als vorher.
+ *
+ * Ohne Gebuehren, weil eine Gebuehr den Effekt verdecken wuerde: sie macht jede Runde
+ * teuer genug, dass Rundungsgewinne darin untergehen. Der Angriff waere trotzdem da.
+ */
+BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS((sam)(ted));
+   const int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   fund( sam, asset(init_amount) );
+   fund( ted, asset(init_amount) );
+
+   const asset_object& usd = create_user_issued_asset(
+         "RTUSD", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+   const asset_object& eur = create_user_issued_asset(
+         "RTEUR", sam, 0, price(asset(1, asset_id_type(1)), asset(1)), 4 );
+   const asset_object& slp = create_user_issued_asset( "RTSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( init_amount ) );
+   issue_uia( sam, eur.amount( init_amount ) );
+   issue_uia( ted, usd.amount( init_amount ) );
+   issue_uia( ted, eur.amount( init_amount ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );  // gebuehrenfrei
+   const liquidity_pool_id_type pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const int64_t ted_a0 = get_balance( ted_id, a );
+   const int64_t ted_b0 = get_balance( ted_id, b );
+   const fc::uint128_t d0 = pid(db).virtual_value;
+   BOOST_TEST_MESSAGE( "  Ted vorher: a=" << ted_a0 << " b=" << ted_b0 );
+
+   const int64_t step = 1000;
+   int rounds = 0;
+   for( ; rounds < 200; ++rounds )
+   {
+      const auto r1 = exchange_with_liquidity_pool(
+            ted_id, pid, asset( step, a ), asset( 1, b ) );
+      if( r1.received.empty() ) break;
+      const int64_t got_b = r1.received.front().amount.value;
+      if( got_b <= 0 ) break;
+      const auto r2 = exchange_with_liquidity_pool(
+            ted_id, pid, asset( got_b, b ), asset( 1, a ) );
+      if( r2.received.empty() ) break;
+      if( r2.received.front().amount.value <= 0 ) break;
+   }
+
+   const int64_t ted_a1 = get_balance( ted_id, a );
+   const int64_t ted_b1 = get_balance( ted_id, b );
+   BOOST_TEST_MESSAGE( "  Ted nachher (" << rounds << " Runden): a=" << ted_a1
+                       << " b=" << ted_b1 );
+   BOOST_TEST_MESSAGE( "  Veraenderung: a=" << ( ted_a1 - ted_a0 )
+                       << "  b=" << ( ted_b1 - ted_b0 ) );
+   // fc::uint128_t ist __int128 unsigned und hat weder Stringkonstruktor noch operator<<.
+   // Fuer die Anzeige reicht der 64-Bit-Anteil: D liegt hier bei rund 2 Millionen.
+   const uint64_t d0_disp = static_cast<uint64_t>( d0 );
+   const uint64_t d1_disp = static_cast<uint64_t>( pid(db).virtual_value );
+   BOOST_TEST_MESSAGE( "  D vorher " << d0_disp << "  nachher " << d1_disp );
+
+   // Der Haendler darf nach einer Rundreise nie mehr haben als vorher -- in keinem Asset.
+   BOOST_CHECK_MESSAGE( ted_a1 <= ted_a0,
+                        "Haendler gewann " + std::to_string( ted_a1 - ted_a0 ) + " von Asset a" );
+   BOOST_CHECK_MESSAGE( ted_b1 <= ted_b0,
+                        "Haendler gewann " + std::to_string( ted_b1 - ted_b0 ) + " von Asset b" );
+   // Und die Invariante darf durch Rundreisen nicht schrumpfen.
+   BOOST_CHECK_MESSAGE( pid(db).virtual_value >= d0,
+                        "D schrumpfte von " + std::to_string( d0_disp ) + " auf "
+                        + std::to_string( d1_disp ) );
+} FC_LOG_AND_RETHROW() }
+
+/**
+ * MMEV gegen eine einseitige Auszahlung, und was die Untergrenze daran aendert.
+ *
+ * Eine einseitige Auszahlung ist ein Swap -- der Kommentar an withdraw_one_asset sagt es
+ * selbst. Ihr Preis haengt an den Poolstaenden in dem Augenblick, in dem sie ausgefuehrt
+ * wird, und wer den Block baut, bestimmt was unmittelbar davor geschieht. Ein Witness kann
+ * also den Pool verschieben, die Auszahlung zum verschobenen Preis laufen lassen und
+ * anschliessend zurueckschieben. Innerhalb seines eigenen Blocks kann ihm dabei niemand
+ * dazwischenkommen.
+ *
+ * Gemessen wird dreimal derselbe Vorgang: unbehelligt, im Sandwich, und im Sandwich mit
+ * einer Untergrenze. Die dritte Variante muss scheitern statt zum verschobenen Preis
+ * auszufuehren -- das ist der ganze Zweck der Untergrenze.
+ */
+/**
+ * Dasselbe fuer die Einzahlung. Eine unausgewogene Einzahlung zahlt eine Gebuehr, die daran
+ * haengt, wie weit sie den Pool aus der Balance schiebt -- also am Poolstand im Augenblick
+ * der Ausfuehrung. Wer den Block baut, bestimmt was unmittelbar davor geschieht: schiebt er
+ * den Pool in dieselbe Richtung vor, schiebt die Einzahlung weiter und zahlt mehr.
+ */
+/**
+ * Die andere Haelfte: eine proportionale Auszahlung zahlt BEIDE Seiten aus, und eine Grenze
+ * auf einem Bein sagt ueber das andere nichts.
+ *
+ * Hier geht es nicht um Abschoepfung. Anteile sind ein Bruchteil des Pools; wer den Pool
+ * verschiebt, aendert die MISCHUNG, die eine Auszahlung ausgibt, nicht ihren Wert -- die
+ * Handelsgebuehr laesst der Angreifer sogar drin. Aber wer ein bestimmtes Asset braucht,
+ * etwa um eine Schuld darin zu bedienen, dem hilft "der Wert stimmt schon" nicht. Genau das
+ * konnte er bisher nicht sagen.
+ */
+BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) ); fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "PRUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "PREUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+   const auto stake = [&]( liquidity_pool_id_type pool ) {
+      return deposit_to_liquidity_pool( ted_id, pool,
+                                        asset( 100000, a ), asset( 100000, b ) ).received.front();
+   };
+
+   // Proportional, also ohne withdraw_one_asset; beide Untergrenzen sind erlaubt.
+   const auto exit_proportional = [&]( liquidity_pool_id_type pool, asset shares,
+                                       fc::optional<share_type> fa,
+                                       fc::optional<share_type> fb ) {
+      liquidity_pool_withdraw_operation wop;
+      wop.account      = ted_id;
+      wop.pool         = pool;
+      wop.share_amount = shares;
+      wop.extensions.value.min_a = fa;
+      wop.extensions.value.min_b = fb;
+      signed_transaction tx;
+      tx.operations.push_back( wop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      PUSH_TX( db, tx );
+   };
+
+   // --- unbehelligt ---------------------------------------------------------------------
+   const auto p1 = make_pool( "PRLP1" );
+   const auto sh1 = stake( p1 );
+   const auto a1 = get_balance( ted_id, a ), b1 = get_balance( ted_id, b );
+   exit_proportional( p1, sh1, {}, {} );
+   const int64_t honest_a = get_balance( ted_id, a ) - a1;
+   const int64_t honest_b = get_balance( ted_id, b ) - b1;
+
+   // --- der Pool wird vorher verschoben --------------------------------------------------
+   // Der Angreifer kauft B heraus, also wird B im Pool knapp: die Auszahlung gibt weniger B
+   // und mehr A. Der Wert bleibt ungefaehr gleich, die Mischung nicht.
+   const auto p2 = make_pool( "PRLP2" );
+   const auto sh2 = stake( p2 );
+   exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
+   const auto a2 = get_balance( ted_id, a ), b2 = get_balance( ted_id, b );
+   exit_proportional( p2, sh2, {}, {} );
+   const int64_t shifted_a = get_balance( ted_id, a ) - a2;
+   const int64_t shifted_b = get_balance( ted_id, b ) - b2;
+
+   BOOST_TEST_MESSAGE( "  unbehelligt : " << honest_a << " A, " << honest_b << " B" );
+   BOOST_TEST_MESSAGE( "  verschoben  : " << shifted_a << " A, " << shifted_b << " B" );
+   BOOST_TEST_MESSAGE( "  B-Seite verliert: " << ( honest_b - shifted_b ) );
+
+   BOOST_CHECK_MESSAGE( shifted_b < honest_b,
+                        "die Verschiebung hat die B-Seite nicht getroffen: " << shifted_b
+                        << " gegen " << honest_b << " -- dann misst dieser Test nichts" );
+   BOOST_CHECK_MESSAGE( shifted_a > honest_a,
+                        "die A-Seite haette wachsen muessen: " << shifted_a
+                        << " gegen " << honest_a );
+
+   // --- eine Grenze auf A allein sieht davon nichts --------------------------------------
+   // Das ist der Punkt: die alte, einbeinige Fassung haette hier durchgewunken.
+   const auto p3 = make_pool( "PRLP3" );
+   const auto sh3 = stake( p3 );
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
+   exit_proportional( p3, sh3, share_type( honest_a ), {} );
+   BOOST_TEST_MESSAGE( "  Grenze nur auf A: geht durch, obwohl B einbricht" );
+
+   // --- eine Grenze auf B haelt ----------------------------------------------------------
+   const auto p4 = make_pool( "PRLP4" );
+   const auto sh4 = stake( p4 );
+   const share_type floor_b{ honest_b - honest_b / 1000 };
+   exchange_with_liquidity_pool( mal_id, p4, asset( 400000, a ), asset( 1, b ) );
+   GRAPHENE_REQUIRE_THROW( exit_proportional( p4, sh4, {}, floor_b ), fc::exception );
+   BOOST_TEST_MESSAGE( "  Grenze auf B (" << floor_b.value << "): abgelehnt" );
+
+   // Und ohne Verschiebung geht dieselbe Grenze durch.
+   const auto p5 = make_pool( "PRLP5" );
+   const auto sh5 = stake( p5 );
+   exit_proportional( p5, sh5, {}, floor_b );
+   BOOST_TEST_MESSAGE( "  dieselbe Grenze ohne Verschiebung: geht durch" );
+
+   BOOST_TEST_MESSAGE( "" );
+   BOOST_TEST_MESSAGE( "  Befund: der Wert bleibt, die Mischung nicht. Wer ein bestimmtes" );
+   BOOST_TEST_MESSAGE( "  Asset braucht, kann das jetzt sagen -- vorher nicht." );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
+{ try {
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+   fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "DPUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "DPEUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+
+   // Einseitig einzahlen: nur A. Das schiebt den Pool aus der Balance und kostet die
+   // Ungleichgewichtsgebuehr -- genau der Betrag, den ein Sandwich vergroessern kann.
+   const auto deposit_one_sided = [&]( liquidity_pool_id_type pool,
+                                       fc::optional<share_type> floor ) {
+      liquidity_pool_deposit_operation dop;
+      dop.account  = ted_id;
+      dop.pool     = pool;
+      dop.amount_a = asset( 200000, a );
+      dop.amount_b = asset( 1, b );
+      dop.extensions.value.min_to_receive = floor;
+      signed_transaction tx;
+      tx.operations.push_back( dop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      return PUSH_TX( db, tx );
+   };
+
+   // --- unbehelligt ---------------------------------------------------------------------
+   const auto p1 = make_pool( "DPLP1" );
+   const auto r1 = deposit_one_sided( p1, fc::optional<share_type>() );
+   const int64_t honest =
+         r1.operation_results.front().get<generic_exchange_operation_result>()
+           .received.front().amount.value;
+
+   // --- im Sandwich ---------------------------------------------------------------------
+   // Der Angreifer schiebt A vorher schon hinein. Teds A-Einzahlung schiebt dann weiter aus
+   // der Balance und praegt weniger Anteile.
+   const auto p2 = make_pool( "DPLP2" );
+   exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
+   const auto r2 = deposit_one_sided( p2, fc::optional<share_type>() );
+   const int64_t sandwiched =
+         r2.operation_results.front().get<generic_exchange_operation_result>()
+           .received.front().amount.value;
+
+   BOOST_TEST_MESSAGE( "  einseitige Einzahlung unbehelligt : " << honest << " Anteile" );
+   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched << " Anteile" );
+   BOOST_TEST_MESSAGE( "  dem Einzahler entgangen           : " << ( honest - sandwiched ) );
+
+   BOOST_CHECK_MESSAGE( sandwiched < honest,
+                        "das Sandwich hat der Einzahlung nichts genommen: " << sandwiched
+                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+
+   // --- im Sandwich, mit Untergrenze ----------------------------------------------------
+   const auto p3 = make_pool( "DPLP3" );
+   const share_type floor_shares = honest - honest / 1000;
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
+   GRAPHENE_REQUIRE_THROW( deposit_one_sided( p3, floor_shares ), fc::exception );
+   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_shares.value
+                       << " scheitert die Einzahlung, statt weniger Anteile hinzunehmen." );
+
+   // Und ohne Angriff geht dieselbe Untergrenze durch.
+   const auto p4 = make_pool( "DPLP4" );
+   deposit_one_sided( p4, floor_shares );
+   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
+{ try {
+   // Ohne den Vorlauf lehnt der Evaluator schon die Poolerzeugung ab, und der Test
+   // stuerbe an der Infrastruktur statt am Gegenstand.
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted)(mal) );
+
+   const int64_t huge = 1000000000;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+   fund( mal, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "MYUSD", sam, 0 );
+   const asset_object& eur = create_user_issued_asset( "MYEUR", sam, 0 );
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   for( const account_object* who : { &sam, &ted, &mal } )
+   {
+      issue_uia( *who, usd.amount( huge ) );
+      issue_uia( *who, eur.amount( huge ) );
+   }
+
+   const int64_t liq = 1000000;
+
+   // Drei identische Pools, damit die drei Durchlaeufe sich nicht gegenseitig faerben.
+   const auto make_pool = [&]( const char* sym ) {
+      const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
+      const liquidity_pool_object& p =
+            create_stable_liquidity_pool( sam_id, a, b, lp.get_id(), 30, 0, 100 );
+      const auto id = p.get_id();
+      deposit_to_liquidity_pool( sam_id, id, asset( liq, a ), asset( liq, b ) );
+      return id;
+   };
+
+   const auto stake = [&]( liquidity_pool_id_type pool ) {
+      const auto in = deposit_to_liquidity_pool( ted_id, pool,
+                                                 asset( 100000, a ), asset( 100000, b ) );
+      return in.received.front();
+   };
+
+   const auto exit_one_sided = [&]( liquidity_pool_id_type pool, asset shares,
+                                    fc::optional<share_type> floor ) {
+      liquidity_pool_withdraw_operation wop;
+      wop.account      = ted_id;
+      wop.pool         = pool;
+      wop.share_amount = shares;
+      wop.extensions.value.withdraw_one_asset = a;
+      // Ausgezahlt wird A, also gilt die Untergrenze der A-Seite. Eine auf B waere hier
+      // nie erfuellbar, und der Evaluator lehnt sie ausdruecklich ab.
+      wop.extensions.value.min_a = floor;
+      signed_transaction tx;
+      tx.operations.push_back( wop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      tx.sign( ted_private_key, db.get_chain_id() );
+      PUSH_TX( db, tx );
+   };
+
+   // --- 1. unbehelligt ------------------------------------------------------------------
+   const auto p1 = make_pool( "MYLP1" );
+   const auto sh1 = stake( p1 );
+   const auto before1 = get_balance( ted_id, a );
+   exit_one_sided( p1, sh1, fc::optional<share_type>() );
+   const int64_t honest = get_balance( ted_id, a ) - before1;
+
+   // --- 2. im Sandwich ------------------------------------------------------------------
+   // Der Angreifer macht A im Pool KNAPP: er verkauft B hinein und zieht A heraus. Eine
+   // Auszahlung, die in A ausgezahlt wird, bekommt dann weniger Einheiten. Danach dreht er
+   // zurueck. (Andersherum -- A hineinverkaufen -- verbilligt A und zahlt dem Auszahler
+   // MEHR aus; ein erster Anlauf lief so und schadete nur dem Angreifer selbst.)
+   const auto p2 = make_pool( "MYLP2" );
+   const auto sh2 = stake( p2 );
+   const auto before2 = get_balance( ted_id, a );
+   const auto mal_a_before = get_balance( mal_id, a );
+   const auto mal_b_before = get_balance( mal_id, b );
+
+   const auto front = exchange_with_liquidity_pool( mal_id, p2, asset( 400000, b ),
+                                                    asset( 1, a ) );
+   exit_one_sided( p2, sh2, fc::optional<share_type>() );
+   exchange_with_liquidity_pool( mal_id, p2, front.received.front(), asset( 1, b ) );
+
+   const int64_t sandwiched = get_balance( ted_id, a ) - before2;
+   const int64_t attacker_a = get_balance( mal_id, a ) - mal_a_before;
+   const int64_t attacker_b = get_balance( mal_id, b ) - mal_b_before;
+
+   BOOST_TEST_MESSAGE( "  einseitige Auszahlung unbehelligt : " << honest );
+   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched );
+   BOOST_TEST_MESSAGE( "  dem Auszahler entgangen           : " << ( honest - sandwiched ) );
+   BOOST_TEST_MESSAGE( "  beim Angreifer haengengeblieben   : " << attacker_a
+                       << " von A, " << attacker_b << " von B" );
+
+   BOOST_CHECK_MESSAGE( sandwiched < honest,
+                        "das Sandwich hat der Auszahlung nichts genommen: " << sandwiched
+                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+
+   // --- 3. im Sandwich, aber mit Untergrenze --------------------------------------------
+   // Ted verlangt fast so viel wie ohne Angriff. Die Auszahlung muss scheitern statt zum
+   // verschobenen Preis durchzugehen.
+   const auto p3 = make_pool( "MYLP3" );
+   const auto sh3 = stake( p3 );
+   const share_type floor_amount{ honest - honest / 1000 };  // ein Promille Nachgiebigkeit
+
+   exchange_with_liquidity_pool( mal_id, p3, asset( 400000, b ), asset( 1, a ) );
+   GRAPHENE_REQUIRE_THROW(
+         exit_one_sided( p3, sh3, share_type( floor_amount ) ), fc::exception );
+
+   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_amount.value
+                       << " scheitert die Auszahlung, statt zum verschobenen Preis zu laufen." );
+
+   // Und ohne Angriff laesst dieselbe Untergrenze die Auszahlung durch -- sonst waere sie
+   // nur eine Blockade und keine Absicherung.
+   const auto p4 = make_pool( "MYLP4" );
+   const auto sh4 = stake( p4 );
+   const auto before4 = get_balance( ted_id, a );
+   exit_one_sided( p4, sh4, share_type( floor_amount ) );
+   BOOST_CHECK_GT( get_balance( ted_id, a ) - before4, 0 );
+   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+   BOOST_TEST_MESSAGE( "" );
+   BOOST_TEST_MESSAGE( "  Einordnung: der entzogene Betrag faellt an den POOL, nicht an den" );
+   BOOST_TEST_MESSAGE( "  Angreifer -- der zahlt auf dem Hin- und Rueckweg zweimal die" );
+   BOOST_TEST_MESSAGE( "  Handelsgebuehr und geht hier mit Verlust heraus. Das ist" );
+   BOOST_TEST_MESSAGE( "  Schaedigung, nicht Abschoepfung, solange er nicht selbst Anteile" );
+   BOOST_TEST_MESSAGE( "  am Pool haelt. Die Untergrenze ist trotzdem richtig: wem der" );
+   BOOST_TEST_MESSAGE( "  Verlust zugutekommt, aendert nichts daran, dass der Auszahlende" );
+   BOOST_TEST_MESSAGE( "  ihn ungefragt traegt." );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE( stableswap_differential_tests )
+
+/**
+ * The constant-product swap path was REFACTORED when StableSwap was added: the two per-asset
+ * branches became one, with the curve chosen by pool type. The arithmetic was meant to be
+ * untouched, but "meant to be" is not evidence, and this is live consensus code that prices
+ * every existing pool on the chain.
+ *
+ * A mainnet replay cannot settle it -- liquidity pools postdate the block log available here,
+ * and the replay only checks serialisation anyway, never running an evaluator. So this
+ * compares the REAL evaluator against the formula as it stood before the refactor, over a
+ * wide spread of balances and trade sizes including the awkward corners: one-unit trades,
+ * trades that dwarf the pool, and extreme imbalance where the rounding decides the outcome.
+ *
+ * The reference below is master's expression, transcribed literally:
+ *
+ *     new_balance_b = ( virtual_value + new_balance_a - 1 ) / new_balance_a     // round up
+ *     delta         = balance_b - new_balance_b
+ */
+// No FC_LOG_AND_RETHROW here on purpose: its catch(...) turns a Boost REQUIRE failure into
+// "unknown type" with no indication of which case failed.
+BOOST_FIXTURE_TEST_CASE( constant_product_matches_the_pre_refactor_formula, database_fixture )
+{
+   // Liquidity pools do not exist before their hardfork; without this the very first
+   // create_liquidity_pool throws and the whole comparison never runs.
+   generate_blocks( HARDFORK_LIQUIDITY_POOL_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   // the historical expression, kept verbatim so a future edit to the evaluator has something
+   // independent to disagree with
+   auto reference_out = []( int64_t balance_in, int64_t balance_out, int64_t sold ) -> int64_t
+   {
+      const fc::uint128_t virtual_value = fc::uint128_t( balance_in ) * balance_out;
+      const int64_t new_in = balance_in + sold;
+      const fc::uint128_t new_out = ( virtual_value + new_in - 1 ) / new_in;   // round up
+      return static_cast<int64_t>( fc::uint128_t( balance_out ) - new_out );
+   };
+
+   struct { int64_t a, b, sell; } cases[] = {
+      {      1000,      1000,       1 },   // one unit in
+      {      1000,      1000,      10 },
+      {      1000,      1000,     999 },
+      {      1000,      1000,    5000 },   // trade dwarfs the pool
+      {         2,         2,       1 },   // smallest meaningful pool
+      {   1000000,         3,       1 },   // extreme imbalance, rounding decides
+      {         3,   1000000,       1 },
+      {   1000000,   1000000,       7 },
+      {  99999999,      1234,   45678 },   // nothing round about any of it
+      { 123456789, 987654321,       1 },
+      { 123456789, 987654321, 1000000 },
+   };
+
+   int checked = 0;
+   for( const auto& c : cases )
+   {
+      BOOST_TEST_MESSAGE( "case " + std::to_string( checked ) + ": a=" + std::to_string( c.a )
+                          + " b=" + std::to_string( c.b ) + " sell=" + std::to_string( c.sell ) );
+      // a fresh pool per case, so one case cannot contaminate the next
+      const std::string suffix = std::to_string( checked );
+      const asset_object& coin_a = create_user_issued_asset( "COINA" + suffix );
+      const asset_object& coin_b = create_user_issued_asset( "COINB" + suffix );
+      // the share asset must belong to the pool's creator, or create_liquidity_pool refuses it
+      const asset_object& share  = create_user_issued_asset( "SHARE" + suffix, sam,
+                                                             charge_market_fee );
+      const auto a_id = coin_a.get_id();
+      const auto b_id = coin_b.get_id();
+
+      issue_uia( sam, coin_a.amount( c.a ) );
+      issue_uia( sam, coin_b.amount( c.b ) );
+      issue_uia( ted, coin_a.amount( c.sell ) );
+
+      const auto& pool = create_liquidity_pool( sam_id, a_id, b_id, share.get_id(), 0, 0 );
+      const auto pool_id = pool.get_id();
+      deposit_to_liquidity_pool( sam_id, pool_id, coin_a.amount( c.a ), coin_b.amount( c.b ) );
+
+      // a taker fee of zero keeps this about the curve and nothing else
+      BOOST_REQUIRE_EQUAL( pool_id(db).balance_a.value, c.a );
+      BOOST_REQUIRE_EQUAL( pool_id(db).balance_b.value, c.b );
+
+      const int64_t expected = reference_out( c.a, c.b, c.sell );
+
+      if( expected <= 0 || expected >= c.b )
+      {
+         // the pre-refactor formula would drain or return nothing; the evaluator refuses such
+         // a trade, and agreeing that it is refused is itself the comparison
+         GRAPHENE_REQUIRE_THROW(
+            exchange_with_liquidity_pool( ted_id, pool_id, coin_a.amount( c.sell ),
+                                          coin_b.amount( 1 ) ), fc::exception );
+      }
+      else
+      {
+         auto result = exchange_with_liquidity_pool( ted_id, pool_id, coin_a.amount( c.sell ),
+                                                     coin_b.amount( 1 ) );
+         const int64_t got = ( c.b - pool_id(db).balance_b.value );
+         BOOST_CHECK_MESSAGE( got == expected,
+            "balances (" + std::to_string(c.a) + "," + std::to_string(c.b) + ") selling "
+            + std::to_string(c.sell) + ": evaluator paid " + std::to_string(got)
+            + ", pre-refactor formula says " + std::to_string(expected) );
+
+         // and the invariant may only ever grow, never shrink: that is what stops a sequence
+         // of small trades extracting value the curve did not intend to give
+         const fc::uint128_t before = fc::uint128_t( c.a ) * c.b;
+         const fc::uint128_t after  = fc::uint128_t( pool_id(db).balance_a.value )
+                                    * pool_id(db).balance_b.value;
+         BOOST_CHECK_MESSAGE( after >= before,
+            "invariant shrank for balances (" + std::to_string(c.a) + ","
+            + std::to_string(c.b) + ")" );
+      }
+      ++checked;
+   }
+   BOOST_CHECK_EQUAL( checked, 11 );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE( stableswap_fuzz_tests )
+
+/**
+ * The StableSwap curve is solved by Newton's method over integers, and integer Newton has two
+ * ways to hurt a chain that the hand-picked cases elsewhere in this file cannot rule out:
+ *
+ *   1. it fails to converge for some balance/amplification combination, permanently bricking
+ *      a pool that was legal to create; and
+ *   2. it converges, but rounds the wrong way often enough that a trader can grind value out
+ *      of the pool one unit at a time.
+ *
+ * Both are properties of the whole input space, not of any one case, so these tests sweep it
+ * pseudo-randomly with a FIXED seed -- a failure here reproduces exactly rather than being a
+ * story about a build that once went red.
+ *
+ * These operate on the header's pure functions, mirroring the evaluator's arithmetic, so they
+ * can run hundreds of thousands of cases. The evaluator-level behaviour is covered by
+ * stableswap_exchange_test; what is under test here is the maths beneath it.
+ */
+namespace {
+
+/// The evaluator's stable-pool swap, fees removed so that only rounding decides the result.
+/// Kept deliberately parallel to liquidity_pool_evaluator.cpp -- if that rounding changes,
+/// this must change with it, and the tests below say what the change is allowed to cost.
+/// Returns the amount paid out, or -1 for a trade the evaluator would have rejected.
+int64_t ss_swap_out( int64_t y, uint64_t amp, int64_t new_x, const fc::uint128_t& d )
+{
+   const fc::uint128_t new_x128( new_x );
+   fc::uint128_t new_y = stableswap::compute_new_y( new_x128, d, amp );
+   new_y += 1;                                     // unconditionally in the pool's favour
+   if( new_y > fc::uint128_t( y ) )
+      new_y = fc::uint128_t( y );
+   return static_cast<int64_t>( fc::uint128_t( y ) - new_y );
+}
+
+} // namespace
+
+/**
+ * D must exist for every pool the protocol allows, and must sit between the two curves it
+ * interpolates: the constant-product invariant 2*sqrt(x*y) at A -> 0, and the constant-sum
+ * invariant x+y at A -> infinity. A D outside that band is not a rounding wobble, it means
+ * the solver converged on the wrong root.
+ */
+BOOST_AUTO_TEST_CASE( d_converges_and_stays_between_the_two_curves )
+{
+   std::mt19937_64 rng( 20260821 );               // fixed seed: failures must reproduce
+   const int64_t max_balance = GRAPHENE_MAX_SHARE_SUPPLY;
+
+   int checked = 0;
+   for( int i = 0; i < 200000; ++i )
+   {
+      // Log-uniform over the whole legal range, so tiny pools are sampled as densely as
+      // huge ones; uniform sampling would spend every case in the top decade.
+      auto log_uniform = [&]( int64_t hi ) -> int64_t
+      {
+         const int bits = 1 + static_cast<int>( rng() % 62 );
+         int64_t v = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1;
+         return v > hi ? hi : v;
+      };
+
+      const int64_t x = log_uniform( max_balance );
+      const int64_t y = log_uniform( max_balance );
+      const uint64_t amp = 1 + rng() % 1000000;
+
+      fc::uint128_t d;
+      BOOST_REQUIRE_NO_THROW( d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp ) );
+
+      const boost::multiprecision::uint256_t prod =
+            boost::multiprecision::uint256_t( x ) * boost::multiprecision::uint256_t( y );
+      const boost::multiprecision::uint256_t lower = 2 * boost::multiprecision::sqrt( prod );
+      const boost::multiprecision::uint256_t upper =
+            boost::multiprecision::uint256_t( x ) + boost::multiprecision::uint256_t( y );
+      const boost::multiprecision::uint256_t d256( d );
+
+      // One unit of slack at each end: Newton stops at a difference of <= 1.
+      BOOST_REQUIRE_MESSAGE( d256 + 1 >= lower && d256 <= upper + 1,
+                             "D out of band for x=" << x << " y=" << y << " amp=" << amp
+                             << ": D=" << d256 << " not in [" << lower << ", " << upper << "]" );
+      ++checked;
+   }
+   BOOST_CHECK_EQUAL( checked, 200000 );
+}
+
+/**
+ * The safety property the whole pool rests on: a swap may never lower D. D is what every
+ * liquidity provider's share is denominated in, so a swap that reduces it takes value from
+ * the providers and hands it to the trader. Rounding must always fall the pool's way.
+ */
+BOOST_AUTO_TEST_CASE( a_swap_never_lowers_d )
+{
+   std::mt19937_64 rng( 20260822 );
+
+   int checked = 0, rejected = 0;
+   for( int i = 0; i < 100000; ++i )
+   {
+      const int bits_x = 4 + static_cast<int>( rng() % 50 );
+      const int bits_y = 4 + static_cast<int>( rng() % 50 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits_x ) ) + 2;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits_y ) ) + 2;
+      const uint64_t amp = 1 + rng() % 100000;
+
+      // Trade sizes from a single unit (where rounding dominates) up to several times the
+      // pool (where the curve is at its most extreme).
+      const int64_t dx = 1 + static_cast<int64_t>( rng() % static_cast<uint64_t>( 4 * x ) );
+      if( x > GRAPHENE_MAX_SHARE_SUPPLY - dx )
+         continue;
+
+      const int64_t new_x = x + dx;
+
+      // Every solver call stays inside this guard on purpose: fc::exception does not derive
+      // from std::exception, so one escaping here is reported by Boost as a bare "unknown
+      // type" with none of the inputs echoed, which is the least useful failure possible.
+      fc::uint128_t d, d_after;
+      int64_t out;
+      try
+      {
+         d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+         out = ss_swap_out( y, amp, new_x, d );
+         if( out < 0 )
+         {
+            ++rejected;
+            continue;
+         }
+         BOOST_REQUIRE_MESSAGE( out <= y - 1,
+                                "swap drained the pool: x=" << x << " y=" << y << " amp=" << amp
+                                << " dx=" << dx << " out=" << out );
+         d_after = stableswap::compute_d( fc::uint128_t( new_x ), fc::uint128_t( y - out ), amp );
+      }
+      catch( const fc::exception& )
+      {
+         ++rejected;                               // a trade the chain refuses is not a loss
+         continue;
+      }
+
+      BOOST_REQUIRE_MESSAGE( d_after >= d,
+                             "D fell across a swap: x=" << x << " y=" << y << " amp=" << amp
+                             << " dx=" << dx << " out=" << out
+                             << " D=" << boost::multiprecision::uint256_t( d )
+                             << " -> " << boost::multiprecision::uint256_t( d_after ) );
+      ++checked;
+   }
+   BOOST_TEST_MESSAGE( "a_swap_never_lowers_d: " << checked << " swaps checked, "
+                       << rejected << " rejected by the evaluator's own guards" );
+   BOOST_CHECK_GT( checked, 50000 );
+}
+
+/**
+ * The grind attack, stated directly: swap one way, swap straight back, and you must not come
+ * out ahead. Rounding errors that individually look like a single unit are only harmless if
+ * they cannot be repeated, so this also runs the round trip in a loop against one pool and
+ * checks the attacker's balance never rises above where it started.
+ */
+BOOST_AUTO_TEST_CASE( round_trips_cannot_extract_value )
+{
+   std::mt19937_64 rng( 20260823 );
+
+   // --- single round trips across a wide spread of pools -------------------------------
+   int checked = 0;
+   for( int i = 0; i < 50000; ++i )
+   {
+      const int bits = 8 + static_cast<int>( rng() % 44 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 100;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 100;
+      const uint64_t amp = 1 + rng() % 100000;
+      const int64_t dx = 1 + static_cast<int64_t>( rng() % static_cast<uint64_t>( x ) );
+
+      try
+      {
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+         const int64_t out = ss_swap_out( y, amp, x + dx, d );
+         if( out <= 0 )
+            continue;
+
+         // Sell the proceeds straight back into the pool it just came from.
+         const int64_t x2 = x + dx, y2 = y - out;
+         const fc::uint128_t d2 = stableswap::compute_d( fc::uint128_t( x2 ), fc::uint128_t( y2 ), amp );
+         const int64_t back = ss_swap_out( x2, amp, y2 + out, d2 );
+         if( back < 0 )
+            continue;
+
+         // Exactly, not approximately: the evaluator rounds every payout in the pool's
+         // favour, so a round trip can never return more than it cost. This assertion is
+         // the reason that rule exists -- before it, this line caught a trader coming back
+         // a unit up on x=159 y=141 amp=72554 dx=103, which repeated into a real drain.
+         BOOST_REQUIRE_MESSAGE( back <= dx,
+                                "round trip returned more than it cost: x=" << x
+                                << " y=" << y << " amp=" << amp << " dx=" << dx
+                                << " back=" << back );
+         ++checked;
+      }
+      catch( const fc::exception& )
+      {
+         continue;
+      }
+   }
+   BOOST_CHECK_GT( checked, 20000 );
+
+   // --- the same pool, ground repeatedly ------------------------------------------------
+   // A one-unit-per-trip leak only matters if it can be repeated, so repeat it.
+   struct { int64_t x, y; uint64_t amp; int64_t trade; } grinds[] = {
+      {      1000000,      1000000,     100,      1 },   // minimum trade, balanced pool
+      {      1000000,      1000000,   10000,      1 },   // high amplification, flattest curve
+      {      1000000,      1000000,       1,      1 },   // amplification floor
+      {      1000000,       999999,     100,      1 },   // barely imbalanced
+      {   1000000000,         1000,     100,      1 },   // extreme imbalance
+      {      1000000,      1000000,     100,   1000 },
+   };
+
+   for( const auto& g : grinds )
+   {
+      int64_t x = g.x, y = g.y;
+      int64_t attacker_a = 1000000000, attacker_b = 0;
+      const int64_t start_a = attacker_a;
+
+      for( int round = 0; round < 500; ++round )
+      {
+         if( g.trade > attacker_a )
+            break;
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), g.amp );
+         const int64_t out = ss_swap_out( y, g.amp, x + g.trade, d );
+         if( out <= 0 )
+            break;
+         attacker_a -= g.trade; attacker_b += out;
+         x += g.trade;          y -= out;
+
+         const fc::uint128_t d2 = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), g.amp );
+         const int64_t back = ss_swap_out( x, g.amp, y + attacker_b, d2 );
+         if( back <= 0 )
+            break;
+         y += attacker_b;       x -= back;
+         attacker_a += back;    attacker_b = 0;
+
+         BOOST_REQUIRE_MESSAGE( attacker_a <= start_a,
+                                "grind profited after " << round << " rounds: pool began x="
+                                << g.x << " y=" << g.y << " amp=" << g.amp << " trade=" << g.trade
+                                << "; attacker " << start_a << " -> " << attacker_a );
+      }
+   }
+}
+
+/**
+ * Selling more must never pay out less. A non-monotonic curve would let a trader improve
+ * their fill by splitting or padding an order, which is both a mispricing and a way to
+ * probe for the rounding steps the test above is guarding.
+ */
+BOOST_AUTO_TEST_CASE( output_is_monotonic_in_input )
+{
+   std::mt19937_64 rng( 20260824 );
+
+   int checked = 0;
+   for( int i = 0; i < 20000; ++i )
+   {
+      const int bits = 10 + static_cast<int>( rng() % 40 );
+      const int64_t x = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1000;
+      const int64_t y = static_cast<int64_t>( rng() % ( 1ULL << bits ) ) + 1000;
+      const uint64_t amp = 1 + rng() % 100000;
+
+      try
+      {
+         const fc::uint128_t d = stableswap::compute_d( fc::uint128_t( x ), fc::uint128_t( y ), amp );
+
+         int64_t prev_out = -1;
+         for( int step = 0; step < 12; ++step )
+         {
+            const int64_t dx = ( 1LL << step );
+            if( x > GRAPHENE_MAX_SHARE_SUPPLY - dx )
+               break;
+            const int64_t out = ss_swap_out( y, amp, x + dx, d );
+            if( out < 0 )
+               break;
+            BOOST_REQUIRE_MESSAGE( out >= prev_out,
+                                   "output fell as input rose: x=" << x << " y=" << y
+                                   << " amp=" << amp << " dx=" << dx
+                                   << " out=" << out << " < previous " << prev_out );
+            prev_out = out;
+         }
+         ++checked;
+      }
+      catch( const fc::exception& )
+      {
+         continue;
+      }
+   }
+   BOOST_CHECK_GT( checked, 10000 );
+}
+
+/**
+ * validate() accepts any amplification above zero, so a pool can be created with one far
+ * outside the range StableSwap is normally parameterised for. Whatever the solver does with
+ * those, it must be a clean rejection and not a hang, a wrap, or a wrong answer -- a pool
+ * that cannot be traded is bad, but a pool that prices wrongly is worse.
+ */
+BOOST_AUTO_TEST_CASE( extreme_amplification_is_handled_cleanly )
+{
+   const uint64_t amps[] = {
+      1, 2, 1000000, 1000000000ULL, 1000000000000ULL,
+      uint64_t( 1 ) << 40, uint64_t( 1 ) << 50, uint64_t( 1 ) << 60,
+      std::numeric_limits<uint64_t>::max() / 4,
+      std::numeric_limits<uint64_t>::max()
+   };
+   const int64_t balances[][2] = {
+      { 1000, 1000 }, { 1000000, 1000000 }, { 1, 1 },
+      { GRAPHENE_MAX_SHARE_SUPPLY, GRAPHENE_MAX_SHARE_SUPPLY },
+      { GRAPHENE_MAX_SHARE_SUPPLY, 1 }
+   };
+
+   int converged = 0, refused = 0;
+   for( uint64_t amp : amps )
+      for( const auto& b : balances )
+      {
+         fc::uint128_t d;
+         bool ok = true;
+         try
+         {
+            d = stableswap::compute_d( fc::uint128_t( b[0] ), fc::uint128_t( b[1] ), amp );
+         }
+         catch( const fc::exception& )
+         {
+            ok = false;                            // refusing is acceptable; wrapping is not
+         }
+         if( !ok )
+         {
+            ++refused;
+            continue;
+         }
+         // If it did converge, the answer still has to be in band.
+         const boost::multiprecision::uint256_t upper =
+               boost::multiprecision::uint256_t( b[0] ) + boost::multiprecision::uint256_t( b[1] );
+         BOOST_CHECK_MESSAGE( boost::multiprecision::uint256_t( d ) <= upper + 1,
+                              "D exceeded x+y at amp=" << amp
+                              << " for x=" << b[0] << " y=" << b[1] );
+         ++converged;
+      }
+   BOOST_TEST_MESSAGE( "extreme_amplification: " << converged << " converged, "
+                       << refused << " refused" );
+   BOOST_CHECK_GT( converged, 0 );
+}
+
+/**
+ * Regression: heavily imbalanced pools used to make Newton cycle rather than converge, and
+ * compute_d threw "StableSwap D did not converge" for balances that are entirely legal. The
+ * iterates in those cycles sit within about one part in 10^10 of each other -- the answer was
+ * there, the stop condition just could not see it.
+ *
+ * Every case below was produced by the fuzzers above and threw before limit-cycle detection
+ * was added. They are pinned here by value so the failure cannot come back quietly: the
+ * fuzzers would find it again, but only as a random case with no history attached.
+ */
+BOOST_AUTO_TEST_CASE( imbalanced_pools_that_used_to_cycle_forever )
+{
+   struct { int64_t x, y; uint64_t amp; } cases[] = {
+      {  22081886358008,     6, 145046 },   // cycle length 2
+      { 698095958805215,     2, 685479 },   // cycle length 4
+      {    276344005464,   130, 903521 },
+      {  44459310978557,    21, 329861 },
+      {  21069301701155, 93099,  38032 },
+      {     45312411853,     6, 868284 },
+      {  12906206037633,    30, 955141 },
+      {  95887410913181,   184, 211893 },
+      {  34322364307006,     3, 976389 },   // cycle length 9
+      { 420124979824210,    43, 390570 },   // cycle length 11
+      {   3505223116620,     2, 198009 },
+      { 120775533911346,   962, 723402 },
+      { 256155875671515,    15, 530124 },
+   };
+
+   for( const auto& c : cases )
+   {
+      fc::uint128_t d;
+      BOOST_REQUIRE_NO_THROW(
+         d = stableswap::compute_d( fc::uint128_t( c.x ), fc::uint128_t( c.y ), c.amp ) );
+
+      const boost::multiprecision::uint256_t prod =
+            boost::multiprecision::uint256_t( c.x ) * boost::multiprecision::uint256_t( c.y );
+      const boost::multiprecision::uint256_t lower = 2 * boost::multiprecision::sqrt( prod );
+      const boost::multiprecision::uint256_t upper =
+            boost::multiprecision::uint256_t( c.x ) + boost::multiprecision::uint256_t( c.y );
+      const boost::multiprecision::uint256_t d256( d );
+      BOOST_REQUIRE_MESSAGE( d256 + 1 >= lower && d256 <= upper + 1,
+                             "resolved D out of band for x=" << c.x << " y=" << c.y
+                             << " amp=" << c.amp << ": " << d256 );
+
+      // Deterministic: consensus needs every node to pick the same member of the cycle.
+      const fc::uint128_t again =
+            stableswap::compute_d( fc::uint128_t( c.x ), fc::uint128_t( c.y ), c.amp );
+      BOOST_REQUIRE( again == d );
+   }
+}
+
+/**
+ * Pin the evaluator to the header maths, end to end.
+ *
+ * The existing stableswap_exchange_test asserts only relations -- the stable curve pays more
+ * than constant product, D does not fall -- so a change of one unit in the payout slips
+ * straight through it. That is not hypothetical: the pool-favouring rounding rule this test
+ * exists to pin was introduced precisely because the alternative leaked a unit per round
+ * trip, and the relational test could not tell the two rules apart.
+ *
+ * So compute the expected payout independently, from the header's own solver plus the rule
+ * as stated, and require the real exchange operation to match it exactly.
+ */
+BOOST_FIXTURE_TEST_CASE( evaluator_payout_matches_the_pool_favouring_rule, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+
+   const int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   fund( sam, asset( init_amount ) );
+   fund( ted, asset( init_amount ) );
+
+   const asset_object& usd = create_user_issued_asset( "SXRUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "SXREUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "SXRSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+
+   issue_uia( sam, usd.amount( init_amount ) );
+   issue_uia( sam, eur.amount( init_amount ) );
+   issue_uia( ted, usd.amount( init_amount ) );
+   issue_uia( ted, eur.amount( init_amount ) );
+
+   const uint64_t amp = 100;
+   const int64_t liq = 1000000;
+
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, amp );
+   const liquidity_pool_id_type pool = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pool, asset( liq, a ), asset( liq, b ) );
+
+   // A spread of trade sizes, including the one-unit case where the rounding rule is the
+   // entire answer, and sizes that leave the pool progressively more imbalanced.
+   const int64_t sells[] = { 1, 2, 7, 100, 4321, 100000, 250000 };
+
+   int exercised = 0;
+   for( int64_t sell : sells )
+   {
+      const share_type bal_a = pool( db ).balance_a;
+      const share_type bal_b = pool( db ).balance_b;
+      const fc::uint128_t d  = pool( db ).virtual_value;
+
+      // Selling asset a, so a is the in-asset and b is the out-asset.
+      const fc::uint128_t new_in( bal_a.value + sell );
+      fc::uint128_t expected_out_balance = stableswap::compute_new_y( new_in, d, amp );
+      expected_out_balance += 1;                        // the rule under test
+      if( expected_out_balance > fc::uint128_t( bal_b.value ) )
+         expected_out_balance = fc::uint128_t( bal_b.value );
+      const int64_t expected =
+            static_cast<int64_t>( fc::uint128_t( bal_b.value ) - expected_out_balance );
+
+      if( expected <= 0 )
+         continue;                                      // min_to_receive would reject it
+
+      const generic_exchange_operation_result res =
+            exchange_with_liquidity_pool( ted_id, pool, asset( sell, a ), asset( 1, b ) );
+      const int64_t got = res.received.front().amount.value;
+
+      BOOST_CHECK_MESSAGE( got == expected,
+                           "payout disagrees with the header maths for sell=" << sell
+                           << ": evaluator paid " << got << ", rule says " << expected );
+
+      // And the invariant it is all supposed to protect.
+      BOOST_CHECK( pool( db ).virtual_value >= d );
+      ++exercised;
+   }
+
+   // Guard against the whole loop quietly skipping: a test that checks nothing passes too.
+   BOOST_CHECK_GE( exercised, 4 );
+}
+
+
+/**
+ * A stable pool takes liquidity in any proportion, and charges for the imbalance.
+ *
+ * This is the property that makes a StableSwap pool one as an LP venue rather than merely one
+ * as a pricing curve. The proportional path used for constant-product pools cannot express it:
+ * it takes the limiting side and quietly leaves the rest of the deposit with the depositor, so
+ * putting in 1,000,000 of one asset and a token amount of the other deposits almost nothing.
+ *
+ * The fee is what stops it being a free swap. Without it, depositing one side and withdrawing
+ * proportionally would trade around the pool's own trading fee -- so the second test here is
+ * the one that matters, and it is an economic assertion, not an arithmetic one.
+ *
+ * Note the one-unit floor on the thin side: liquidity_pool_deposit_operation::validate()
+ * requires both amounts positive, and relaxing that would make transactions that every existing
+ * node rejects suddenly valid, with no hardfork gate to hide behind. One unit is the smallest
+ * amount the operation admits and is indistinguishable from zero for any real deposit.
+ */
+BOOST_FIXTURE_TEST_CASE( a_stable_pool_accepts_an_imbalanced_deposit, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "IMBUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "IMBEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "IMBSLP", sam, 0 );
+   const asset_object& clp = create_user_issued_asset( "IMBCLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+
+   // 0.3% trading fee, so the imbalance fee is a real number rather than zero.
+   const liquidity_pool_object& s_lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto s_id = s_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+   const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 30, 0 );
+   const auto c_id = c_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+
+   // Heavily one-sided: a lot of A, the smallest admissible amount of B.
+   const int64_t lopsided = 100000;
+
+   const auto s_before_a = s_id(db).balance_a;
+   const auto s_res = deposit_to_liquidity_pool( ted_id, s_id, asset( lopsided, a ), asset( 1, b ) );
+   const int64_t s_shares = s_res.received.front().amount.value;
+
+   // The whole deposit was taken, not the limiting share of it.
+   BOOST_CHECK_EQUAL( ( s_id(db).balance_a - s_before_a ).value, lopsided );
+   BOOST_CHECK_GT( s_shares, 0 );
+
+   // The constant-product pool takes the limiting side, which for this deposit is almost
+   // nothing -- the contrast is the whole point.
+   const auto c_before_a = c_id(db).balance_a;
+   deposit_to_liquidity_pool( ted_id, c_id, asset( lopsided, a ), asset( 1, b ) );
+   BOOST_CHECK_MESSAGE( ( c_id(db).balance_a - c_before_a ).value < lopsided / 100,
+                        "the constant-product pool took "
+                        << ( c_id(db).balance_a - c_before_a ).value
+                        << " of a " << lopsided << " deposit, so there is nothing to contrast" );
+}
+
+/// The imbalance fee has to make a round trip cost something. Deposit one-sided, withdraw
+/// proportionally, and you must not come out ahead -- otherwise it is a swap that skips the
+/// pool's trading fee, which is the whole reason Curve charges for imbalance.
+BOOST_FIXTURE_TEST_CASE( an_imbalanced_deposit_is_not_a_free_swap, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) );
+   fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "SWPUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "SWPEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "SWPSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const auto ted_a_before = get_balance( ted_id, a );
+   const auto ted_b_before = get_balance( ted_id, b );
+
+   const int64_t lopsided = 100000;
+   const auto res = deposit_to_liquidity_pool( ted_id, pid, asset( lopsided, a ), asset( 1, b ) );
+   const auto shares = res.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   withdraw_from_liquidity_pool( ted_id, pid, shares );
+
+   const auto gained_a = get_balance( ted_id, a ) - ted_a_before;
+   const auto gained_b = get_balance( ted_id, b ) - ted_b_before;
+
+   // Ted put in `lopsided` of A and 1 of B. Whatever mix he gets back, valuing the two sides
+   // one-for-one -- which is what a stable pool asserts they are worth -- he must be down.
+   const int64_t net = gained_a + gained_b;
+   BOOST_CHECK_MESSAGE( net < 0,
+                        "a one-sided deposit and proportional withdrawal netted "
+                        << net << ", which is a swap that skipped the trading fee" );
+}
+
+
+/**
+ * A stable pool can pay a withdrawal entirely in one asset.
+ *
+ * The invariant is what makes this answerable: burning shares shrinks D in proportion, and
+ * solving for where the taken side must sit at the smaller D -- with the other side untouched
+ * -- says exactly how much of one asset those shares are worth. A constant-product pool has no
+ * such answer that is not simply a swap, so it is refused rather than approximated.
+ *
+ * It pays the same imbalance fee a one-sided deposit does, and for the same reason: without it,
+ * depositing one side and withdrawing the other is a swap that never touched the trading fee.
+ * That round trip is the second test, and it is the one that matters.
+ */
+BOOST_FIXTURE_TEST_CASE( a_stable_pool_can_pay_a_withdrawal_in_one_asset, database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "ONEUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "ONEEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "ONESLP", sam, 0 );
+   const asset_object& clp = create_user_issued_asset( "ONECLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& s_lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto s_id = s_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, s_id, asset( liq, a ), asset( liq, b ) );
+
+   // Ted takes a balanced stake, then exits entirely into A.
+   const auto in = deposit_to_liquidity_pool( ted_id, s_id, asset( 100000, a ), asset( 100000, b ) );
+   const auto shares = in.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   const auto b_before = get_balance( ted_id, b );
+   const auto a_before = get_balance( ted_id, a );
+
+   liquidity_pool_withdraw_operation wop;
+   wop.account      = ted_id;
+   wop.pool         = s_id;
+   wop.share_amount = shares;
+   wop.extensions.value.withdraw_one_asset = a;
+   signed_transaction tx;
+   tx.operations.push_back( wop );
+   db.current_fee_schedule().set_fee( tx.operations.back() );
+   set_expiration( db, tx );
+   tx.sign( ted_private_key, db.get_chain_id() );
+   PUSH_TX( db, tx );
+
+   // Everything came back in A, and nothing in B.
+   BOOST_CHECK_EQUAL( get_balance( ted_id, b ) - b_before, 0 );
+   const auto got_a = get_balance( ted_id, a ) - a_before;
+   BOOST_CHECK_GT( got_a, 0 );
+
+   // He put in 100k of each and took it all out in A, so he should be near 200k of A but
+   // short of it: the pool charged him for pushing itself out of balance.
+   BOOST_CHECK_MESSAGE( got_a < 200000,
+                        "a one-sided exit returned " << got_a
+                        << " of A for a 100k+100k stake, which is not paying for the imbalance" );
+   BOOST_CHECK_MESSAGE( got_a > 190000,
+                        "a one-sided exit returned only " << got_a
+                        << " of A, which is far more than an imbalance fee" );
+
+   // A constant-product pool has no invariant to answer this with, so it must refuse.
+   const liquidity_pool_object& c_lpo = create_liquidity_pool( sam_id, a, b, clp.get_id(), 30, 0 );
+   const auto c_id = c_lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, c_id, asset( liq, a ), asset( liq, b ) );
+   const auto c_in = deposit_to_liquidity_pool( ted_id, c_id, asset( 1000, a ), asset( 1000, b ) );
+
+   liquidity_pool_withdraw_operation cop;
+   cop.account      = ted_id;
+   cop.pool         = c_id;
+   cop.share_amount = c_in.received.front();
+   cop.extensions.value.withdraw_one_asset = a;
+   signed_transaction ctx2;
+   ctx2.operations.push_back( cop );
+   db.current_fee_schedule().set_fee( ctx2.operations.back() );
+   set_expiration( db, ctx2 );
+   ctx2.sign( ted_private_key, db.get_chain_id() );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, ctx2 ), fc::exception );
+}
+
+/// Deposit one side, withdraw the other. If that came out ahead it would be a swap that never
+/// paid the trading fee, which is the entire reason both sides charge for imbalance.
+BOOST_FIXTURE_TEST_CASE( depositing_one_side_and_withdrawing_the_other_is_not_free,
+                         database_fixture )
+{
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (sam)(ted) );
+   const int64_t huge = 1000000000000LL;
+   fund( sam, asset(huge) ); fund( ted, asset(huge) );
+
+   const asset_object& usd = create_user_issued_asset( "RTUSD", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& eur = create_user_issued_asset( "RTEUR", sam, 0,
+                                   price( asset( 1, asset_id_type( 1 ) ), asset( 1 ) ), 4 );
+   const asset_object& slp = create_user_issued_asset( "RTSLP", sam, 0 );
+
+   const asset_id_type a = std::min( usd.get_id(), eur.get_id() );
+   const asset_id_type b = std::max( usd.get_id(), eur.get_id() );
+   issue_uia( sam, usd.amount( huge ) ); issue_uia( sam, eur.amount( huge ) );
+   issue_uia( ted, usd.amount( huge ) ); issue_uia( ted, eur.amount( huge ) );
+
+   const int64_t liq = 1000000;
+   const liquidity_pool_object& lpo =
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 30, 0, 100 );
+   const auto pid = lpo.get_id();
+   deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
+
+   const auto a_before = get_balance( ted_id, a );
+   const auto b_before = get_balance( ted_id, b );
+
+   // In on the A side...
+   const int64_t lopsided = 100000;
+   const auto in = deposit_to_liquidity_pool( ted_id, pid, asset( lopsided, a ), asset( 1, b ) );
+   const auto shares = in.received.front();
+   BOOST_REQUIRE_GT( shares.amount.value, 0 );
+
+   // ...and out on the B side. This is a swap dressed as liquidity provision.
+   liquidity_pool_withdraw_operation wop;
+   wop.account      = ted_id;
+   wop.pool         = pid;
+   wop.share_amount = shares;
+   wop.extensions.value.withdraw_one_asset = b;
+   signed_transaction tx;
+   tx.operations.push_back( wop );
+   db.current_fee_schedule().set_fee( tx.operations.back() );
+   set_expiration( db, tx );
+   tx.sign( ted_private_key, db.get_chain_id() );
+   PUSH_TX( db, tx );
+
+   const int64_t net = ( get_balance( ted_id, a ) - a_before )
+                     + ( get_balance( ted_id, b ) - b_before );
+   BOOST_CHECK_MESSAGE( net < 0,
+                        "in on one side and out on the other netted " << net
+                        << ", so it is a swap that skipped the trading fee" );
+}
+
+
+/**
+ * OEKONOMIE: wie bricht die Kurve, wenn ein Asset seinen Peg verliert?
+ *
+ * Der vorhandene Test deckt die numerische Robustheit von A bis uint64_t::max() ab. Was er
+ * nicht sagt, ist das wirtschaftliche Verhalten: eine Stable-Kurve haelt den Kurs flach,
+ * SOLANGE der Pool halbwegs ausgewogen ist, und faellt danach steil ab. Wo dieser Knick
+ * liegt, entscheidet daruber, ab wann Liquiditaetsgeber bei einem Depeg Geld verlieren --
+ * und das ist die Zahl, die eine Dimensionierung braucht.
+ *
+ * Gemessen an der reinen Funktion, nicht am Pool: so ist das Ergebnis frei von Gebuehren
+ * und Rundung der Evaluatoren und zeigt allein die Kurve.
+ */
+BOOST_AUTO_TEST_CASE( measure_how_the_stable_curve_degrades_under_depeg )
+{
+   const uint64_t amp = 100;
+   const int64_t start = 1000000;      // 1:1 ausgewogen
+
+   BOOST_TEST_MESSAGE( "  Pool 1.000.000 / 1.000.000, A = " << amp );
+   BOOST_TEST_MESSAGE( "  Ungleichgewicht -> was 10.000 des reichlichen Assets einbringen" );
+
+   int64_t x = start, y = start;
+   const fc::uint128_t d = stableswap::compute_d( fc::uint128_t(x), fc::uint128_t(y), amp );
+
+   int knee = 0;
+   for( int pct = 10; pct <= 90; pct += 10 )
+   {
+      // Pool auf pct% Ungleichgewicht bringen: x waechst, y schrumpft, D bleibt.
+      const int64_t xi = start + start * pct / 100;
+      const fc::uint128_t yi = stableswap::compute_new_y( fc::uint128_t(xi), d, amp );
+      if( yi == 0 ) { BOOST_TEST_MESSAGE( "  " << pct << "%  Pool erschoepft" ); break; }
+
+      // Was bringt ein Tausch von 10.000 x an dieser Stelle?
+      const fc::uint128_t y_after =
+            stableswap::compute_new_y( fc::uint128_t(xi + 10000), d, amp );
+      const int64_t out = static_cast<int64_t>( yi - y_after );
+
+      BOOST_TEST_MESSAGE( "  " << pct << "%  y=" << static_cast<int64_t>(yi)
+                          << "  10.000 x -> " << out << " y" );
+      // Der Knick: das erste Mal, dass ein Tausch weniger als 90% des Nennwerts bringt.
+      if( 0 == knee && out < 9000 ) knee = pct;
+   }
+
+   BOOST_TEST_MESSAGE( "  ==> unter 90% Auszahlung ab " << knee << "% Ungleichgewicht" );
+   // Der Zweck der flachen Kurve ist, das lange durchzuhalten. Bricht sie schon unter 30%,
+   // schuetzt A=100 nicht mehr als eine Constant-Product-Kurve und ist Etikettenschwindel.
+   BOOST_CHECK_MESSAGE( 0 == knee || knee >= 30,
+                        "Stable-Kurve faellt bereits bei " + std::to_string( knee )
+                        + "% Ungleichgewicht unter 90% Auszahlung" );
+}
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -2,7 +2,7 @@ name: Docker
 on: [ push, pull_request ]
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Decide whether to push to DockerHub, and set tag
       if: |
