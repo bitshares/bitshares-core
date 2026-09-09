@@ -2,6 +2,10 @@
 FROM phusion/baseimage:noble-1.0.2 AS build
 ENV LANG=en_US.UTF-8
 
+ENV CCACHE_DIR=/ccache
+ENV CCACHE_COMPRESS=true
+ENV CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime,time_macros
+
 # Install dependencies
 RUN \
     apt-get update && \
@@ -12,6 +16,7 @@ RUN \
       autoconf \
       cmake \
       git \
+      ccache \
       libbz2-dev \
       libzstd-dev \
       liblzma-dev \
@@ -32,16 +37,16 @@ RUN \
       libboost-coroutine-dev \
       libtool \
       doxygen \
-      ca-certificates \
-    && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+      ca-certificates
 
 ADD . /bitshares-core
 WORKDIR /bitshares-core
 
+RUN mkdir -p /ccache
+
 # Compile
-RUN \
+RUN --mount=type=cache,id=cpp-ccache,target=/ccache \
+    ccache --show-stats && \
     ( git submodule sync --recursive || \
       find `pwd`  -type f -name .git | \
 	while read f; do \
@@ -52,9 +57,12 @@ RUN \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
 	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
     make witness_node cli_wallet get_dev_key && \
+    ccache --show-stats && \
     install -s programs/witness_node/witness_node \
                programs/genesis_util/get_dev_key \
                programs/cli_wallet/cli_wallet \
@@ -62,9 +70,7 @@ RUN \
     #
     # Obtain version
     mkdir -p /etc/bitshares && \
-    git rev-parse --short HEAD > /etc/bitshares/version && \
-    cd / && \
-    rm -rf /bitshares-core
+    git rev-parse --short HEAD > /etc/bitshares/version
 
 # The final image
 FROM phusion/baseimage:noble-1.0.2

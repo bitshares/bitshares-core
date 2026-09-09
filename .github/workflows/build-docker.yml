@@ -31,8 +31,30 @@ jobs:
       run: echo "${DOCKER_PUSH_TAG}"
     - name: Checkout
       uses: actions/checkout@v7
+    - name: Extract base image from Dockerfile
+      id: get_base_image
+      shell: bash
+      run: echo "base-image=`grep -i 'FROM' Dockerfile | grep -i 'AS build' | awk '{print $2}' | sed s/:/-/g`" >> "$GITHUB_OUTPUT"
+    - name: Load Cache
+      uses: actions/cache@v6
+      id: cache
+      with:
+        path: ccache
+        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-
+          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-
+    - name: Make sure the cache dir exists
+      run: mkdir -p ccache
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
+      id: setup-buildx
+    - name: Restore Docker cache mounts
+      uses: reproducible-containers/buildkit-cache-dance@v3
+      with:
+        builder: ${{ steps.setup-buildx.outputs.name }}
+        cache-dir: ccache
+        dockerfile: Dockerfile
     - name: Build only
       uses: docker/build-push-action@v7
       with:
