@@ -19,7 +19,7 @@ jobs:
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
       id: cache-libs
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: libs
         key: mingw64-libs-${{ env.OS_VERSION }}-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
@@ -119,7 +119,7 @@ jobs:
     - run: |
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load external libraries
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: libs
         key: mingw64-libs-${{ env.OS_VERSION }}-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
@@ -143,7 +143,7 @@ jobs:
               -D GRAPHENE_DISABLE_UNITY_BUILD=ON \
               ..
     - name: Load Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: ccache
         key: ccache-mingw64-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}

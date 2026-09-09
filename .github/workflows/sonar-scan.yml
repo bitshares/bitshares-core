@@ -106,7 +106,7 @@ jobs:
     - run: |
         echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: |
           ccache
