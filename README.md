@@ -36,12 +36,13 @@ Prebuilt binaries can be found in the [releases page](https://github.com/bitshar
 
 ### Installing Node and Command-Line Wallet Software
 
-We recommend building on Ubuntu 20.04 LTS (64-bit)
+We recommend building on Ubuntu 24.04 LTS (64-bit).
+Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), we recommened Ubuntu 20.04 LTS.
 
 **Install Operating System Dependencies:**
 
     sudo apt-get update
-    sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev doxygen
+    sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libz-dev libbz2-dev liblzma-dev libzstd-dev libcurl4-openssl-dev doxygen
 
 **Build Node And Command-Line Wallet:**
 
@@ -77,19 +78,22 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
   * Windows (various versions, Visual Studio and MinGW)
   * OpenBSD (various versions)
 
-* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.74`.
+* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.83`.
 Newer versions may work, but have not been tested.
 If your system came pre-installed with a version of Boost libraries that you do not wish to use, you may
 manually build your preferred version and use it with BitShares by specifying it on the CMake command line.
 
   Example: `cmake -DBOOST_ROOT=/path/to/boost ..`
 
-* BitShares requires [OpenSSL](https://www.openssl.org/) libraries to build, supports version `1.0.2` to `1.1.1`.
+  Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), the supported boost version is `1.58` to `1.74`.
+
+* BitShares requires [OpenSSL](https://www.openssl.org/) libraries to build, supports version `1.0.2` to `1.1.1` and version `3.0.x`.
 If your system came pre-installed with a version of OpenSSL libraries that you do not wish to use, you may
 manually build your preferred version and use it with BitShares by specifying it on the CMake command line.
 
   Example: `cmake -DOPENSSL_ROOT_DIR=/path/to/openssl ..`
 
+  Note: a) some earlier version of OpenSSL 3 are incompatible due to the lack of the `RIPEMD160` provider, and b) for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), OpenSSL 3 is not supported.
 
 ### Running and Stopping Node Software
 
