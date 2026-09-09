@@ -1,0 +1,41 @@
+name: Keep Cache
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: "26 4 * * 2,5"
+
+jobs:
+  keep-ubuntu-caches:
+    name: Keep Ubuntu Build Caches
+    strategy:
+      matrix:
+        os: [ ubuntu-24.04 ]
+        build-type: [ "release", "debug" ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Load Ubuntu Build Caches
+      uses: actions/cache/restore@v6
+      with:
+        path: ccache-${{ matrix.build-type }}
+        key: ccache-${{ matrix.build-type }}-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-release-${{ matrix.os }}-${{ github.ref }}-
+          ccache-release-${{ matrix.os }}-
+
+  keep-docker-cache:
+    name: Keep Docker Build Cache
+    runs-on: ubuntu-latest
+    steps:
+    - name: Extract base image from Dockerfile
+      id: get_base_image
+      shell: bash
+      run: echo "base-image=`grep -i 'FROM' Dockerfile | grep -i 'AS build' | awk '{print $2}' | sed s/:/-/g`" >> "$GITHUB_OUTPUT"
+    - name: Load Docker Build Cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ccache-docker
+        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-
+          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-
