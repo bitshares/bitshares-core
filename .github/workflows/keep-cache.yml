@@ -39,3 +39,10 @@ jobs:
         restore-keys: |
           ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-
           ccache-docker-${{ steps.get_base_image.outputs.base-image }}-
+
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: liskin/gh-workflow-keepalive@7a9194bad497f0b993708eeaf10fc0a2d726eb71
