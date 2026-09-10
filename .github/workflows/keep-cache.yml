@@ -27,6 +27,7 @@ jobs:
     name: Keep Docker Build Cache
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v7
     - name: Extract base image from Dockerfile
       id: get_base_image
       shell: bash
