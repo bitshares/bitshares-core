@@ -7,20 +7,26 @@ containers. This README serves as documentation.
 
 The `Dockerfile` performs the following steps:
 
-1. Obtain base image (phusion/baseimage:0.10.1)
+### 1. The build stage
+1. Obtain base image (phusion/baseimage)
 2. Install required dependencies using `apt-get`
 3. Add bitshares-core source code into container
 4. Update git submodules
 5. Perform `cmake` with build type `Release`
-6. Run `make` and `make_install` (this will install binaries into `/usr/local/bin`
-7. Purge source code off the container
-8. Add a local bitshares user and set `$HOME` to `/var/lib/bitshares`
-9. Make `/var/lib/bitshares` and `/etc/bitshares` a docker *volume*
-10. Expose ports `8090` and `1776`
-11. Add default config from `docker/default_config.ini` and
+6. Run `make` and `make_install` (this will install binaries into `/usr/local/bin`)
+7. Get version
+
+### 2. The final image stage
+1. Obtain base image (phusion/baseimage)
+2. Install required dependencies and update installed packages using `apt-get`
+3. Copy the binaries and the version file from the build stage to the final image
+4. Add a local bitshares user and set `$HOME` to `/var/lib/bitshares`
+5. Make `/var/lib/bitshares` and `/etc/bitshares` a docker *volume*
+6. Expose ports `8090` and `1776`
+7. Add default config from `docker/default_config.ini` and
     `docker/default_logging.ini`
-12. Add an entry point script
-13. Run the entry point script by default
+8. Add an entry point script
+9. Run the entry point script by default
 
 The entry point simplifies the use of parameters for the `witness_node`
 (which is run by default when spinning up the container).
