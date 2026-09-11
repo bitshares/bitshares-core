@@ -1401,6 +1401,11 @@ net::node_ptr application::p2p_node()
    return my->_p2p_network;
 }
 
+std::shared_ptr<fc::http::websocket_server> application::websocket_server()
+{
+   return my->_websocket_server;
+}
+
 std::shared_ptr<chain::database> application::chain_database() const
 {
    return my->_chain_db;

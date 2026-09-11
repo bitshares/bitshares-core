@@ -251,7 +251,7 @@ class test_node : public graphene::net::node
 public:
    std::vector<std::shared_ptr<test_peer>> test_peers;
 
-   test_node( const std::string& name, const fc::path& config_dir, int port, int seed_port = -1 )
+   test_node( const std::string& name, const fc::path& config_dir )
          : node( name )
    {
       std::cout << "test_node::test_node(): current thread=" << uint64_t(&fc::thread::current()) << std::endl;
@@ -376,9 +376,8 @@ BOOST_FIXTURE_TEST_SUITE( p2p_node_tests, p2p_fixture )
 BOOST_AUTO_TEST_CASE( hello_test )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -434,9 +433,8 @@ BOOST_AUTO_TEST_CASE( hello_test )
 BOOST_AUTO_TEST_CASE( hello_firewalled_peer_test )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -504,9 +502,8 @@ BOOST_AUTO_TEST_CASE( hello_firewalled_peer_test )
 BOOST_AUTO_TEST_CASE( hello_not_accepting_connections )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // Note: no fake_network_connect_guard here, by default the node is not accepting connections
 
    // a new peer (peer3)
@@ -542,9 +539,8 @@ BOOST_AUTO_TEST_CASE( hello_not_accepting_connections )
 BOOST_AUTO_TEST_CASE( hello_unexpected )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -580,9 +576,8 @@ BOOST_AUTO_TEST_CASE( hello_unexpected )
 BOOST_AUTO_TEST_CASE( hello_from_different_chain )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -633,9 +628,8 @@ BOOST_AUTO_TEST_CASE( hello_from_different_chain )
 BOOST_AUTO_TEST_CASE( hello_invalid_signature )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -669,9 +663,8 @@ BOOST_AUTO_TEST_CASE( hello_invalid_signature )
 BOOST_AUTO_TEST_CASE( hello_null_node_id )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -705,9 +698,8 @@ BOOST_AUTO_TEST_CASE( hello_null_node_id )
 BOOST_AUTO_TEST_CASE( hello_from_self )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -761,9 +753,8 @@ BOOST_AUTO_TEST_CASE( hello_from_self )
 BOOST_AUTO_TEST_CASE( hello_already_connected )
 { try {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -813,9 +804,8 @@ BOOST_AUTO_TEST_CASE( hello_already_connected )
 BOOST_AUTO_TEST_CASE( address_request_without_hello )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -849,9 +839,8 @@ BOOST_AUTO_TEST_CASE( address_request_without_hello )
 BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -883,9 +872,8 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
 BOOST_AUTO_TEST_CASE( advertise_list_test )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -924,9 +912,8 @@ BOOST_AUTO_TEST_CASE( advertise_list_test )
 BOOST_AUTO_TEST_CASE( exclude_list )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 
@@ -965,9 +952,8 @@ BOOST_AUTO_TEST_CASE( exclude_list )
 BOOST_AUTO_TEST_CASE( advertising_all_test )
 {
    // create a node (node1)
-   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir( graphene::utilities::temp_directory_path() );
-   test_node node1( "Node1", node1_dir.path(), node1_port );
+   test_node node1( "Node1", node1_dir.path() );
    // simulate that node1 started to connect to the network and accepting connections
    fake_network_connect_guard guard( node1 );
 

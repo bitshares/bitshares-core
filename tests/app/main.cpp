@@ -225,18 +225,13 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       // Start app1
       BOOST_TEST_MESSAGE( "Creating and initializing app1" );
 
-      auto port = fc::network::get_available_port();
-      auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
-      auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
-      auto app3_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
-
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
       auto genesis_file = create_genesis_file(app_dir);
 
       graphene::app::application app1;
       auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
       auto& cfg = *sharable_cfg;
-      fc::set_option( cfg, "p2p-endpoint", app1_p2p_endpoint_str );
+      fc::set_option( cfg, "p2p-endpoint", string("127.0.0.1:0") );
       fc::set_option( cfg, "genesis-json", genesis_file );
       fc::set_option( cfg, "seed-nodes", string("[]") );
       app1.initialize(app_dir.path(), sharable_cfg);
@@ -245,10 +240,16 @@ BOOST_AUTO_TEST_CASE( three_node_network )
 
       auto node_startup_wait_time = fc::seconds(15);
 
-      fc::wait_for( node_startup_wait_time, [&app1,port] () {
+      uint16_t port = 0;
+      fc::wait_for( node_startup_wait_time, [&app1,&port] () {
          const auto status = app1.p2p_node()->network_get_info();
-         return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == port;
+         port = status["listening_on"].as<fc::ip::endpoint>( 5 ).port();
+         return 0 != port;
       });
+
+      auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
+      auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
+      auto app3_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
 
       // Start app2
       BOOST_TEST_MESSAGE( "Creating and initializing app2" );

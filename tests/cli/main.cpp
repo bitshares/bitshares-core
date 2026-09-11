@@ -95,8 +95,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
    auto& cfg = *sharable_cfg;
-   server_port_number = fc::network::get_available_port();
-   fc::set_option( cfg, "rpc-endpoint", string("127.0.0.1:") + std::to_string(server_port_number) );
+   fc::set_option( cfg, "rpc-endpoint", string("127.0.0.1:0") );
    fc::set_option( cfg, "p2p-accept-incoming-connections", false );
    fc::set_option( cfg, "genesis-json", create_genesis_file(app_dir) );
    fc::set_option( cfg, "seed-nodes", string("[]") );
@@ -104,6 +103,8 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->initialize(app_dir.path(), sharable_cfg);
 
    app1->startup();
+
+   server_port_number = app1->websocket_server()->get_listening_port();
 
    return app1;
 }
