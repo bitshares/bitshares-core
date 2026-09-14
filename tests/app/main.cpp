@@ -206,9 +206,9 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_legacy_config_ini_options)
 }
 
 /////////////
-/// @brief create a 3 node network
+/// @brief create a 5 node network
 /////////////
-BOOST_AUTO_TEST_CASE( three_node_network )
+BOOST_AUTO_TEST_CASE( five_node_network )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
@@ -250,12 +250,15 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
       auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
       auto app3_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
+      auto app4_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
+      auto app5_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
 
-      // Start app2
+      // Start app2, which will try to listen on the default port first, and will choose another port if failed
       BOOST_TEST_MESSAGE( "Creating and initializing app2" );
 
       fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
-      graphene::app::application app2;
+      auto p_app2 = std::make_unique<graphene::app::application>();
+      auto& app2 = *p_app2;
       auto sharable_cfg2 = std::make_shared<boost::program_options::variables_map>();
       auto& cfg2 = *sharable_cfg2;
       fc::set_option( cfg2, "genesis-json", genesis_file );
@@ -278,6 +281,7 @@ BOOST_AUTO_TEST_CASE( three_node_network )
          }
          return false;
       });
+
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
@@ -370,7 +374,7 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
 
-      // Start app3
+      // Start app3, which will not listen for incoming connections
       BOOST_TEST_MESSAGE( "Creating and initializing app3" );
 
       fc::temp_directory app3_dir( graphene::utilities::temp_directory_path() );
@@ -433,6 +437,75 @@ BOOST_AUTO_TEST_CASE( three_node_network )
       BOOST_REQUIRE_EQUAL(app3.p2p_node()->get_connection_count(), 2u);
       BOOST_TEST_MESSAGE( "app2 and app3 successfully connected" );
 
+      // Start app4, which has the same configurations as app2,
+      // they both will try to listen on the default port first, and will choose another port if failed,
+      // and in the end they will be listening on different ports
+      BOOST_TEST_MESSAGE( "Creating and initializing app4" );
+
+      fc::temp_directory app4_dir( graphene::utilities::temp_directory_path() );
+      graphene::app::application app4;
+      auto sharable_cfg4 = std::make_shared<boost::program_options::variables_map>();
+      auto& cfg4 = *sharable_cfg4;
+      fc::set_option( cfg4, "genesis-json", genesis_file );
+      fc::set_option( cfg4, "seed-nodes", app4_seed_nodes_str );
+      app4.initialize(app4_dir.path(), sharable_cfg4);
+
+      BOOST_TEST_MESSAGE( "Starting app4 and waiting for connection" );
+      app4.startup();
+
+      uint16_t port2 = app2.p2p_node()->network_get_info()["listening_on"].as<fc::ip::endpoint>( 5 ).port();
+      uint16_t port4 = 0;
+      fc::wait_for( node_startup_wait_time, [&app4,&port4] () {
+         const auto status = app4.p2p_node()->network_get_info();
+         port4 = status["listening_on"].as<fc::ip::endpoint>( 5 ).port();
+         return 0 != port4;
+      });
+
+      BOOST_CHECK( port4 != port2 );
+
+      fc::wait_for( node_startup_wait_time, [&app4] () {
+         return 1u == app4.chain_database()->head_block_num();
+      });
+      BOOST_TEST_MESSAGE( "app4 is synced" );
+
+      // Start app5, which is configured to listen to app2's port
+      BOOST_TEST_MESSAGE( "Creating and initializing app5" );
+
+      fc::temp_directory app5_dir( graphene::utilities::temp_directory_path() );
+      graphene::app::application app5;
+      auto sharable_cfg5 = std::make_shared<boost::program_options::variables_map>();
+      auto& cfg5 = *sharable_cfg5;
+      fc::set_option( cfg5, "p2p-endpoint", string("127.0.0.1:") + std::to_string(port2) );
+      fc::set_option( cfg5, "genesis-json", genesis_file );
+      fc::set_option( cfg5, "seed-nodes", app5_seed_nodes_str );
+      app5.initialize(app5_dir.path(), sharable_cfg5);
+
+      uint16_t port5 = 0;
+
+      // Schedule to shutdown app2
+      BOOST_TEST_MESSAGE( "Scheduling app2 to shutdown" );
+      auto node_shutdown_delay = fc::seconds(20);
+      auto app2_shutdown_schedule = fc::schedule( [&p_app2,&app5,&port5]() {
+                 port5 = app5.p2p_node()->network_get_info()["listening_on"].as<fc::ip::endpoint>( 5 ).port();
+                 BOOST_CHECK_EQUAL( port5, 0 );
+                 BOOST_TEST_MESSAGE( "app5 is still waiting" );
+                 BOOST_TEST_MESSAGE( "Shutting down app2" );
+                 p_app2 = nullptr;
+              },
+              fc::time_point::now() + node_shutdown_delay,
+              "app2_shutdown" );
+
+      BOOST_TEST_MESSAGE( "Starting app5, it should wait because the port is in use" );
+      app5.startup(); // this is blocked
+
+      BOOST_TEST_MESSAGE( "app5 is started" );
+      port5 = app5.p2p_node()->network_get_info()["listening_on"].as<fc::ip::endpoint>( 5 ).port();
+      BOOST_CHECK_EQUAL( port5, port2 );
+
+      fc::wait_for( node_startup_wait_time, [&app5] () {
+         return 1u == app5.chain_database()->head_block_num();
+      });
+      BOOST_TEST_MESSAGE( "app5 is synced" );
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
