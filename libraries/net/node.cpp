@@ -4311,7 +4311,6 @@ namespace graphene { namespace net { namespace detail {
       // This is to address the race condition mentioned above. This may cause problems
       // on the "some platforms" mentioned above.
 
-      _tcp_server.set_reuse_address();
       bool first = true;
       while( true )
       {
@@ -4319,6 +4318,7 @@ namespace graphene { namespace net { namespace detail {
         {
           ilog( "Trying to listen for connections on endpoint ${endpoint}",
                 ( "endpoint", listen_endpoint ) );
+          _tcp_server.set_reuse_address();
           if( listen_endpoint.get_address() != fc::ip::address() )
             _tcp_server.listen( listen_endpoint );
           else
@@ -4354,6 +4354,7 @@ namespace graphene { namespace net { namespace detail {
             wlog(error_message); // logging to p2p.log
             std::cerr << "\033[33m" << error_message << std::endl; // message in yellow color
             listen_endpoint.set_port( 0 );
+            _tcp_server.close();
           }
           else // Configured to wait when fails to listen, regardless of the reason (not only "endpoint_is_busy")
           {
@@ -4375,6 +4376,7 @@ namespace graphene { namespace net { namespace detail {
             wlog(error_message); // logging to p2p.log
             std::cerr << "\033[31m" << error_message; // message in red color
             _delegate->error_encountered( error_message, fc::oexception() );
+            _tcp_server.close();
             fc::usleep( fc::seconds(5) );
           }
       } // while true
