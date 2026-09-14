@@ -4333,23 +4333,26 @@ namespace graphene { namespace net { namespace detail {
           wlog( "Failed to listen on endpoint ${endpoint}, error ${error}",
                 ( "endpoint", listen_endpoint ) ( "error", e ) );
 
+          if( !_node_configuration.wait_if_endpoint_is_busy   // If configured to NOT wait when fails to listen,
+                                                              // regardless of the reason (not only "endpoint_is_busy")
+              // If port is 0, throw
+              && 0 == listen_endpoint.port() )
+          {
+              FC_RETHROW_EXCEPTION( e, error, "Unable to listen on ${endpoint}", ("endpoint",listen_endpoint ) );
+          }
+        } // catch
+
           if( !_node_configuration.wait_if_endpoint_is_busy ) // If configured to NOT wait when fails to listen,
                                                               // regardless of the reason (not only "endpoint_is_busy")
           {
-            // If port is 0, throw
-            if( 0 == listen_endpoint.port() )
-            {
-              FC_RETHROW_EXCEPTION( e, error, "Unable to listen on ${endpoint}", ("endpoint",listen_endpoint ) );
-            }
-
-            // If port is not 0, change port to 0 and retry
+            // Port is not 0, change port to 0 and retry
             std::ostringstream error_message_stream;
             error_message_stream << "Unable to listen for connections on endpoint " << std::string(listen_endpoint)
                                  << ", which probably means the port is already in use, "
                                  << " will try to listen on port 0 to let OS select a port";
             std::string error_message = error_message_stream.str();
             wlog(error_message); // logging to p2p.log
-            std::cerr << "\033[33m" << error_message; // message in yellow color
+            std::cerr << "\033[33m" << error_message << std::endl; // message in yellow color
             listen_endpoint.set_port( 0 );
           }
           else // Configured to wait when fails to listen, regardless of the reason (not only "endpoint_is_busy")
@@ -4374,7 +4377,6 @@ namespace graphene { namespace net { namespace detail {
             _delegate->error_encountered( error_message, fc::oexception() );
             fc::usleep( fc::seconds(5) );
           }
-        } // catch
       } // while true
     }
 
