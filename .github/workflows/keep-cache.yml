@@ -3,7 +3,7 @@ name: Keep Cache
 on:
   workflow_dispatch:
   schedule:
-  - cron: "26 4 * * 2,5"
+  - cron: "26 4 * * *"
 
 jobs:
   keep-ubuntu-caches:
@@ -18,9 +18,8 @@ jobs:
       uses: actions/cache/restore@v6
       with:
         path: ccache
-        key: ccache-${{ matrix.build-type }}-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        key: ccache-${{ matrix.build-type }}-${{ matrix.os }}-${{ github.ref }}
         restore-keys: |
-          ccache-${{ matrix.build-type }}-${{ matrix.os }}-${{ github.ref }}-
           ccache-${{ matrix.build-type }}-${{ matrix.os }}-
 
   keep-docker-cache:
@@ -36,9 +35,8 @@ jobs:
       uses: actions/cache/restore@v6
       with:
         path: ccache
-        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-${{ github.sha }}
+        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}
         restore-keys: |
-          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-
           ccache-docker-${{ steps.get_base_image.outputs.base-image }}-
 
   keepalive:

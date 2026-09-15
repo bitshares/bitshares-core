@@ -110,9 +110,8 @@ jobs:
       with:
         path: |
           ccache
-        key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
+        key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}
         restore-keys: |
-          sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
           sonar-${{ env.OS_VERSION }}-
     - name: Build
       run: |

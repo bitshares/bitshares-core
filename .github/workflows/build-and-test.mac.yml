@@ -34,9 +34,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ccache
-        key: ccache-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        key: ccache-${{ matrix.os }}-${{ github.ref }}
         restore-keys: |
-          ccache-${{ matrix.os }}-${{ github.ref }}-
           ccache-${{ matrix.os }}-
     - name: Build
       run: |
