@@ -266,8 +266,14 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::ticket_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
    }
-   void operator()(const graphene::chain::liquidity_pool_create_operation&) const {
+   void operator()(const graphene::chain::liquidity_pool_create_operation& op) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+      // hf_stableswap. A proposal is checked when it is created, not when it executes, so
+      // without this the extensions could be carried past the hardfork inside a proposal.
+      if( !HARDFORK_STABLESWAP_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.pool_type.valid() && !op.extensions.value.amplification.valid(),
+                    "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+      }
    }
    void operator()(const graphene::chain::liquidity_pool_delete_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
@@ -275,11 +281,23 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::liquidity_pool_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2604_PASSED(block_time), "Not allowed until the core-2604 hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_deposit_operation&) const {
+   void operator()(const graphene::chain::liquidity_pool_deposit_operation& op) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+      // hf_stableswap
+      if( !HARDFORK_STABLESWAP_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.min_to_receive.valid(),
+                    "The min_to_receive extension is not allowed until the StableSwap hardfork" );
+      }
    }
-   void operator()(const graphene::chain::liquidity_pool_withdraw_operation&) const {
+   void operator()(const graphene::chain::liquidity_pool_withdraw_operation& op) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+      // hf_stableswap
+      if( !HARDFORK_STABLESWAP_PASSED(block_time) ) {
+         FC_ASSERT( !op.extensions.value.withdraw_one_asset.valid()
+                    && !op.extensions.value.min_a.valid()
+                    && !op.extensions.value.min_b.valid(),
+                    "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+      }
    }
    void operator()(const graphene::chain::liquidity_pool_exchange_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );

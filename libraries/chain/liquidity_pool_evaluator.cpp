@@ -46,12 +46,21 @@ void_result liquidity_pool_create_evaluator::do_evaluate(const liquidity_pool_cr
    const asset_object& asset_b_obj = op.asset_b(d); // Make sure it exists
    _share_asset = &op.share_asset(d);
 
+   // Before the hardfork the whole extensions field has to be absent, not merely harmless.
+   // Gating on the VALUE let pool_type = constant_product through untouched, and an operation
+   // carrying a set-but-default extension serialises differently from one carrying none --
+   // which is the part that has to hold across a replay, whatever the value happens to mean.
+   if( !HARDFORK_STABLESWAP_PASSED( block_time ) )
+   {
+      FC_ASSERT( !op.extensions.value.pool_type.valid() && !op.extensions.value.amplification.valid(),
+                 "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+   }
+
    // StableSwap pools: validate the new options and the equal-precision requirement.
    const auto& opt_pool_type = op.extensions.value.pool_type;
    if( ( opt_pool_type.valid() && *opt_pool_type != static_cast<uint8_t>( liquidity_pool_curve_type::constant_product ) )
        || op.extensions.value.amplification.valid() )
    {
-      FC_ASSERT( HARDFORK_STABLESWAP_PASSED(block_time), "Not allowed until the StableSwap hardfork" );
       FC_ASSERT( opt_pool_type.valid()
                  && *opt_pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable ),
                  "amplification can only be specified for a stable pool" );
@@ -185,6 +194,14 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
 { try {
    const database& d = db();
 
+   // Checked first, and on presence rather than on value: an extension that exists at all
+   // changes how the operation serialises, so it cannot be carried before the hardfork.
+   if( !HARDFORK_STABLESWAP_PASSED( d.head_block_time() ) )
+   {
+      FC_ASSERT( !op.extensions.value.min_to_receive.valid(),
+                 "The min_to_receive extension is not allowed until the StableSwap hardfork" );
+   }
+
    _pool = &op.pool(d);
 
    FC_ASSERT( op.amount_a.asset_id == _pool->asset_a, "Asset type A mismatch" );
@@ -305,15 +322,15 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
       _account_receives = asset( static_cast<int64_t>( new_supply ), _pool->share_asset );
    }
 
-   // Untergrenze des Einzahlers durchsetzen. Eine unausgewogene Einzahlung zahlt eine
-   // Gebuehr, die am Poolstand im Augenblick der Ausfuehrung haengt -- und der steht dem
-   // frei, der den Block baut. Wie beim Swap und bei der Auszahlung darf der Einzahler
+   // Enforce the depositor's floor. An unbalanced deposit pays a fee that depends on the
+   // pool balances at the moment of execution, and those are in the hands of whoever builds
+   // the block. As with a swap and with a withdrawal, the depositor has to be able
    // sagen, wieviel Abweichung er hinnimmt.
    const auto& floor = op.extensions.value.min_to_receive;
    if( floor.valid() )
    {
-      // Das Feld gab es vor StableSwap nicht, und eine Einzahlung in einen
-      // Konstantprodukt-Pool ist aelter als das.
+      // The field did not exist before StableSwap, and depositing into a constant-product
+      // pool predates it.
       FC_ASSERT( HARDFORK_STABLESWAP_PASSED( d.head_block_time() ),
                  "Deposit minimums are not allowed until the StableSwap hardfork" );
       FC_ASSERT( _account_receives.amount >= *floor,
@@ -357,6 +374,17 @@ generic_exchange_operation_result liquidity_pool_deposit_evaluator::do_apply(
 void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_withdraw_operation& op)
 { try {
    const database& d = db();
+
+   // Same rule, and first for the same reason: presence of any of the three, not what they
+   // say. Checking it here rather than deducing it from a later condition also means the
+   // cheap test runs before anything is computed.
+   if( !HARDFORK_STABLESWAP_PASSED( d.head_block_time() ) )
+   {
+      FC_ASSERT( !op.extensions.value.withdraw_one_asset.valid()
+                 && !op.extensions.value.min_a.valid()
+                 && !op.extensions.value.min_b.valid(),
+                 "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+   }
 
    _pool = &op.pool(d);
 
@@ -439,14 +467,27 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
       FC_ASSERT( out > 0, "Aborting due to zero outcome" );
       FC_ASSERT( out < fc::uint128_t( taken_balance.value ), "Internal error" );
 
-      const share_type paid{ static_cast<int64_t>( out ) };
+      // The pool's own withdrawal fee, which the proportional path below charges and this one
+      // did not. Two single-asset withdrawals are a way out of the pool just as much as one
+      // proportional withdrawal is, so leaving it off here made the fee optional: a member
+      // could take one side, then the other, and pay nothing for either.
+      //
+      // The imbalance fee above is a separate thing and is NOT charged again here -- it is
+      // already priced into `out`, by being left in the pool before solving for what the
+      // shares are worth. Only this fee is reported as the withdrawal fee, for the same
+      // reason: reporting the imbalance twice would overstate what the operation cost.
+      fc::uint128_t out128( out );
+      const fc::uint128_t wfee = out128 * _pool->withdrawal_fee_percent / GRAPHENE_100_PERCENT;
+      FC_ASSERT( wfee <= out128, "Withdrawal fee percent of the pool is too high" );
+      out128 -= wfee;
+      FC_ASSERT( out128 > 0, "Aborting due to zero outcome" );
+
+      const share_type paid{ static_cast<int64_t>( out128 ) };
+      const share_type charged{ static_cast<int64_t>( wfee ) };
       _pool_pays_a = asset( want_a ? paid : share_type( 0 ), _pool->asset_a );
       _pool_pays_b = asset( want_a ? share_type( 0 ) : paid, _pool->asset_b );
-      // The imbalance fee is not taken out of the payout here -- it is already priced in,
-      // by being left in the pool before solving for what the shares are worth. Reporting it
-      // again as a withdrawal fee would double-count it in the operation result.
-      _fee_a = asset( 0, _pool->asset_a );
-      _fee_b = asset( 0, _pool->asset_b );
+      _fee_a = asset( want_a ? charged : share_type( 0 ), _pool->asset_a );
+      _fee_b = asset( want_a ? share_type( 0 ) : charged, _pool->asset_b );
 
       check_withdrawal_floor( d, op );
 
@@ -506,9 +547,9 @@ void liquidity_pool_withdraw_evaluator::check_withdrawal_floor(
    FC_ASSERT( HARDFORK_STABLESWAP_PASSED( d.head_block_time() ),
               "Withdrawal minimums are not allowed until the StableSwap hardfork" );
 
-   // Eine Untergrenze auf der Seite, die bei einer einseitigen Auszahlung nichts auszahlt,
-   // koennte nie erfuellt werden. Das ist keine schwaechere Absicherung, sondern eine, die
-   // immer scheitert -- und sie liest sich wie Schutz. Also ablehnen statt hinnehmen.
+   // A floor on the side that pays out nothing in a single-asset withdrawal could never be
+   // met. That is not a weaker guarantee but one that always fails, while reading like
+   // protection -- so refuse it rather than accept it.
    const auto& one = op.extensions.value.withdraw_one_asset;
    if( one.valid() )
    {

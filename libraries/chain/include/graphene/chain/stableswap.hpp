@@ -70,7 +70,7 @@ namespace stableswap {
 /// Number of coins in the pool. Fixed at 2 for BitShares liquidity pools.
 constexpr uint32_t SS_N_COINS = 2;
 /// Maximum number of Newton iterations before we give up converging.
-constexpr int SS_MAX_ITER = 255;
+constexpr int16_t SS_MAX_ITER = 255;
 
 namespace detail {
 
@@ -134,7 +134,7 @@ inline fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, 
    wide_uint recent[SS_CYCLE_WINDOW] = {};
    size_t filled = 0;
 
-   for( int i = 0; i < SS_MAX_ITER; ++i )
+   for( int16_t i = 0; i < SS_MAX_ITER; ++i )
    {
       // D_P = D^(n+1) / (n^n * prod(x_i)) ; for n=2: D_P = D^3 / (4 * x * y)
       // Computed in a 256-bit accumulator: the D_P*D intermediate below can transiently
@@ -213,7 +213,7 @@ inline fc::uint128_t compute_new_y( const fc::uint128_t& new_x, const fc::uint12
    wide_uint y = d256;       // initial guess
    wide_uint y_prev;
 
-   for( int i = 0; i < SS_MAX_ITER; ++i )
+   for( int16_t i = 0; i < SS_MAX_ITER; ++i )
    {
       y_prev = y;
       // y = (y^2 + c) / (2y + b - D)

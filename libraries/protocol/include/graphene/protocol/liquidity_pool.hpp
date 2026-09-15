@@ -143,7 +143,7 @@ namespace graphene { namespace protocol {
          fc::optional<share_type> min_to_receive;
       };
 
-      extension<ext> extensions;  ///< Unused. Reserved for future use.
+      extension<ext> extensions;  ///< The depositor's floor on the pool shares issued
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -203,7 +203,7 @@ namespace graphene { namespace protocol {
          fc::optional<share_type> min_b;
       };
 
-      extension<ext> extensions;  ///< Unused. Reserved for future use.
+      extension<ext> extensions;  ///< Single-asset withdrawal, and the withdrawer's floors
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -259,12 +259,8 @@ FC_REFLECT( graphene::protocol::liquidity_pool_update_operation,
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation,
             (fee)(account)(pool)(amount_a)(amount_b)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_deposit_operation::ext, (min_to_receive) )
-FC_REFLECT_TYPENAME(
-      graphene::protocol::extension<graphene::protocol::liquidity_pool_deposit_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation::ext,
             (withdraw_one_asset)(min_a)(min_b) )
-FC_REFLECT_TYPENAME(
-      graphene::protocol::extension<graphene::protocol::liquidity_pool_withdraw_operation::ext> )
 FC_REFLECT( graphene::protocol::liquidity_pool_withdraw_operation,
             (fee)(account)(pool)(share_amount)(extensions) )
 FC_REFLECT( graphene::protocol::liquidity_pool_exchange_operation,
