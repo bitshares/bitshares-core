@@ -68,9 +68,8 @@ jobs:
       uses: actions/cache@v6
       with:
         path: ccache
-        key: ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        key: ccache-release-${{ matrix.os }}-${{ github.ref }}
         restore-keys: |
-          ccache-release-${{ matrix.os }}-${{ github.ref }}-
           ccache-release-${{ matrix.os }}-
     - name: Build
       run: |

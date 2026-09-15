@@ -40,9 +40,8 @@ jobs:
       id: cache
       with:
         path: ccache
-        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-${{ github.sha }}
+        key: ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}
         restore-keys: |
-          ccache-docker-${{ steps.get_base_image.outputs.base-image }}-${{ github.ref }}-
           ccache-docker-${{ steps.get_base_image.outputs.base-image }}-
     - name: Make sure the cache dir exists
       run: mkdir -p ccache
