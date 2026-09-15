@@ -31,6 +31,7 @@
 #include <fc/asio.hpp>
 #include <fc/filesystem.hpp>
 #include <fc/time.hpp>
+#include <fc/network/tcp_socket.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_connection.hpp>
@@ -987,5 +988,130 @@ BOOST_AUTO_TEST_CASE( advertising_all_test )
    const auto& msg2 = peer3_ptr->messages_received.back();
    test_closing_connection_message( msg2 );
 }
+
+/**
+ * A port that is busy because this object is holding it.
+ *
+ * Not obtained by binding, closing and hoping: the socket stays open for as long as the holder
+ * lives, so "this port is in use" is a fact for the whole test rather than an observation that
+ * was already stale when it was made. The number comes from listen(0), so the OS picks one that
+ * is free and nothing has to guess a range or search for a gap.
+ */
+class held_port
+{
+public:
+   held_port() { _server.listen( 0 ); }
+   uint16_t port()const { return _server.get_local_endpoint().port(); }
+   void release() { _server.close(); }
+private:
+   fc::tcp_server _server;
+};
+
+/// Asking for port 0 means "any free port", which is the one request that cannot race with
+/// anything: the kernel picks and binds in a single step. The node has to report back what it
+/// was given.
+BOOST_AUTO_TEST_CASE( listening_on_port_zero_reports_what_the_os_chose )
+{ try {
+   fc::temp_directory dir( graphene::utilities::temp_directory_path() );
+   test_node node( "PortZero", dir.path() );
+
+   node.set_listen_endpoint( fc::ip::endpoint( fc::ip::address( "127.0.0.1" ), 0 ), false );
+   node.listen_to_p2p_network();
+
+   BOOST_CHECK( node.get_actual_listening_endpoint().port() != 0 );
+} FC_LOG_AND_RETHROW() }
+
+/// A port that is genuinely occupied, with wait_if_not_available false: the node has to give up
+/// on it and come up on an OS-assigned one instead of failing to start.
+BOOST_AUTO_TEST_CASE( an_occupied_endpoint_is_abandoned_when_not_waiting )
+{ try {
+   held_port busy;
+   const uint16_t wanted = busy.port();
+
+   fc::temp_directory dir( graphene::utilities::temp_directory_path() );
+   test_node node( "Busy", dir.path() );
+
+   node.set_listen_endpoint( fc::ip::endpoint( fc::ip::address( "127.0.0.1" ), wanted ), false );
+   node.listen_to_p2p_network();
+
+   const auto actual = node.get_actual_listening_endpoint();
+   BOOST_CHECK( actual.port() != 0 );
+   BOOST_CHECK_MESSAGE( actual.port() != wanted,
+                        "the node should have moved off the occupied port, but reports "
+                        + std::to_string( actual.port() ) );
+} FC_LOG_AND_RETHROW() }
+
+/// The same port with wait_if_not_available true: the node has to keep asking for the port it
+/// was given and take it once it is free. The holder lets go while the node is waiting, so what
+/// is being tested is that the node retried, not that it happened to be lucky.
+///
+/// This is the case that used to raise
+///   "Attempting to yield while processing an exception"
+/// because the five-second sleep sat inside the catch block. It passes now that the waiting
+/// happens after the catch has been left.
+BOOST_AUTO_TEST_CASE( an_occupied_endpoint_is_waited_for )
+{ try {
+   held_port busy;
+   const uint16_t wanted = busy.port();
+
+   fc::async( [&busy]() {
+      fc::usleep( fc::seconds( 3 ) );
+      busy.release();
+   } );
+
+   fc::temp_directory dir( graphene::utilities::temp_directory_path() );
+   test_node node( "Waits", dir.path() );
+
+   node.set_listen_endpoint( fc::ip::endpoint( fc::ip::address( "127.0.0.1" ), wanted ), true );
+   node.listen_to_p2p_network();
+
+   BOOST_CHECK_EQUAL( node.get_actual_listening_endpoint().port(), wanted );
+} FC_LOG_AND_RETHROW() }
+
+/// listen_to_p2p_network() retries on the one tcp_server it owns, calling close() before each
+/// new attempt and set_reuse_address() again afterwards. That sequence has to leave the object
+/// usable, which is what the retry rests on entirely -- fc does not promise it anywhere.
+BOOST_AUTO_TEST_CASE( a_tcp_server_can_listen_again_after_close )
+{ try {
+   held_port busy;
+
+   fc::tcp_server server;
+   server.set_reuse_address();
+   BOOST_CHECK_THROW(
+      server.listen( fc::ip::endpoint( fc::ip::address( "127.0.0.1" ), busy.port() ) ),
+      fc::exception );
+
+   // Exactly what the loop does on its next pass.
+   server.close();
+   server.set_reuse_address();
+   BOOST_CHECK_NO_THROW( server.listen( 0 ) );
+   BOOST_CHECK( server.get_local_endpoint().port() != 0 );
+   server.close();
+} FC_LOG_AND_RETHROW() }
+
+/// set_reuse_address() must not let two servers share one port.
+///
+/// It used to set SO_REUSEPORT alongside SO_REUSEADDR, and two sockets that both set it are
+/// allowed to bind the same address and port -- the kernel then splits incoming connections
+/// between them. That mattered once the temporary probe server was removed: the probe bound
+/// without the reuse flags, which is how it could tell that a port was "already being used by
+/// another application", whereas the real listen carries them. A second node pointed at a port
+/// a first node held would have been granted it.
+///
+/// SO_REUSEPORT is no longer set, so the second server has to be refused.
+BOOST_AUTO_TEST_CASE( set_reuse_address_does_not_let_two_servers_share_a_port )
+{ try {
+   fc::tcp_server first;
+   first.set_reuse_address();
+   first.listen( 0 );
+   const uint16_t taken = first.get_local_endpoint().port();
+
+   fc::tcp_server second;
+   second.set_reuse_address();
+   BOOST_CHECK_THROW( second.listen( taken ), fc::exception );
+
+   second.close();
+   first.close();
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
