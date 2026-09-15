@@ -37,7 +37,7 @@ Prebuilt binaries can be found in the [releases page](https://github.com/bitshar
 ### Installing Node and Command-Line Wallet Software
 
 We recommend building on Ubuntu 24.04 LTS (64-bit).
-Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), we recommened Ubuntu 20.04 LTS.
+Note: for older releases (Mainnet releases up to `7.0.2`, Testnet releases up to `test-7.0.4`), we recommend Ubuntu 20.04 LTS.
 
 **Install Operating System Dependencies:**
 
