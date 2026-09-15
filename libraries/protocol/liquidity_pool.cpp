@@ -35,6 +35,18 @@ void liquidity_pool_create_operation::validate()const
               "Share asset can not be the same as one of the assets in the pool" );
    FC_ASSERT( taker_fee_percent <= GRAPHENE_100_PERCENT, "Taker fee percent should not exceed 100%" );
    FC_ASSERT( withdrawal_fee_percent <= GRAPHENE_100_PERCENT, "Withdrawal fee percent should not exceed 100%" );
+
+   const auto& opt_pool_type = extensions.value.pool_type;
+   if( opt_pool_type.valid() )
+      FC_ASSERT( *opt_pool_type < static_cast<uint8_t>( liquidity_pool_curve_type::LP_CURVE_TYPE_COUNT ),
+                 "Invalid pool_type" );
+
+   const bool is_stable = opt_pool_type.valid()
+                          && *opt_pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   FC_ASSERT( is_stable == extensions.value.amplification.valid(),
+              "amplification must be specified for, and only for, a stable pool" );
+   if( extensions.value.amplification.valid() )
+      FC_ASSERT( *extensions.value.amplification > 0, "amplification must be positive" );
 }
 
 void liquidity_pool_delete_operation::validate()const
@@ -58,12 +70,25 @@ void liquidity_pool_deposit_operation::validate()const
    FC_ASSERT( amount_a.amount > 0 && amount_b.amount > 0, "Both amounts of the assets should be positive" );
    FC_ASSERT( amount_a.asset_id < amount_b.asset_id,
               "ID of the first asset should be smaller than ID of the second asset" );
+
+   const auto& floor = extensions.value.min_to_receive;
+   if( floor.valid() )
+      FC_ASSERT( *floor > 0, "Minimum amount of shares to receive should be positive" );
 }
 
 void liquidity_pool_withdraw_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0, "Fee should not be negative" );
    FC_ASSERT( share_amount.amount > 0, "Amount of the share asset should be positive" );
+
+   // Welcher Seite eine Untergrenze gilt, entscheidet erst der Evaluator: hier ist der Pool
+   // nicht bekannt, also auch nicht, welches seiner beiden Assets withdraw_one_asset nennt.
+   const auto& min_a = extensions.value.min_a;
+   const auto& min_b = extensions.value.min_b;
+   if( min_a.valid() )
+      FC_ASSERT( *min_a > 0, "Minimum amount of asset A to receive should be positive" );
+   if( min_b.valid() )
+      FC_ASSERT( *min_b > 0, "Minimum amount of asset B to receive should be positive" );
 }
 
 void liquidity_pool_exchange_operation::validate()const
