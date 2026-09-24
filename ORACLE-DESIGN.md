@@ -344,6 +344,11 @@ In order of how sound and how cheap each step is:
 4. **Transparency.** The API reports, for each oracle, the bonded stake, the value that depends
    on it (smartcoin debt and futures open interest), and each producer's liveness and
    deviation history. Stake at risk against value secured is the honest headline number.
+5. **Open producer sets, as an owner's choice.** Instead of an allow-list, an owner may let
+   any account join by bonding at least a minimum, with weight in proportion to its bond. The
+   cost of controlling the median is then the cost of holding half the bonded weight, and that
+   has to exceed the value secured, which is why step 4 comes first. Capping the weight per
+   account would not help, because one party can split its bond across many accounts.
 
 **Considered and not proposed:**
 
@@ -356,6 +361,10 @@ In order of how sound and how cheap each step is:
   evaluated inside consensus on every match, so the settlement price has to be in chain state.
   What could be taken from pull designs is relaying: producers sign values off-chain and anyone
   may submit them, which separates who attests to a price from who pays the fee.
+- **A deviation threshold that adapts to volatility.** The quorum rule already keeps the filter
+  from freezing the oracle in a crash, so adapting is not needed for that. It would also need a
+  volatility estimate computed inside consensus, and an attacker who can make the price
+  volatile could widen the band on purpose.
 - **A circuit breaker that bounds how far the aggregate may move per round.** Revision 1 tried
   anchoring on the previous output and removed it: in a genuine move the honest producers are
   the ones who deviate, so a stale producer survived and outvoted them.
