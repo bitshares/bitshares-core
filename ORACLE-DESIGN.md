@@ -148,16 +148,17 @@ already on chain.
 
 ## Oracles
 
-Two things change from revision 1. `base_asset` and `quote_asset` become `base` and `quote` of
-type `reference_asset_id_type`. And a published value is a list of rationals, one per declared
-series, instead of one `price`.
+Three things change from revision 1. `base_asset` and `quote_asset` become `base` and `quote`
+of type `reference_asset_id_type`. A published value is a list of rationals, one per declared
+series, instead of one `price`. And a producer entry becomes a struct instead of a bare weight,
+so that an economic layer can be added later (see "Trust model").
 
 A value is `(base_amount, quote_amount)`: that many smallest units of the base reference asset
 equal that many smallest units of the quote. Both are positive int64. Comparing two values
 stays exact, by 128-bit cross-multiplication, as in revision 1.
 
-Everything else carries over unchanged: owner, name, producers and weights, quorum, value
-lifetime, both aggregation methods, the deviation filter and history.
+Everything else carries over unchanged: owner, name, the producer set and its weights, quorum,
+value lifetime, both aggregation methods, the deviation filter and history.
 
 ### Series
 
@@ -286,6 +287,93 @@ So:
 
 A minority that disagrees with the rest is filtered out; everyone moving together is believed.
 
+## Trust model
+
+An oracle here is exactly as trustworthy as its producer set and whoever controls it. The
+owner chooses the producers, nothing is bonded, and a bad producer is removed by the owner.
+That is the trust model of today's price feeds, and of BitShares consensus itself: block
+producers are elected by stake-weighted vote, and the chain slashes no one, block producers
+included. This design changes how prices are shared and aggregated. It does not claim a new
+security model. Outside reviews have called it a data schema rather than a cryptoeconomic
+oracle, and on the economic dimension that is accurate.
+
+**What aggregation already guarantees, without any economics.** While honest producers hold
+more than half the weight, the weighted median lies inside the range of honest values. A
+minority cannot move it, whatever it publishes. Quorum turns too few live producers into an
+absent value, not a guess. The windowed median defeats a single-block spike. What economics
+would have to add is protection in the two cases aggregation cannot handle: a colluding
+majority, and producers that simply stop publishing.
+
+### What an economic layer can and cannot enforce
+
+A penalty that runs without human judgement needs a fault the chain can verify on its own.
+
+- **Liveness can be verified.** Whether a producer had a live submission at a given time is a
+  fact in chain state. A reward that is paid only for being live, or a penalty for absence,
+  can therefore be enforced automatically.
+- **Accuracy cannot.** The only price the chain knows is the aggregate. Slashing producers for
+  deviating from the aggregate sounds natural, but it is unsound:
+  - it only ever catches a minority, and a minority cannot move the median anyway;
+  - it hands a colluding majority a way to confiscate the bonds of the honest producers who
+    disagree with it;
+  - in a genuine fast move, it punishes the producers who report the move first. That rewards
+    reporting late and copying the median, which is the failure the quorum-aware outlier rule
+    above was designed to avoid.
+- **Equivocation is not a fault here.** Each submission replaces the producer's previous one,
+  so two conflicting submissions are an update, not a contradiction.
+
+So a penalty for inaccuracy needs a source of truth outside the aggregate. In practice that is
+a bonded challenge resolved by a vote, which on BitShares ends in stake-weighted governance
+again, but with capital at risk on both sides.
+
+### A proposal for a later stage
+
+In order of how sound and how cheap each step is:
+
+1. **Producer bonds.** An owner may require a minimum bond, and producers lock it to be
+   eligible. A bond is released only after an unbonding delay, so a challenge can still reach
+   it.
+2. **Rewards for liveness, funded by consumers.** A consumer that binds to an oracle pays into
+   its reward pool, as a subscription or as a share of the smartcoin's market fees. At each
+   maintenance interval, producers that were live are paid in proportion to their weight.
+   Paying for liveness and not for agreeing with the median matters, because paying for
+   agreement rewards copying.
+3. **Bonded challenges.** Anyone may challenge a value by posting a bond. The challenge is
+   resolved by the committee or by stake vote within a fixed window, and the loser's bond goes
+   to the winner. This is the only path by which a bond is slashed.
+4. **Transparency.** The API reports, for each oracle, the bonded stake, the value that depends
+   on it (smartcoin debt and futures open interest), and each producer's liveness and
+   deviation history. Stake at risk against value secured is the honest headline number.
+
+**Considered and not proposed:**
+
+- **Weights earned from reputation.** Weight earned by agreeing with the aggregate is exactly
+  what a patient attacker accumulates before striking. Weights stay owner-set.
+- **Commit-reveal rounds.** They stop producers copying each other's visible submissions, but
+  cost two operations per value and a round of latency. They could be added later as a
+  per-oracle option.
+- **A pull model, where a consumer fetches a price on demand.** Smartcoin margin calls are
+  evaluated inside consensus on every match, so the settlement price has to be in chain state.
+  What could be taken from pull designs is relaying: producers sign values off-chain and anyone
+  may submit them, which separates who attests to a price from who pays the fee.
+- **A circuit breaker that bounds how far the aggregate may move per round.** Revision 1 tried
+  anchoring on the previous output and removed it: in a genuine move the honest producers are
+  the ones who deviate, so a stale producer survived and outvoted them.
+- **The BitShares order book as a price source.** It is deterministic and verifiable, but for
+  smartcoins it is circular: the price that triggers margin calls would come from the market
+  those margin calls trade on, and a thin book is cheap to move. It could serve as a declared
+  series or a sanity bound, not as the settlement source.
+- **Proof of data origin (TLSNotary, DECO, zero-knowledge proofs).** Verifying these would put
+  new cryptography inside consensus. Out of scope.
+
+### What the first stage does to keep this possible
+
+In revision 1, a producer entry is a bare weight: `flat_map<account_id_type, uint16_t>`.
+Revision 2 makes it a struct with an extensions field, `producer_entry { weight, extensions }`.
+Bonds and reward shares can then be added later without a new operation. `oracle_options`
+already carries extensions. This is the only change the economic layer asks of the first
+stage.
+
 ## Consensus safety
 
 - **Determinism.** Aggregation selects among observed values. The only arithmetic is the
@@ -312,15 +400,15 @@ Revision 2 is larger than revision 1. Staging keeps the first hardfork reviewabl
    and the conversion.
 2. **Without a hardfork:** opening reference-asset creation, by changing the parameter.
 3. **With a later hardfork, if wanted:** per-name approval, fees and expiry, a moving
-   StableSwap multiplier.
+   StableSwap multiplier, and the economic layer described under "Trust model".
 
 ## Out of scope
 
 - **Non-price data.** The value type is a price.
 - **Off-chain sourcing, signing schemes or a fetch protocol.** How a producer decides what to
   publish stays off-chain, as it is today.
-- **Incentives, staking or slashing.** The owner removes a bad producer. There is no automatic
-  punishment.
+- **Incentives, staking or slashing in the first stage.** See "Trust model" for why, and for
+  what a later stage could add.
 - **Replacing the legacy feed path.** It stays. Assets migrate individually, and the old path
   must keep producing identical results for assets that do not.
 
@@ -339,6 +427,8 @@ Revision 2 is larger than revision 1. Staging keeps the first hardfork reviewabl
 | 9 | A token with no off-chain meaning | Reasonable; implementation complexity is the concern | Its own reference asset, mapped 1 : 1, so the oracle type stays uniform | Open |
 | 10 | Namespace | — | Separate from asset symbols | Proposal |
 | 11 | Rounding direction in the conversion | Consumers choose among declared series | The conversion rounds the same way as the chosen series | Open |
+| 12 | Economic layer | — (raised in outside reviews) | A later stage: bonds, liveness rewards funded by consumers, bonded challenges; never automatic slashing for deviation | Proposal |
+| 13 | Producer entry | — | A struct with extensions from the first stage, so that bonds can be added later | Proposal |
 
 ## Implementation status
 
