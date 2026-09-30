@@ -96,9 +96,6 @@ void oracle_options::validate()const
    if( oracle_aggregation_method::median_over_window == get_aggregation() )
       FC_ASSERT( window_sec > 0,
                  "window_sec should be positive when aggregating over a window" );
-
-   FC_ASSERT( max_deviation_ppm <= GRAPHENE_100_PERCENT * 100,
-              "max_deviation_ppm is out of range" );
 }
 
 void oracle_create_operation::validate()const

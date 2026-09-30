@@ -453,8 +453,9 @@ BOOST_AUTO_TEST_CASE( weights_shift_the_median )
    BOOST_CHECK( *oid(db).current_value == usd_per_core( 300 ) );
 } FC_LOG_AND_RETHROW() }
 
-/// A minority disagreeing with the rest is filtered out.
-BOOST_AUTO_TEST_CASE( an_outlier_is_excluded_while_quorum_survives )
+/// One producer publishing something wild does not move the median. No filter is needed for
+/// that: the median ignores a minority on its own.
+BOOST_AUTO_TEST_CASE( a_single_wild_producer_does_not_move_the_median )
 { try {
    generate_blocks( HARDFORK_ORACLE_TIME );
    generate_block();
@@ -469,7 +470,6 @@ BOOST_AUTO_TEST_CASE( an_outlier_is_excluded_while_quorum_survives )
    opts.producers[carol_id] = 1;
    opts.producers[dave_id]  = 1;
    opts.minimum_producers   = 2;
-   opts.max_deviation_ppm   = 100000;   // 10%
    const auto oid = make_oracle( alice_id, alice_private_key, "CORE.USD", opts );
 
    // establish a baseline of 100
@@ -478,15 +478,14 @@ BOOST_AUTO_TEST_CASE( an_outlier_is_excluded_while_quorum_survives )
    BOOST_REQUIRE( oid(db).current_value.valid() );
    BOOST_CHECK( *oid(db).current_value == usd_per_core( 100 ) );
 
-   // dave publishes wildly off; two honest submissions still meet quorum, so he is dropped
+   // dave publishes wildly off. He counts as a live producer, but the median does not move.
    publish( oid, dave_id, dave_private_key, 100000 );
    BOOST_REQUIRE( oid(db).current_value.valid() );
    BOOST_CHECK( *oid(db).current_value == usd_per_core( 100 ) );
-   BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 2u );
+   BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 3u );
 } FC_LOG_AND_RETHROW() }
 
-/// ...but when everyone moves together, that is a real crash and the oracle must follow it.
-/// Freezing here is the failure mode the quorum-aware rule exists to prevent.
+/// When every producer reports a crash together, the oracle follows it at once.
 BOOST_AUTO_TEST_CASE( when_every_producer_moves_together_the_oracle_moves )
 { try {
    generate_blocks( HARDFORK_ORACLE_TIME );
@@ -501,15 +500,13 @@ BOOST_AUTO_TEST_CASE( when_every_producer_moves_together_the_oracle_moves )
    opts.producers[bob_id]   = 1;
    opts.producers[carol_id] = 1;
    opts.minimum_producers   = 2;
-   opts.max_deviation_ppm   = 100000;   // 10%
    const auto oid = make_oracle( alice_id, alice_private_key, "CORE.USD", opts );
 
    publish( oid, bob_id,   bob_private_key,   100 );
    publish( oid, carol_id, carol_private_key, 100 );
    BOOST_REQUIRE( oid(db).current_value.valid() );
 
-   // both producers report a 10x move, far outside the deviation bound. Excluding them would
-   // leave zero submissions and break quorum, so they are believed.
+   // both producers report a 10x move, and the value follows immediately
    publish( oid, bob_id,   bob_private_key,   1000 );
    publish( oid, carol_id, carol_private_key, 1000 );
 
@@ -643,88 +640,14 @@ BOOST_AUTO_TEST_CASE( only_the_owner_may_update_or_delete )
 } FC_LOG_AND_RETHROW() }
 
 /**
- * REGRESSION: the deviation filter must not let a minority capture the price.
+ * Four of five producers report a move from 100 to 200, and mallory keeps saying 100. The median
+ * follows the majority at once, and mallory repeating the old number cannot hold it back.
  *
- * The filter drops submissions far from a reference and keeps the survivors. It used to
- * reference the LAST PUBLISHED VALUE, which inverted the security model: on a genuine price
- * move it is the HONEST producers who deviate -- they are reporting the new price -- while a
- * producer repeating the old number sits inside the band and survives. The survivors became
- * the entire live set, so one stale producer outvoted an honest majority; and because
- * current_value never moved, neither did the band, so the capture held indefinitely.
- *
- * The reference is now the round's own weighted median, which is the majority's number by
- * construction, so the outlier is what gets trimmed. Four of five producers report a move
- * from 100 to 200 and win immediately; mallory, still saying 100, is the one dropped.
+ * This began as a regression test for the outlier filter, which once anchored its band on the
+ * last published value and so let one stale producer outvote the rest. The filter is gone; the
+ * test stays, because the property is what matters.
  */
-BOOST_AUTO_TEST_CASE( the_deviation_filter_cannot_let_a_minority_capture_the_price )
-{ try {
-   generate_blocks( HARDFORK_ORACLE_TIME );
-   generate_block();
-   set_expiration( db, trx );
-   setup_assets();
-
-   ACTORS( (owner)(p1)(p2)(p3)(p4)(mallory) );
-
-   oracle_options opts;
-   opts.producers[ p1_id ]      = 1;
-   opts.producers[ p2_id ]      = 1;
-   opts.producers[ p3_id ]      = 1;
-   opts.producers[ p4_id ]      = 1;
-   opts.producers[ mallory_id ] = 1;
-   opts.minimum_producers = 1;      // the shipped default
-   opts.max_deviation_ppm = 100000; // 10% band -- a plausible "manipulation resistance" setting
-   opts.aggregation = static_cast<uint8_t>( oracle_aggregation_method::median_of_latest );
-
-   const auto oid = make_oracle( owner_id, owner_private_key, "CORE.USD", opts );
-
-   // Everyone agrees the price is 100. (usd_per_core is 1/n, so a bigger n is a lower price.)
-   publish( oid, p1_id, p1_private_key, 100 );
-   publish( oid, p2_id, p2_private_key, 100 );
-   publish( oid, p3_id, p3_private_key, 100 );
-   publish( oid, p4_id, p4_private_key, 100 );
-   publish( oid, mallory_id, mallory_private_key, 100 );
-   BOOST_REQUIRE( oid(db).current_value.valid() );
-   BOOST_CHECK( *oid(db).current_value == usd_per_core( 100 ) );
-
-   // The market moves hard. The four honest producers report it; mallory does not.
-   // A block between rounds keeps mallory's repeated submission from being a byte-identical
-   // transaction, which the chain would reject as a duplicate.
-   generate_block();
-   set_expiration( db, trx );
-   publish( oid, p1_id, p1_private_key, 200 );
-   publish( oid, p2_id, p2_private_key, 200 );
-   publish( oid, p3_id, p3_private_key, 200 );
-   publish( oid, p4_id, p4_private_key, 200 );
-   publish( oid, mallory_id, mallory_private_key, 100 );
-
-   // The band is anchored on this round's median, so mallory is the outlier and is trimmed.
-   BOOST_REQUIRE( oid(db).current_value.valid() );
-   BOOST_CHECK_MESSAGE( *oid(db).current_value == usd_per_core( 200 ),
-                        "the honest majority must win" );
-   BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 4 );
-
-   // And it is not a one-round lag: the band is anchored to a value mallory controls, so
-   // republishing the same number holds the oracle there indefinitely.
-   for( int round = 0; round < 5; ++round )
-   {
-      generate_block();
-      set_expiration( db, trx );
-      publish( oid, p1_id, p1_private_key, 200 );
-      publish( oid, p2_id, p2_private_key, 200 );
-      publish( oid, p3_id, p3_private_key, 200 );
-      publish( oid, p4_id, p4_private_key, 200 );
-      publish( oid, mallory_id, mallory_private_key, 100 );
-   }
-   BOOST_CHECK( *oid(db).current_value == usd_per_core( 200 ) );
-   BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 4 );
-
-} FC_LOG_AND_RETHROW() }
-
-/**
- * The same oracle without the filter behaves as a median should: the honest majority wins
- * immediately. The filter is the whole difference.
- */
-BOOST_AUTO_TEST_CASE( without_the_deviation_filter_the_majority_wins )
+BOOST_AUTO_TEST_CASE( an_honest_majority_wins_immediately_when_the_market_moves )
 { try {
    generate_blocks( HARDFORK_ORACLE_TIME );
    generate_block();
@@ -740,28 +663,37 @@ BOOST_AUTO_TEST_CASE( without_the_deviation_filter_the_majority_wins )
    opts.producers[ p4_id ]      = 1;
    opts.producers[ mallory_id ] = 1;
    opts.minimum_producers = 1;
-   opts.max_deviation_ppm = 0;      // off
    opts.aggregation = static_cast<uint8_t>( oracle_aggregation_method::median_of_latest );
 
    const auto oid = make_oracle( owner_id, owner_private_key, "CORE.USD", opts );
 
+   // Everyone agrees the price is 100. (usd_per_core is 1/n, so a bigger n is a lower price.)
    publish( oid, p1_id, p1_private_key, 100 );
    publish( oid, p2_id, p2_private_key, 100 );
    publish( oid, p3_id, p3_private_key, 100 );
    publish( oid, p4_id, p4_private_key, 100 );
    publish( oid, mallory_id, mallory_private_key, 100 );
-
-   generate_block();
-   set_expiration( db, trx );
-   publish( oid, p1_id, p1_private_key, 200 );
-   publish( oid, p2_id, p2_private_key, 200 );
-   publish( oid, p3_id, p3_private_key, 200 );
-   publish( oid, p4_id, p4_private_key, 200 );
-   publish( oid, mallory_id, mallory_private_key, 100 );
-
    BOOST_REQUIRE( oid(db).current_value.valid() );
-   BOOST_CHECK( *oid(db).current_value == usd_per_core( 200 ) );
-   BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 5 );
+   BOOST_CHECK( *oid(db).current_value == usd_per_core( 100 ) );
+
+   // The market moves. The four honest producers report it; mallory does not. A block between
+   // rounds keeps mallory's repeated submission from being a byte-identical transaction, which
+   // the chain would reject as a duplicate.
+   for( int round = 0; round < 6; ++round )
+   {
+      generate_block();
+      set_expiration( db, trx );
+      publish( oid, p1_id, p1_private_key, 200 );
+      publish( oid, p2_id, p2_private_key, 200 );
+      publish( oid, p3_id, p3_private_key, 200 );
+      publish( oid, p4_id, p4_private_key, 200 );
+      publish( oid, mallory_id, mallory_private_key, 100 );
+
+      BOOST_REQUIRE( oid(db).current_value.valid() );
+      BOOST_CHECK_MESSAGE( *oid(db).current_value == usd_per_core( 200 ),
+                           "the honest majority must win, round " << round );
+      BOOST_CHECK_EQUAL( oid(db).current_value_producer_count, 5 );
+   }
 } FC_LOG_AND_RETHROW() }
 
 
@@ -935,6 +867,71 @@ BOOST_AUTO_TEST_CASE( measure_the_on_chain_cost_of_publishing_a_false_value )
                         "the last false submission was not accepted" );
    BOOST_CHECK_MESSAGE( get_balance( liar_id, core_id ) >= after,
                         "something was taken back after the submission" );
+} FC_LOG_AND_RETHROW() }
+
+/**
+ * Two colluding producers out of five must not be able to push the value outside the range of
+ * the three honest submissions. A plain weighted median guarantees that: while the honest
+ * producers hold a majority of the weight, the median is one of their values or lies between
+ * them, whatever the others publish.
+ *
+ * The colluders sweep across the honest range and beyond, and every result is checked.
+ *
+ * Revision 1's outlier filter failed exactly this. Anchored on the round's median, which the
+ * colluders can shift to one end of the honest range, it let them get honest producers at the
+ * other end excluded as outliers. With a band of 1% or 0.5%, 18 of 162 rounds ended outside the
+ * honest range, set by the colluders' own value.
+ */
+BOOST_AUTO_TEST_CASE( a_colluding_minority_cannot_push_the_value_outside_the_honest_range )
+{ try {
+   generate_blocks( HARDFORK_ORACLE_TIME );
+   generate_block();
+   set_expiration( db, trx );
+   setup_assets();
+
+   ACTORS( (owner)(h1)(h2)(h3)(c1)(c2) );
+
+   // usd_per_core(n) is 1/n, so the honest range runs from usd_per_core(1010) up to
+   // usd_per_core(990).
+   const price lowest_honest  = usd_per_core( 1010 );
+   const price highest_honest = usd_per_core( 990 );
+
+   oracle_options opts;
+   opts.producers[ h1_id ] = 1;
+   opts.producers[ h2_id ] = 1;
+   opts.producers[ h3_id ] = 1;
+   opts.producers[ c1_id ] = 1;
+   opts.producers[ c2_id ] = 1;
+   opts.minimum_producers = 3;
+   opts.aggregation = static_cast<uint8_t>( oracle_aggregation_method::median_of_latest );
+   const auto oid = make_oracle( owner_id, owner_private_key, "RANGE.TEST", opts );
+
+   size_t rounds = 0;
+   size_t outside = 0;
+   for( int64_t colluders = 960; colluders <= 1040; ++colluders )
+   {
+      generate_block();
+      set_expiration( db, trx );
+      publish( oid, h1_id, h1_private_key, 990 );
+      publish( oid, h2_id, h2_private_key, 1000 );
+      publish( oid, h3_id, h3_private_key, 1010 );
+      publish( oid, c1_id, c1_private_key, colluders );
+      publish( oid, c2_id, c2_private_key, colluders );
+
+      BOOST_REQUIRE( oid(db).current_value.valid() );
+      const price& v = *oid(db).current_value;
+      ++rounds;
+      if( v < lowest_honest || highest_honest < v )
+      {
+         ++outside;
+         BOOST_TEST_MESSAGE( "  colluders at " << colluders << ": value 1/"
+                             << ( v.quote.amount.value / v.base.amount.value )
+                             << " is outside the honest range 1/1010 .. 1/990, from "
+                             << oid(db).current_value_producer_count << " producers" );
+      }
+   }
+   BOOST_TEST_MESSAGE( "  " << outside << " of " << rounds << " rounds ended outside the honest range" );
+   BOOST_CHECK_EQUAL( outside, 0u );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

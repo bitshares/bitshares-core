@@ -92,16 +92,11 @@ namespace graphene { namespace protocol {
       /// Window for median_over_window. Ignored by median_of_latest.
       uint32_t window_sec = 3600;
 
-      /**
-       * How far a submission may sit from the current aggregate before it is treated as an
-       * outlier, in parts per million. Zero disables the check.
-       *
-       * Outliers are excluded only while enough non-outliers remain to satisfy
-       * minimum_producers. If excluding them would break quorum, nothing is excluded and the
-       * aggregate moves -- otherwise a real crash, where every honest producer moves at once,
-       * would freeze the oracle at the moment it most needs to update.
-       */
-      uint32_t max_deviation_ppm = 0;
+      // There is deliberately no outlier filter. A weighted median already confines a minority
+      // to the range of the honest values. A filter anchored on the round's median, which a
+      // minority can shift, let two colluders out of five get honest producers excluded and
+      // push the value outside that range. See ORACLE-DESIGN.md and the test
+      // a_colluding_minority_cannot_push_the_value_outside_the_honest_range.
 
       extensions_type extensions;
 
@@ -230,7 +225,7 @@ FC_REFLECT_ENUM( graphene::protocol::oracle_aggregation_method,
 
 FC_REFLECT( graphene::protocol::oracle_options,
             (producers)(minimum_producers)(value_lifetime_sec)(aggregation)(window_sec)
-            (max_deviation_ppm)(extensions) )
+            (extensions) )
 
 FC_REFLECT( graphene::protocol::oracle_create_operation::fee_params_t, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::oracle_update_operation::fee_params_t, (fee)(price_per_kbyte) )
