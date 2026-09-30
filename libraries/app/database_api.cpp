@@ -2076,6 +2076,63 @@ vector<credit_offer_object> database_api::get_credit_offers_by_owner(
                                   idx, limit, start_id, owner );
 }
 
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Oracles                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<optional<oracle_object>> database_api::get_oracles(
+            const vector<oracle_id_type>& oracle_ids )const
+{
+   const auto& idx = my->_db.get_index_type<oracle_index>().indices().get<by_id>();
+   vector<optional<oracle_object>> result;
+   result.reserve( oracle_ids.size() );
+   // An unknown id yields an empty slot rather than an error: callers batch ids, and one bad
+   // one should not discard the whole answer.
+   std::transform( oracle_ids.begin(), oracle_ids.end(), std::back_inserter(result),
+                   [&idx]( oracle_id_type id ) -> optional<oracle_object> {
+      auto itr = idx.find( object_id_type( id ) );
+      if( itr == idx.end() )
+         return {};
+      return *itr;
+   } );
+   return result;
+}
+
+optional<oracle_object> database_api::get_oracle_by_name( const string& name )const
+{
+   const auto& idx = my->_db.get_index_type<oracle_index>().indices().get<by_oracle_name>();
+   auto itr = idx.find( name );
+   if( itr == idx.end() )
+      return {};
+   return *itr;
+}
+
+vector<oracle_object> database_api::list_oracles(
+            const optional<uint32_t>& limit,
+            const optional<oracle_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<oracle_index>().indices().get<by_id>();
+   return my->get_objects_by_x< oracle_object,
+                                oracle_id_type
+                               >( &application_options::api_limit_get_oracles,
+                                  idx, limit, start_id );
+}
+
+vector<oracle_object> database_api::get_oracles_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<oracle_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->get_id();
+   const auto& idx = my->_db.get_index_type<oracle_index>().indices().get<by_owner>();
+   return my->get_objects_by_x< oracle_object,
+                                oracle_id_type
+                               >( &application_options::api_limit_get_oracles,
+                                  idx, limit, start_id, owner );
+}
+
 vector<credit_offer_object> database_api::get_credit_offers_by_asset(
             const std::string& asset_symbol_or_id,
             const optional<uint32_t>& limit,

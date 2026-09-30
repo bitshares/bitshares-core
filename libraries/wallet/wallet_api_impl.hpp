@@ -260,6 +260,17 @@ public:
    signed_transaction update_asset_feed_producers(string symbol, flat_set<string> new_feed_producers,
          bool broadcast );
 
+   /// Resolves an oracle by name or by id string, throwing if there is no such oracle.
+   oracle_object get_oracle( const string& name_or_id )const;
+
+   signed_transaction create_oracle( string owner, string name, string description,
+         string base_symbol, string quote_symbol, oracle_options options, bool broadcast );
+   signed_transaction update_oracle( string owner, string name_or_id,
+         optional<string> new_description, optional<oracle_options> new_options, bool broadcast );
+   signed_transaction delete_oracle( string owner, string name_or_id, bool broadcast );
+   signed_transaction publish_oracle_value( string producer, string name_or_id, price value,
+         bool broadcast );
+
    signed_transaction publish_asset_feed(string publishing_account, string symbol, price_feed feed,
          bool broadcast );
 

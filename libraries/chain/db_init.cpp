@@ -34,6 +34,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/credit_offer_object.hpp>
+#include <graphene/chain/oracle_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
@@ -59,6 +60,7 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/credit_offer_evaluator.hpp>
+#include <graphene/chain/oracle_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/liquidity_pool_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
@@ -149,6 +151,10 @@ void database::initialize_evaluators()
    register_evaluator<credit_offer_accept_evaluator>();
    register_evaluator<credit_deal_repay_evaluator>();
    register_evaluator<credit_deal_update_evaluator>();
+   register_evaluator<oracle_create_evaluator>();
+   register_evaluator<oracle_update_evaluator>();
+   register_evaluator<oracle_delete_evaluator>();
+   register_evaluator<oracle_publish_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -178,6 +184,7 @@ void database::initialize_indexes()
    add_index< primary_index<samet_fund_index> >();
    add_index< primary_index<credit_offer_index> >();
    add_index< primary_index<credit_deal_index> >();
+   add_index< primary_index<oracle_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
