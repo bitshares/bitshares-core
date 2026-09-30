@@ -43,7 +43,8 @@ using graphene::protocol::oracle_aggregation_method;
  *  own right so that several consumers can reference the same series, and so that a price
  *  that is not the settlement price of any particular smartcoin has somewhere to live.
  *
- *  See ORACLE-DESIGN.md for the reasoning behind the aggregation and outlier rules.
+ *  See ORACLE-DESIGN.md for the reasoning behind the aggregation rules, and for why there is
+ *  no outlier filter.
  */
 class oracle_object : public abstract_object<oracle_object, protocol_ids, oracle_object_type>
 {
