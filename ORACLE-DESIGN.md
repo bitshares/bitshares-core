@@ -41,8 +41,8 @@ price still inherits collateral-ratio machinery that means nothing to it.
 vote each. There is no way to say "these five exchanges, and require four of them", or to
 weight a producer that has been reliable for a year above one added yesterday.
 
-**Aggregation is median-of-latest, and nothing else.** There is no outlier handling, no bound
-on how far one update may move the result, and no time dimension at all.
+**Aggregation has no time dimension.** It is the median of the latest submissions, with no way
+to damp a price that holds for a single block.
 
 **There is no history.** Only the latest submission per publisher is kept, so no
 time-averaged measure can be computed even in principle. History has to start being recorded
@@ -62,6 +62,26 @@ token only to name what the contract tracks.
 
 Both follow from one choice: pricing in asset ids ties creating an oracle to creating an
 asset. Revision 2 removes that choice.
+
+**Its outlier filter let a minority move the price.** Revision 1 excluded submissions further
+than `max_deviation_ppm` from the round's median, as long as quorum and a majority of the
+weight remained. But a minority can shift the round's median to one end of the honest range.
+Colluders who stay just inside the band then get honest producers at the other end excluded as
+outliers, and the median of the survivors can land outside every honest value. Measured with
+the chain's own `update_current_value`: five producers of equal weight, quorum 3, honest
+submissions of 99, 100 and 101, and two colluders who submit the same value.
+
+| Band | Colluders at 98.5 | at 98.8 | at 101.2 | at 101.5 |
+|---|---|---|---|---|
+| no filter | 99 | 99 | 101 | 101 |
+| 1% | **98.5** | **98.8** | 101 | 101 |
+| 0.5% | 99 | **98.8** | **101.2** | **101.5** |
+
+Without the filter the result stays between 99 and 101, whatever the colluders submit. With it,
+they can place the result up to one band width outside every honest value. The filter helped in
+only one case: colluders far outside the band were dropped, which moved the result from the
+edge of the honest range towards its centre. But colluders choose what they submit. Revision 2
+removes the filter, and the code on this branch no longer has it (see "Aggregation").
 
 ## Concepts
 
@@ -158,7 +178,8 @@ equal that many smallest units of the quote. Both are positive int64. Comparing 
 stays exact, by 128-bit cross-multiplication, as in revision 1.
 
 Everything else carries over unchanged: owner, name, the producer set and its weights, quorum,
-value lifetime, both aggregation methods, the deviation filter and history.
+value lifetime, both aggregation methods and history. The deviation filter does not; see "What
+revision 1 got wrong".
 
 ### Series
 
@@ -185,12 +206,10 @@ has a bid ≤ v, so the weight at or below v is at least as large for bids as fo
 bid median is reached first. `median_over_window` inherits the property, because every history
 entry satisfies it.
 
-This constrains the outlier filter. In revision 1 each producer has one value, so excluding a
-value and excluding a producer were the same thing. With several series they are not, and the
-filter must exclude a producer from all series or from none. Otherwise the bid median and the ask
-median are taken over different producers, and the aggregated bid can exceed the aggregated
-ask. The rule: a producer is an outlier when any of its values deviates by more than
-`max_deviation_ppm` from that series' median for the round. The quorum rule is unchanged.
+Without an outlier filter this holds automatically, because every series is aggregated over the
+same live producers. Any filter added later would have to exclude a producer from all series or
+from none. Otherwise the bid median and the ask median would come from different producers, and
+the aggregated bid could exceed the aggregated ask.
 
 History stores one value per series per entry, so its bound becomes
 `GRAPHENE_ORACLE_MAX_HISTORY` × the series count.
@@ -272,102 +291,121 @@ scaling or wide accumulators whose overflow behaviour has to match on every node
 windowed median returns a price that was actually observed, so it is exact by construction,
 and it still defeats a single-block spike.
 
-## Outlier handling
-
-`max_deviation_ppm` bounds how far a submission may sit from the round's median before it is
-excluded. With series, the exclusion is per producer; see above.
-
-The subtle case is a genuine crash, when every honest producer moves at once. A rule that
-rejects every deviating submission would freeze the oracle exactly when it most needs to move.
-So:
-
-> Outliers are excluded **only while enough non-outliers remain to meet quorum.** If
-> excluding them would drop the count below `minimum_producers`, nothing is excluded and the
-> aggregate moves.
-
-A minority that disagrees with the rest is filtered out; everyone moving together is believed.
+**There is no outlier filter.** The weighted median is the robust part: it confines a minority
+to the range of the honest values without any filtering. A filter measured against a median
+that the minority itself can shift does worse, as "What revision 1 got wrong" shows. Any band
+narrower than the spread of the honest values lets the minority exclude honest producers. So
+`max_deviation_ppm` is removed from `oracle_options`, and quorum is the only rule applied before
+the median.
 
 ## Trust model
 
-An oracle here is exactly as trustworthy as its producer set and whoever controls it. The
-owner chooses the producers, nothing is bonded, and a bad producer is removed by the owner.
-That is the trust model of today's price feeds, and of BitShares consensus itself: block
-producers are elected by stake-weighted vote, and the chain slashes no one, block producers
-included. This design changes how prices are shared and aggregated. It does not claim a new
-security model. Outside reviews have called it a data schema rather than a cryptoeconomic
-oracle, and on the economic dimension that is accurate.
+**The owner's key is the root of trust.** The owner chooses the producers and their weights,
+and `oracle_update` applies a new set at once: it recomputes the value and pushes it to every
+bound smartcoin in the same operation. Whoever holds that key can add producers of their own,
+give them most of the weight and set the price within a few blocks. The test
+`the_owner_can_flip_the_value_by_reweighting_alone` pins this down: re-weighting alone, with no
+new submission, moves the value. Nothing is bonded, and a bad producer is removed by the owner.
 
-**What aggregation already guarantees, without any economics.** While honest producers hold
-more than half the weight, the weighted median lies inside the range of honest values. A
-minority cannot move it, whatever it publishes. Quorum turns too few live producers into an
-absent value, not a guess. The windowed median defeats a single-block spike. What economics
-would have to add is protection in the two cases aggregation cannot handle: a colluding
-majority, and producers that simply stop publishing.
+How that compares with what exists:
+
+- It is the trust model of today's smartcoins whose issuer runs its own feed producers.
+- It is weaker than that of today's witness-fed and committee-fed smartcoins, whose producer
+  sets change only by election or by committee proposal. It matches them only if the oracle
+  that feeds such a smartcoin is owned by the committee account, so that every change passes
+  through a proposal and its review period.
+- It gives more power than a block producer has. Every node checks a block against the rules,
+  but an oracle value is accepted as given, and it triggers margin calls and settlement
+  directly. BitShares slashes no one today, block producers included, but the comparison with
+  consensus ends there.
+
+This design changes how prices are shared and aggregated. It does not claim a new security
+model, and it is not a cryptoeconomic oracle.
+
+**What aggregation limits, and what it does not.** While honest producers hold more than half
+the weight, the weighted median lies within the range of the honest values. A minority cannot
+push it outside that range, but it can choose where inside the range it lands, by publishing at
+one end. With honest submissions of 99, 100 and 101, two colluders out of five make the value
+99 or 101 at will. That range is widest in a fast move, when some honest producers have caught
+up and others have not. Quorum turns too few live producers into an absent value, not a guess.
+So a minority whose submissions the quorum needs can make the value absent by stopping. That
+fails closed, but it is a denial of service. The windowed median defeats a single-block spike.
+Aggregation does nothing against a colluding majority, or against an owner who installs one.
 
 ### What an economic layer can and cannot enforce
 
-A penalty that runs without human judgement needs a fault the chain can verify on its own.
+A penalty that runs without human judgement needs a fault the chain can check on its own.
 
-- **Liveness can be verified.** Whether a producer had a live submission at a given time is a
-  fact in chain state. A reward that is paid only for being live, or a penalty for absence,
-  can therefore be enforced automatically.
-- **Accuracy cannot.** The only price the chain knows is the aggregate. Slashing producers for
-  deviating from the aggregate sounds natural, but it is unsound:
-  - it only ever catches a minority, and a minority cannot move the median anyway;
-  - it hands a colluding majority a way to confiscate the bonds of the honest producers who
-    disagree with it;
-  - in a genuine fast move, it punishes the producers who report the move first. That rewards
-    reporting late and copying the median, which is the failure the quorum-aware outlier rule
-    above was designed to avoid.
-- **Equivocation is not a fault here.** Each submission replaces the producer's previous one,
-  so two conflicting submissions are an update, not a contradiction.
+- **Liveness, mostly.** Chain state shows whether a producer's submission was included in time,
+  not whether the producer sent it. Block producers who leave a producer's operations out make
+  it look absent. A rule for absence has to tolerate that, for example by measuring over a long
+  interval.
+- **Not accuracy.** The only price the chain knows is the aggregate, and slashing producers for
+  deviating from it does not work:
+  - against a minority it adds little, because the median already confines a minority to the
+    honest range;
+  - against a colluding majority it does nothing, because the majority defines the aggregate,
+    and it lets that majority confiscate the bonds of the honest producers who disagree;
+  - in a genuine fast move it punishes whoever reports the move first, which rewards reporting
+    late and copying.
+- **Equivocation is not a fault here.** Each submission replaces the producer's previous one.
 
-So a penalty for inaccuracy needs a source of truth outside the aggregate. In practice that is
-a bonded challenge resolved by a vote, which on BitShares ends in stake-weighted governance
-again, but with capital at risk on both sides.
+A penalty for inaccuracy therefore needs a source of truth outside the aggregate. That means a
+bonded challenge resolved by a vote, which on BitShares ends in stake-weighted governance
+again, though with capital at risk on both sides. It also acts after the fact. By the time a
+challenge is resolved, the margin calls and settlements the bad value triggered have happened,
+and they cannot be undone. A slashed bond can compensate; it cannot prevent.
 
 ### A proposal for a later stage
 
-In order of how sound and how cheap each step is:
+Each step, and what it does not solve:
 
-1. **Producer bonds.** An owner may require a minimum bond, and producers lock it to be
-   eligible. A bond is released only after an unbonding delay, so a challenge can still reach
-   it.
-2. **Rewards for liveness, funded by consumers.** A consumer that binds to an oracle pays into
-   its reward pool, as a subscription or as a share of the smartcoin's market fees. At each
-   maintenance interval, producers that were live are paid in proportion to their weight.
-   Paying for liveness and not for agreeing with the median matters, because paying for
-   agreement rewards copying.
-3. **Bonded challenges.** Anyone may challenge a value by posting a bond. The challenge is
-   resolved by the committee or by stake vote within a fixed window, and the loser's bond goes
-   to the winner. This is the only path by which a bond is slashed.
+1. **Producer bonds.** An owner may require a minimum bond, released only after an unbonding
+   delay so that a challenge can still reach it. A bond in BTS behind an oracle that prices BTS
+   is worth least exactly when BTS is falling fast, which is when the oracle matters most.
+2. **Rewards for liveness, funded by consumers.** A consumer that binds pays into the oracle's
+   reward pool, and producers that were live are paid at each maintenance interval. This buys
+   availability, not independence. A producer that copies the last aggregate is paid exactly
+   as much as one that does the work, and nothing in chain state tells them apart. And because
+   the owner sets both the producers and their weights, paying by weight lets an owner steer a
+   consumer-funded pool to accounts of its own.
+3. **Bonded challenges.** Anyone may challenge a value by posting a bond. The committee or a
+   stake vote resolves it within a fixed window, and the loser's bond goes to the winner.
+   **Open:** whether part of a slashed bond should go to the holders the bad value harmed, and
+   what the disputed value does during the window. Freezing it stops further harm, but it hands
+   anyone with a bond a way to freeze the oracle.
 4. **Transparency.** The API reports, for each oracle, the bonded stake, the value that depends
-   on it (smartcoin debt and futures open interest), and each producer's liveness and
-   deviation history. Stake at risk against value secured is the honest headline number.
-5. **Open producer sets, as an owner's choice.** Instead of an allow-list, an owner may let
-   any account join by bonding at least a minimum, with weight in proportion to its bond. The
-   cost of controlling the median is then the cost of holding half the bonded weight, and that
-   has to exceed the value secured, which is why step 4 comes first. Capping the weight per
-   account would not help, because one party can split its bond across many accounts.
+   on it (smartcoin debt and futures open interest), and each producer's liveness history. The
+   question that matters is whether the bond an attacker would actually lose exceeds what a
+   false value is worth to them. The API can report the inputs to that question, not the
+   answer.
+5. **Open producer sets, as an owner's choice.** Any account may join by bonding at least a
+   minimum, with weight in proportion to its bond. To control the median, an attacker then
+   needs more bonded weight than all other producers together. Acquiring that weight is not the
+   same as paying for an attack. Without automatic slashing, a bond is lost only if a challenge
+   succeeds, and it is returned after the unbonding delay otherwise. The attack costs the bond
+   times the chance of losing the challenge, plus what the capital could have earned elsewhere,
+   and that has to exceed the profit from the false value. A weight cap per account would not
+   help, because a bond can be split across accounts.
 
 **Considered and not proposed:**
 
-- **Weights earned from reputation.** Weight earned by agreeing with the aggregate is exactly
-  what a patient attacker accumulates before striking. Weights stay owner-set.
-- **Commit-reveal rounds.** They stop producers copying each other's visible submissions, but
-  cost two operations per value and a round of latency. They could be added later as a
-  per-oracle option.
+- **Weights earned automatically from agreeing with the aggregate.** They reward copying, and
+  they can be accumulated patiently before an attack. Owner-set weights share the second
+  problem, not the first.
+- **Commit-reveal rounds.** They stop copying of the current round's submissions, though not
+  copying of the last aggregate, at the cost of two operations per value and a round of
+  latency. They could be added later as a per-oracle option.
 - **A pull model, where a consumer fetches a price on demand.** Smartcoin margin calls are
   evaluated inside consensus on every match, so the settlement price has to be in chain state.
   What could be taken from pull designs is relaying: producers sign values off-chain and anyone
   may submit them, which separates who attests to a price from who pays the fee.
-- **A deviation threshold that adapts to volatility.** The quorum rule already keeps the filter
-  from freezing the oracle in a crash, so adapting is not needed for that. It would also need a
-  volatility estimate computed inside consensus, and an attacker who can make the price
-  volatile could widen the band on purpose.
-- **A circuit breaker that bounds how far the aggregate may move per round.** Revision 1 tried
-  anchoring on the previous output and removed it: in a genuine move the honest producers are
-  the ones who deviate, so a stale producer survived and outvoted them.
+- **A deviation threshold that adapts to volatility.** It would keep a band tight in calm
+  markets, which a fixed band cannot do. With the outlier filter removed, there is no band to
+  adapt.
+- **A circuit breaker that bounds how far the aggregate may move per round.** It makes the value
+  lag a genuine move. For smartcoins, a settlement price that falls more slowly than the market
+  triggers margin calls late, which is how debt ends up undercollateralised.
 - **The BitShares order book as a price source.** It is deterministic and verifiable, but for
   smartcoins it is circular: the price that triggers margin calls would come from the market
   those margin calls trade on, and a thin book is cheap to move. It could serve as a declared
@@ -375,13 +413,20 @@ In order of how sound and how cheap each step is:
 - **Proof of data origin (TLSNotary, DECO, zero-knowledge proofs).** Verifying these would put
   new cryptography inside consensus. Out of scope.
 
-### What the first stage does to keep this possible
+### What the first stage should do
 
-In revision 1, a producer entry is a bare weight: `flat_map<account_id_type, uint16_t>`.
-Revision 2 makes it a struct with an extensions field, `producer_entry { weight, extensions }`.
-Bonds and reward shares can then be added later without a new operation. `oracle_options`
-already carries extensions. This is the only change the economic layer asks of the first
-stage.
+- **Store each producer as a struct with extensions**, `producer_entry { weight, extensions }`,
+  instead of a bare weight. Bonds and reward shares can then be added later without a new
+  operation.
+- **Delay the changes that can hand over control.** **Proposal.** Every change of producers or
+  policy takes effect only after a delay the owner declares and the protocol bounds from below.
+  The exceptions are removing a producer, raising the quorum and shortening the value lifetime:
+  those stay immediate, because they are what an owner does in an emergency, and at worst they
+  make the value absent. The delay does not remove the need to trust the owner. An owner can
+  still add producers through the delay and later remove the honest ones. But a takeover
+  becomes visible in advance, which gives bound consumers time to act. It costs a record of the
+  pending change on the oracle, and applying it when the delay expires. A committee-owned
+  oracle gets the same protection from the proposal review period, with no new mechanism.
 
 ## Consensus safety
 
@@ -432,18 +477,21 @@ Revision 2 is larger than revision 1. Staging keeps the first hardfork reviewabl
 | 5 | Who declares a mapping | The issuer | The issuer | Settled |
 | 6 | Can a mapping change | Consumers bear this like other issuer risks | Yes, behind a renounceable permission bit | Open |
 | 7 | Precision on reference assets | Keep it; prices stay rational | Same | Settled |
-| 8 | Series with kind and rounding | Suggested in review | Same producer set across series; per-producer outlier rule | Open: which kinds, and which stage |
+| 8 | Series with kind and rounding | Suggested in review | Every series aggregated over the same live producers | Open: which kinds, and which stage |
 | 9 | A token with no off-chain meaning | Reasonable; implementation complexity is the concern | Its own reference asset, mapped 1 : 1, so the oracle type stays uniform | Open |
 | 10 | Namespace | — | Separate from asset symbols | Proposal |
 | 11 | Rounding direction in the conversion | Consumers choose among declared series | The conversion rounds the same way as the chosen series | Open |
-| 12 | Economic layer | — (raised in outside reviews) | A later stage: bonds, liveness rewards funded by consumers, bonded challenges; never automatic slashing for deviation | Proposal |
+| 12 | Economic layer | — (raised in discussion of this design) | A later stage: bonds, liveness rewards funded by consumers, bonded challenges; never automatic slashing for deviation | Proposal |
 | 13 | Producer entry | — | A struct with extensions from the first stage, so that bonds can be added later | Proposal |
+| 14 | Outlier filter | — | Removed: it let a colluding minority push the value outside the honest range. Removed from the code on this branch, with a test | Proposal |
+| 15 | Delay on changes of producers and policy | — | Delayed by an owner-declared, protocol-bounded period; removing a producer, raising quorum and shortening lifetime stay immediate | Open |
 
 ## Implementation status
 
 Revision 1 is implemented on this branch: the oracle object and index, the four operations
 with hardfork gating, submissions and `median_of_latest`, history and `median_over_window`,
-outlier handling, `price_oracle_id` on smartcoins, and the wallet and database API. That code
-remains useful. Aggregation, history, the outlier filter and the quorum rules carry over, and
-what changes is concentrated in the object's base and quote, the publish payload, and the two
-binding checks. Revision 2 code waits for the open decisions above.
+`price_oracle_id` on smartcoins, and the wallet and database API. Its outlier filter has been
+removed. The test `a_colluding_minority_cannot_push_the_value_outside_the_honest_range` fails
+with the filter and passes without it. That code remains useful: aggregation, history and the
+quorum rules carry over, and what changes is concentrated in the object's base and quote, the
+publish payload, and the two binding checks. Revision 2 code waits for the open decisions above.
