@@ -104,7 +104,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    app1->startup();
 
-   server_port_number = app1->websocket_server()->get_listening_port();
+   server_port_number = app1->get_websocket_port();
 
    return app1;
 }
