@@ -71,8 +71,11 @@ namespace graphene { namespace wallet { namespace detail {
             xfer_op.memo = memo_data();
             xfer_op.memo->from = from_account.options.memo_key;
             xfer_op.memo->to = to_account.options.memo_key;
-            xfer_op.memo->set_message(get_private_key(from_account.options.memo_key),
-                                      to_account.options.memo_key, memo);
+            // Upgraded automatically when the recipient has published an ML-KEM memo key: the
+            // sender needs no new key material of their own to encapsulate, so there is nothing
+            // to opt into and no reason to leave the weaker option as the default.
+            encrypt_memo_message( *xfer_op.memo, get_private_key(from_account.options.memo_key),
+                                  to_account.options.pq_memo_key.value, memo );
          }
 
       signed_transaction tx;
@@ -108,8 +111,8 @@ namespace graphene { namespace wallet { namespace detail {
             memo_data data;
             data.from = from_acct.options.memo_key;
             data.to = to_acct.options.memo_key;
-            data.set_message( 
-                  get_private_key(from_acct.options.memo_key), to_acct.options.memo_key, memo);
+            encrypt_memo_message( data, get_private_key(from_acct.options.memo_key),
+                                  to_acct.options.pq_memo_key.value, memo );
             create_op.extensions.value.memo = data;
          }
 

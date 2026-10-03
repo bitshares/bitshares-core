@@ -134,6 +134,11 @@ bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
+   // PQ serialization format for block storage + validation
+   const bool pq_active = is_pq_serialization_active();
+   fc::raw::scoped_pq_format pq_fmt( pq_active ? fc::raw::pq_format::current
+                                              : fc::raw::pq_format::legacy );
+
    const auto now = fc::time_point::now().sec_since_epoch();
    if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > now - 86400 )
    {
@@ -237,7 +242,24 @@ void database::verify_signing_witness( const signed_block& new_block, const fork
    const auto& scheduled_witness = (*fork_entry.scheduled_witnesses)[index];
    FC_ASSERT( new_block.witness == scheduled_witness.first, "Witness produced block at wrong time",
               ("block witness",new_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
-   FC_ASSERT( new_block.validate_signee( scheduled_witness.second ) );
+   if( new_block.witness_pq_signature.valid() )
+   {
+      // Deliberately not verified here. This is an early, pre-apply screen, and the only
+      // witness keys available to it are the classical ones captured in fork_entry --
+      // there is no fork-captured PQ key. Reading the live witness object instead
+      // (new_block.witness(*this)) consults whichever branch is currently at head, which
+      // for a block on a competing fork is the wrong branch: a witness that registered a
+      // PQ key on one branch but not the other would have its valid blocks rejected, so
+      // the node could not follow the winning fork.
+      //
+      // The PQ signature is fully verified in validate_block_header(), which runs inside
+      // _apply_block() against the state of the fork actually being applied. Skipping the
+      // check here only forgoes an early rejection; it cannot let a bad block through.
+   }
+   else
+   {
+      FC_ASSERT( new_block.validate_signee( scheduled_witness.second ) );
+   }
 }
 
 void database::update_witnesses( fork_item& fork_entry )const
@@ -383,13 +405,15 @@ signed_block database::generate_block(
    fc::time_point_sec when,
    witness_id_type witness_id,
    const fc::ecc::private_key& block_signing_private_key,
-   uint32_t skip /* = 0 */
+   uint32_t skip, /* = 0 */
+   const fc::optional<fc::pq_private_key>& block_pq_signing_private_key /* = fc::optional<fc::pq_private_key>() */
    )
 { try {
    signed_block result;
    detail::with_skip_flags( *this, skip, [&]()
    {
-      result = _generate_block( when, witness_id, block_signing_private_key );
+      result = _generate_block( when, witness_id, block_signing_private_key,
+                                block_pq_signing_private_key );
    } );
    return result;
 } FC_CAPTURE_AND_RETHROW() } // GCOVR_EXCL_LINE
@@ -397,7 +421,8 @@ signed_block database::generate_block(
 signed_block database::_generate_block(
    fc::time_point_sec when,
    witness_id_type witness_id,
-   const fc::ecc::private_key& block_signing_private_key
+   const fc::ecc::private_key& block_signing_private_key,
+   const fc::optional<fc::pq_private_key>& block_pq_signing_private_key
    )
 {
    try {
@@ -406,6 +431,11 @@ signed_block database::_generate_block(
    FC_ASSERT( slot_num > 0 );
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
+
+   // PQ serialization format for block production
+   const bool pq_active = is_pq_serialization_active();
+   fc::raw::scoped_pq_format pq_fmt( pq_active ? fc::raw::pq_format::current
+                                              : fc::raw::pq_format::legacy );
 
    //
    // The following code throws away existing pending_tx_session and
@@ -430,7 +460,17 @@ signed_block database::_generate_block(
       // _pending_tx_session is the result of applying _pending_tx.
       // In this case, when the node received a new block,
       // the push_block() call will re-create the _pending_tx_session.
-      FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+      if ( witness_id(*this).pq_signing_key.valid() )
+      {
+         FC_ASSERT( block_pq_signing_private_key.valid(),
+                    "Witness has a post-quantum signing key registered, the PQ private key is required to produce blocks" );
+         FC_ASSERT( pq_public_key_type( block_pq_signing_private_key->get_public_key() )
+                       == *witness_id(*this).pq_signing_key );
+      }
+      else
+      {
+         FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+      }
    }
 
    static const size_t max_partial_block_header_size = ( fc::raw::pack_size( signed_block_header() )
@@ -508,7 +548,24 @@ signed_block database::_generate_block(
    pending_block.witness = witness_id;
 
    if( 0 == (skip & skip_witness_signature) )
-      pending_block.sign( block_signing_private_key );
+   {
+      // Sign PQ only when THIS witness has a PQ key registered on chain -- not merely
+      // because the node happens to hold some PQ private key. An operator running several
+      // witnesses from one node supplies every key it needs on the command line, so keying
+      // the decision off block_pq_signing_private_key.valid() made every witness emit a PQ
+      // signature, including those with no PQ key registered. Validation then rejects each
+      // such block ("Block has PQ signature but witness has no PQ key") and those witnesses
+      // stop producing entirely.
+      if( witness_id(*this).pq_signing_key.valid() )
+      {
+         FC_ASSERT( block_pq_signing_private_key.valid(),
+                    "Witness ${w} has a PQ signing key registered but no PQ private key was supplied",
+                    ("w", witness_id) );
+         pending_block.sign_pq( *block_pq_signing_private_key );
+      }
+      else
+         pending_block.sign( block_signing_private_key );
+   }
 
    push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing
                                                                     // self-generated blocks
@@ -595,6 +652,11 @@ void database::_apply_block( const signed_block& next_block )
    uint32_t next_block_num = next_block.block_num();
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
+
+   // PQ serialization format: activate after hardfork time + committee parameter
+   const bool pq_active = is_pq_serialization_active();
+   fc::raw::scoped_pq_format pq_fmt( pq_active ? fc::raw::pq_format::current
+                                              : fc::raw::pq_format::legacy );
 
    if( 0 == (skip & skip_block_size_check) )
    {
@@ -699,7 +761,35 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
+   // PQ serialization format for transaction validation. This MUST be derived from chain
+   // state here -- the single choke point every transaction entry point (P2P gossip via
+   // push_transaction, the plain JSON-RPC broadcast_transaction path, and
+   // validate_transaction) funnels through -- rather than relying on the caller to have set
+   // an ambient fc::raw::pq_format first. trx.validate()/trx.id() and verify_authority()
+   // below all depend on it (authority/signed_transaction packing conditionally includes
+   // pq_key_auths/pq_signatures bytes only under pq_format::current), so setting it late or
+   // not at all silently mismatches the digest the signer used, causing valid PQ-signed
+   // transactions submitted through, e.g., network_broadcast_api::broadcast_transaction to be
+   // rejected once the PQ_0 hardfork is active.
+   const bool pq_active = is_pq_serialization_active();
+   fc::raw::scoped_pq_format pq_fmt( pq_active ? fc::raw::pq_format::current
+                                                : fc::raw::pq_format::legacy );
+
    trx.validate();
+
+   // PQ consensus gate: reject pq_signatures before activation.
+   //
+   // Outside the signature-check skip on purpose. Whether the field may be present at all is a
+   // structural rule about the transaction, in the same category as validate() above it, not a
+   // question of whether a signature is good -- and skip_transaction_signatures is set by nodes
+   // that trust the producer, which is exactly when a structural rule still has to hold.
+   //
+   // It cannot be reached from the network in any case: pq_gated emits nothing at all under the
+   // legacy format, not even a length prefix, so a transaction unpacked before activation has
+   // no such field to carry. What this catches is a transaction built in process.
+   if( !pq_active )
+      FC_ASSERT( trx.pq_signatures.empty(),
+                 "Post-quantum signatures are not yet active" );
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
@@ -831,7 +921,25 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    const witness_object& witness = next_block.witness(*this);
 
    if( 0 == (skip&skip_witness_signature) )
-      FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
+   {
+      const auto& gpo_params = get_global_properties().parameters;
+      bool pq_active = HARDFORK_PQ_0_PASSED(head_block_time())
+                     && gpo_params.extensions.value.pq_serialization_active.valid()
+                     && *gpo_params.extensions.value.pq_serialization_active;
+
+      if( next_block.witness_pq_signature.valid() )
+      {
+         FC_ASSERT( pq_active, "Post-quantum block signatures are not yet active" );
+         FC_ASSERT( witness.pq_signing_key.valid(),
+                    "Block carries a post-quantum signature but the signing witness has no PQ key",
+                    ("witness",witness.id)("signature",*next_block.witness_pq_signature) );
+         FC_ASSERT( next_block.validate_signee_pq( *witness.pq_signing_key ) );
+      }
+      else
+      {
+         FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
+      }
+   }
 
    if( 0 == (skip&skip_witness_schedule_check) )
    {
@@ -871,8 +979,18 @@ static const uint32_t skip_expensive = database::skip_transaction_signatures | d
                                        | database::skip_merkle_check | database::skip_transaction_dupe_check;
 
 template<typename Trx>
-void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const
+void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip,
+                                      fc::raw::pq_format fmt )const
 {
+   // This runs on a worker thread dispatched via fc::do_parallel(), which does NOT inherit
+   // the calling thread's fc::raw::scoped_pq_format (it's thread_local) -- so the format must
+   // be computed by the caller from chain state and passed in explicitly here, rather than
+   // relying on trx->id()/get_signature_keys()'s own default parameter (which is a fixed
+   // constant, oblivious to chain state or which thread it runs on). Without this, the
+   // precomputed/cached _tx_id_buffer and _signees on the transaction could be computed under
+   // the wrong format and then silently reused (never recomputed) by the later single-threaded
+   // validation path in _apply_transaction, since both id() and get_signature_keys() memoize.
+   fc::raw::scoped_pq_format pq_fmt( fmt );
    for( size_t i = 0; i < count; ++i, ++trx )
    {
       trx->validate(); // TODO - parallelize wrt confidential operations
@@ -881,34 +999,44 @@ void database::_precompute_parallel( const Trx* trx, const size_t count, const u
       if( 0 == (skip&skip_transaction_dupe_check) )
          trx->id();
       if( 0 == (skip&skip_transaction_signatures) )
-         trx->get_signature_keys( get_chain_id() );
+         trx->get_signature_keys( get_chain_id(), fmt );
    }
 }
 
 fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
 { try {
+   // See _apply_block's identical computation; this must match what block validation/
+   // application will later use, since the results computed here (transaction ids, recovered
+   // signature keys, the block id) get cached and are not recomputed downstream.
+   const bool pq_active = is_pq_serialization_active();
+   const fc::raw::pq_format fmt = pq_active ? fc::raw::pq_format::current : fc::raw::pq_format::legacy;
+
    std::vector<fc::future<void>> workers;
    if( !block.transactions.empty() )
    {
       if( (skip & skip_expensive) == skip_expensive )
-         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
+         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip, fmt );
       else
       {
          uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
          uint32_t chunk_size = ( block.transactions.size() + chunks - 1 ) / chunks;
          workers.reserve( chunks + 1 );
          for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
-            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
+            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip,fmt] () {
                _precompute_parallel( &block.transactions[base],
                                      ( ( base + chunk_size ) < block.transactions.size() ) ? chunk_size
                                                  : ( block.transactions.size() - base ),
-                                     skip );
+                                     skip, fmt );
             }) );
       }
    }
 
-   if( 0 == (skip&skip_witness_signature) )
+   if( 0 == (skip&skip_witness_signature) && !block.witness_pq_signature.valid() )
       workers.push_back( fc::do_parallel( [&block] () { block.signee(); } ) );
+   // calculate_merkle_root()/id() run on this (the calling) thread, not a worker, but still
+   // need the correct ambient format explicitly set -- see merkle_digest()'s and id()'s own
+   // "respect ambient, don't self-override" fixes; this scope is what they now rely on.
+   fc::raw::scoped_pq_format pq_fmt( fmt );
    if( 0 == (skip&skip_merkle_check) )
       block.calculate_merkle_root();
    block.id();
@@ -925,8 +1053,10 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
 
 fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
 {
-   return fc::do_parallel([this,&trx] () {
-      _precompute_parallel( &trx, 1, skip_nothing );
+   const bool pq_active = is_pq_serialization_active();
+   const fc::raw::pq_format fmt = pq_active ? fc::raw::pq_format::current : fc::raw::pq_format::legacy;
+   return fc::do_parallel([this,&trx,fmt] () {
+      _precompute_parallel( &trx, 1, skip_nothing, fmt );
    });
 }
 

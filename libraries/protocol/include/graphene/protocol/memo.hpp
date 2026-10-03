@@ -58,12 +58,58 @@ namespace graphene { namespace protocol {
        */
       vector<char> message;
 
+      /**
+       * ML-KEM (FIPS 203) ciphertext, present only on memos encrypted with post-quantum
+       * protection and only under the post-quantum serialization format.
+       *
+       * The recipient recovers the KEM shared secret from this and folds it into the AES
+       * key alongside the ECDH secret, so the memo is readable only by someone holding
+       * both the classical memo key and the post-quantum one. That is deliberate: the
+       * construction is no weaker than today's memo even if this KEM implementation turns
+       * out to be flawed, and no weaker than the KEM even once secp256k1 falls.
+       *
+       * Memos matter more than most fields here for post-quantum purposes. A signature
+       * only has to resist forgery until it is confirmed, but a memo encrypted today is
+       * recorded on chain permanently, so traffic captured now becomes readable the moment
+       * secp256k1 breaks. Nothing done later can undo that -- which is why this exists.
+       */
+      fc::pq_gated< optional< vector<char> > > pq_ciphertext;
+
       /// @note custom_nonce is for debugging only; do not set to a nonzero value in production
       void        set_message(const fc::ecc::private_key& priv,
                               const fc::ecc::public_key& pub, const string& msg, uint64_t custom_nonce = 0);
 
       std::string get_message(const fc::ecc::private_key& priv,
                               const fc::ecc::public_key& pub)const;
+
+      /**
+       * Encrypt with hybrid classical + post-quantum key agreement.
+       *
+       * Performs the usual ECDH against @p pub and additionally encapsulates to @p to_pq_key,
+       * an ML-KEM public key belonging to the recipient. Both secrets are folded into the AES
+       * key, and the KEM ciphertext is carried in @ref pq_ciphertext.
+       *
+       * @param priv      the sender's classical memo private key
+       * @param pub       the recipient's classical memo public key
+       * @param to_pq_key the recipient's ML-KEM public key, from their account options
+       * @param msg       the plaintext
+       * @param custom_nonce debugging only; leave zero in production
+       */
+      void set_message_pq(const fc::ecc::private_key& priv,
+                          const fc::ecc::public_key& pub,
+                          const std::vector<char>& to_pq_key,
+                          const string& msg, uint64_t custom_nonce = 0);
+
+      /**
+       * Decrypt a memo written by @ref set_message_pq.
+       *
+       * @param priv       the recipient's (or sender's) classical memo private key
+       * @param pub        the other party's classical memo public key
+       * @param pq_priv_key the recipient's ML-KEM secret key
+       */
+      std::string get_message_pq(const fc::ecc::private_key& priv,
+                                 const fc::ecc::public_key& pub,
+                                 const std::vector<char>& pq_priv_key)const;
    };
 
    /**
@@ -88,7 +134,29 @@ namespace graphene { namespace protocol {
 } } // namespace graphene::protocol
 
 FC_REFLECT( graphene::protocol::memo_message, (checksum)(text) )
-FC_REFLECT( graphene::protocol::memo_data, (from)(to)(nonce)(message) )
+// pq_ciphertext is reflected so JSON and the API see it, but it is NOT part of the
+// reflected binary packing: fc::raw::pack/unpack for memo_data are written out by hand in
+// memo.cpp so the field only reaches the wire under the post-quantum format. memo_data is
+// embedded in transfer_operation and has been on chain since genesis; emitting a new field
+// unconditionally would make every historical memo fail to deserialize.
+FC_REFLECT( graphene::protocol::memo_data, (from)(to)(nonce)(message)(pq_ciphertext) )
+
+namespace fc { namespace raw {
+   void pack( datastream<size_t>& s, const graphene::protocol::memo_data& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( sha256::encoder& s, const graphene::protocol::memo_data& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( datastream<char*>& s, const graphene::protocol::memo_data& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void unpack( datastream<const char*>& s, graphene::protocol::memo_data& v,
+                uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+   // Prevent implicit instantiation of 1-arg vector-returning pack/pack_size in other TUs --
+   // the instantiation in memo.cpp sees these declarations.
+   extern template std::vector<char> pack( const graphene::protocol::memo_data& v,
+                                           uint32_t _max_depth );
+   extern template size_t pack_size( const graphene::protocol::memo_data& v );
+} } // namespace fc::raw
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::memo_message )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::memo_data )

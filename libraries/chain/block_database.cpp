@@ -28,6 +28,57 @@
 
 namespace graphene { namespace chain {
 
+namespace {
+
+/**
+ * Post-quantum: decode a stored block, trying both serialization formats and letting the
+ * recorded block id decide which one was right.
+ *
+ * store() packs a block under whichever format was in effect on the writing thread, which
+ * follows chain state at the moment the block was applied. Reads happen on entirely
+ * different threads -- API calls, p2p item requests, startup index checks -- whose format
+ * is whatever their own context happened to set, and is normally the legacy one. So from
+ * the PQ hardfork onward a reader decodes a post-quantum-format block using the legacy
+ * format; the unpack, or the id comparison after it, then fails.
+ *
+ * Every caller in this file swallows that exception, so the failure is silent and the
+ * consequences are severe: get_block() returns null for every block after activation, the
+ * node cannot serve those blocks to peers (so nobody can sync past the hardfork), and the
+ * index check on startup treats them as corruption and truncates the index file, throwing
+ * away every block after the activation point.
+ *
+ * Trying both formats needs no change to the on-disk layout and cannot accept a wrong
+ * decode, because a block decoded under the wrong format does not hash to the id stored
+ * alongside it.
+ */
+fc::optional<signed_block> unpack_block_checked( const std::vector<char>& data,
+                                                 const block_id_type& expected_id )
+{
+   const fc::raw::pq_format current_fmt = fc::raw::get_pq_format();
+   const fc::raw::pq_format other_fmt = ( current_fmt == fc::raw::pq_format::current )
+                                           ? fc::raw::pq_format::legacy
+                                           : fc::raw::pq_format::current;
+   for( const auto fmt : { current_fmt, other_fmt } )
+   {
+      try
+      {
+         fc::raw::scoped_pq_format scoped( fmt );
+         auto result = fc::raw::unpack<signed_block>( data );
+         if( result.id() == expected_id )
+            return result;
+      }
+      catch (const fc::exception&)
+      {
+      }
+      catch (const std::exception&)
+      {
+      }
+   }
+   return {};
+}
+
+} // anonymous namespace
+
 struct index_entry
 {
    index_entry() {
@@ -168,8 +219,8 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
       _blocks.seekg( e.block_pos.value() );
       if (e.block_size.value())
          _blocks.read( data.data(), e.block_size.value() );
-      auto result = fc::raw::unpack<signed_block>(data);
-      FC_ASSERT( result.id() == e.block_id );
+      auto result = unpack_block_checked( data, e.block_id );
+      FC_ASSERT( result.valid() );
       return result;
    }
    catch (const fc::exception&)
@@ -197,8 +248,8 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
       vector<char> data( e.block_size.value() );
       _blocks.seekg( e.block_pos.value() );
       _blocks.read( data.data(), e.block_size.value() );
-      auto result = fc::raw::unpack<signed_block>(data);
-      FC_ASSERT( result.id() == e.block_id );
+      auto result = unpack_block_checked( data, e.block_id );
+      FC_ASSERT( result.valid() );
       return result;
    }
    catch (const fc::exception&)
@@ -238,8 +289,11 @@ optional<index_entry> block_database::last_index_entry()const {
                _blocks.read( data.data(), e.block_size.value() );
                if( _blocks.gcount() == long(e.block_size.value()) )
                {
-                  const signed_block block = fc::raw::unpack<signed_block>(data);
-                  if( block.id() == e.block_id )
+                  // unpack_block_checked() only returns a block whose id matches, so a
+                  // valid result here is the same guarantee the id comparison used to give
+                  // -- without mistaking a format difference for a corrupt index and
+                  // truncating away every block written since the hardfork.
+                  if( unpack_block_checked( data, e.block_id ).valid() )
                      return e;
                }
             }

@@ -535,6 +535,17 @@ class wallet_api
        */
       map<public_key_type, string> dump_private_keys()const;
 
+      /** Dumps all post-quantum private keys owned by the wallet.
+       *
+       * The keys are printed in base58 format. You can import these keys into another
+       * wallet using \c import_pq_key(). Without this, a PQ key created by
+       * \c generate_pq_key() or \c migrate_wallet() exists only inside this wallet file
+       * and cannot be backed up or moved -- which for an account that has migrated to a
+       * PQ-only authority means losing the wallet file loses the account.
+       * @returns a map containing the private keys, indexed by their public key
+       */
+      map<pq_public_key_type, string> dump_pq_private_keys()const;
+
       /** Returns a list of all commands supported by the wallet API.
        *
        * This lists each command, along with its arguments and return types.
@@ -644,6 +655,120 @@ class wallet_api
        * @returns true if the key was imported
        */
       bool import_key( const string& account_name_or_id, const string& wif_key )const;
+
+      /** Imports a post-quantum private key (FIPS 204 ML-DSA) in base58 form
+       *  into the wallet.
+       *
+       * @param account_name_or_id the account owning the key
+       * @param base58_key the PQ private key in base58 form
+       * @returns true if the key was imported
+       */
+      bool import_pq_key( const string& account_name_or_id, const string& base58_key )const;
+
+      /** Deterministically derives a post-quantum key pair from the given
+       *  account's existing (legacy) key, stores the PQ private key in the
+       *  wallet, and returns the PQ public key string (Approach A migration).
+       *
+       * @param account_name_or_id the account owning the key
+       * @param owner_or_active_key_string a WIF or public key string; may be
+       *        left empty when the account has exactly one key in this wallet
+       * @param algorithm optional pq_algorithm tag (default: ML-DSA-65)
+       * @returns the post-quantum public key string
+       */
+      string generate_pq_key( const string& account_name_or_id,
+                             const string& owner_or_active_key_string = string(),
+                             const optional<uint8_t>& algorithm = optional<uint8_t>() )const;
+
+      /** Adds post-quantum (FIPS 204 ML-DSA) keys to the account's owner and active
+       *  authorities, keeping the existing classical keys in place.
+       *
+       *  \warning This does NOT make the account quantum-resistant, and is not meant to.
+       *  An authority is satisfied as soon as its weight threshold is met, and the classical
+       *  keys are still there at their original weight, so the account remains fully
+       *  controllable by its secp256k1 key alone. Against an adversary who can break
+       *  secp256k1 the added key changes nothing: it is an OR, not an AND.
+       *
+       *  It is the right first step because it cannot lock anyone out -- classical access
+       *  still works while the post-quantum key is verified and backed up with
+       *  \c dump_pq_private_keys(). Quantum resistance begins only when no classical key
+       *  remains in the authority, which is \c migrate_wallet_pq_only().
+       *
+       *  The post-quantum keys are generated from independent randomness, not derived from
+       *  the classical keys; deriving them from the secret they are meant to outlive would
+       *  defeat the purpose.
+       *
+       * @param account_name_or_id the account to migrate
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction migrate_wallet( const string& account_name_or_id, bool broadcast )const;
+
+      /** Replaces the account's owner and active authorities with post-quantum-only ones,
+       *  retiring every classical key.
+       *
+       *  This is what actually makes an account quantum-resistant. Each classical key is
+       *  replaced by a freshly generated ML-DSA key carrying the same weight, so the
+       *  threshold arithmetic is unchanged, and any post-quantum keys already present are
+       *  kept. Account authorities are preserved, since they delegate to another account
+       *  whose own authority is checked in turn.
+       *
+       *  \warning Irreversible in practice. From the block this lands in, the account can
+       *  only be authorized by the new post-quantum keys. Export them with
+       *  \c dump_pq_private_keys() and confirm the backup before running this: losing the
+       *  wallet file afterwards means losing the account. The command refuses to write an
+       *  authority that has no post-quantum key, and refuses accounts holding address
+       *  authorities, which are classical and would silently remain spendable.
+       *
+       * @param account_name_or_id the account to migrate
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction migrate_wallet_pq_only( const string& account_name_or_id,
+                                                 bool broadcast )const;
+
+      /** Replaces every address authority with one derived from a freshly generated
+       *  post-quantum key.
+       *
+       *  An address is the hash of a key, so an address entry made from a classical key can
+       *  only ever be satisfied classically. It cannot be converted -- only replaced. This
+       *  generates one ML-DSA key per entry, stores it in the wallet, and writes the address
+       *  of that key in place of the old one at the same weight.
+       *
+       *  \warning This REMOVES whoever held the original address key from the authority.
+       *  If an address entry belonged to a co-signer rather than to you, they lose the
+       *  ability to sign and will not be told. That is why migrate_wallet_pq_only() refuses
+       *  such accounts instead of doing this quietly: run this only when you know every
+       *  address entry is your own.
+       *
+       * @param account_name_or_id the account to migrate
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction migrate_address_auths_pq( const string& account_name_or_id,
+                                                   bool broadcast )const;
+
+      /** Generates a post-quantum (ML-KEM-768) memo key for an account and publishes the
+       *  public half in the account's options.
+       *
+       *  This is what makes post-quantum memos reachable. Until an account publishes a key,
+       *  senders have nowhere to encapsulate to and every memo written to it stays classical
+       *  -- readable by anyone who records the chain today and breaks secp256k1 later.
+       *  Once published, \c transfer() upgrades automatically; senders need no key of their
+       *  own and nothing to opt into.
+       *
+       *  The secret half is written to this wallet file before the transaction is broadcast.
+       *  Back it up with \c dump_pq_private_keys(): if the account advertises a key whose
+       *  secret is lost, memos sent to it afterwards are unreadable permanently, by everyone.
+       *
+       *  Requires the PQ_0 hardfork to have passed and the committee to have enabled
+       *  \c pq_serialization_active.
+       *
+       * @param account_name_or_id the account to publish a memo key for
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction generate_pq_memo_key( const string& account_name_or_id,
+                                               bool broadcast )const;
 
       /** Imports accounts from a BitShares 0.x wallet file.
        * Current wallet file must be unlocked to perform the import.
@@ -1425,6 +1550,28 @@ class wallet_api
                                          bool broadcast = false )const;
 
       /**
+       * Register a witness that signs its blocks with a post-quantum key.
+       *
+       * Separate from create_witness() rather than an extra parameter on it. The wallet API
+       * applies no default arguments over RPC -- every parameter must be supplied -- so
+       * adding one to an existing method breaks every caller written against the previous
+       * signature. A new name leaves those callers alone.
+       *
+       * @param owner_account the name or id of the account which is creating the witness
+       * @param url a URL to include in the witness record in the blockchain.  May be blank.
+       * @param block_pq_signing_key post-quantum (ML-DSA) block signing key, in base58. The
+       *            witness must sign its blocks with the matching PQ private key, supplied
+       *            to the node via --pq-private-key. Requires the PQ_0 hardfork to be
+       *            active. The empty string leaves the witness on classical block signing.
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction registering a witness
+       */
+      signed_transaction create_witness_pq( const string& owner_account,
+                                            const string& url,
+                                            const string& block_pq_signing_key,
+                                            bool broadcast = false )const;
+
+      /**
        * Update a witness object owned by the given account.
        *
        * @param witness_name The name of the witness's owner account.
@@ -1438,6 +1585,28 @@ class wallet_api
                                          const string& url,
                                          const string& block_signing_key,
                                          bool broadcast = false )const;
+
+      /**
+       * Update a witness object, including its post-quantum block signing key.
+       *
+       * Separate from update_witness() for the same reason create_witness_pq() is separate
+       * from create_witness(): see that method.
+       *
+       * @param witness_name The name of the witness's owner account.
+       *                     Also accepts the ID of the owner account or the ID of the witness.
+       * @param url Same as for create_witness.  The empty string makes it remain the same.
+       * @param block_signing_key The new block signing public key.  The empty string makes it
+       *                          remain the same.
+       * @param block_pq_signing_key The new post-quantum (ML-DSA) block signing key, in
+       *                             base58.  The empty string makes it remain the same.
+       * @param broadcast true if you wish to broadcast the transaction.
+       * @return the signed transaction
+       */
+      signed_transaction update_witness_pq( const string& witness_name,
+                                            const string& url,
+                                            const string& block_signing_key,
+                                            const string& block_pq_signing_key,
+                                            bool broadcast = false )const;
 
 
       /**
@@ -1849,6 +2018,7 @@ FC_API( graphene::wallet::wallet_api,
         (is_locked)
         (lock)(unlock)(set_password)
         (dump_private_keys)
+        (dump_pq_private_keys)
         (list_my_accounts)
         (list_accounts)
         (list_account_balances)
@@ -1896,7 +2066,9 @@ FC_API( graphene::wallet::wallet_api,
         (list_witnesses)
         (list_committee_members)
         (create_witness)
+        (create_witness_pq)
         (update_witness)
+        (update_witness_pq)
         (create_worker)
         (update_worker_votes)
         (htlc_create)
@@ -1938,6 +2110,12 @@ FC_API( graphene::wallet::wallet_api,
         (get_transaction_signers)
         (get_key_references)
         (get_prototype_operation)
+        (generate_pq_key)
+        (import_pq_key)
+        (migrate_wallet)
+        (migrate_wallet_pq_only)
+        (migrate_address_auths_pq)
+        (generate_pq_memo_key)
         (propose_parameter_change)
         (propose_fee_change)
         (approve_proposal)

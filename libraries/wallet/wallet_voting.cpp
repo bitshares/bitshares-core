@@ -194,7 +194,7 @@ namespace graphene { namespace wallet { namespace detail {
    }
 
    signed_transaction wallet_api_impl::create_witness(string owner_account,
-         string url, bool broadcast /* = false */)
+         string url, bool broadcast /* = false */, string block_pq_signing_key /* = "" */)
    { try {
       account_object witness_account = get_account(owner_account);
       fc::ecc::private_key active_private_key = get_private_key_for_account(witness_account);
@@ -207,6 +207,15 @@ namespace graphene { namespace wallet { namespace detail {
       witness_create_op.witness_account = witness_account.id;
       witness_create_op.block_signing_key = witness_public_key;
       witness_create_op.url = url;
+      if( block_pq_signing_key != "" )
+      {
+         // Chain-side this is gated on the PQ_0 hardfork plus pq_serialization_active
+         // (witness_evaluator.cpp); validate() catches a malformed key here rather than
+         // letting it reach the evaluator.
+         pq_public_key_type pq_key( block_pq_signing_key );
+         pq_key.validate();
+         witness_create_op.block_pq_signing_key = pq_key;
+      }
 
       if (_remote_db->get_witness_by_account(std::string(witness_create_op.witness_account)))
          FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
@@ -222,7 +231,7 @@ namespace graphene { namespace wallet { namespace detail {
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
 
    signed_transaction wallet_api_impl::update_witness(string witness_name, string url,
-         string block_signing_key, bool broadcast )
+         string block_signing_key, bool broadcast, string block_pq_signing_key /* = "" */ )
    { try {
       witness_object witness = get_witness(witness_name);
       account_object witness_account = get_account( witness.witness_account );
@@ -234,6 +243,13 @@ namespace graphene { namespace wallet { namespace detail {
          witness_update_op.new_url = url;
       if( block_signing_key != "" )
          witness_update_op.new_signing_key = public_key_type( block_signing_key );
+      if( block_pq_signing_key != "" )
+      {
+         // See create_witness: rejected on chain until PQ_0 is active.
+         pq_public_key_type pq_key( block_pq_signing_key );
+         pq_key.validate();
+         witness_update_op.new_pq_signing_key = pq_key;
+      }
 
       signed_transaction tx;
       tx.operations.push_back( witness_update_op );

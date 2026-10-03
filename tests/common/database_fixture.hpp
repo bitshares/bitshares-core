@@ -242,7 +242,8 @@ struct database_fixture_base {
    void vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness);
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
-                               int miss_blocks = 0);
+                               int miss_blocks = 0,
+                               const fc::optional<fc::pq_private_key>& pq_key = fc::optional<fc::pq_private_key>());
 
    /**
     * @brief Generates block_count blocks

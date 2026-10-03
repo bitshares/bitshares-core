@@ -168,6 +168,24 @@ void account_options::validate() const
 
    FC_ASSERT( needed_witnesses == 0 && needed_committee == 0,
               "May not specify fewer witnesses or committee members than the number voted for.");
+
+   if( pq_memo_key.valid() )
+   {
+      // A memo key is for encapsulation, never for signing. Accepting an ML-DSA key here would
+      // publish a signing key in a field senders treat as a KEM key, and every encapsulation
+      // against it would fail; reject the whole class rather than only the wrong sizes.
+      //
+      // ML-KEM-768 specifically, not any ML-KEM parameter set: memo_data::set_message_pq
+      // encapsulates at 768 (NIST Category 3, matching the ML-DSA-65 used for signatures), and
+      // the memo carries no algorithm tag of its own. Accepting a 512 or 1024 key here would
+      // publish something no sender could encapsulate to. Widening this requires the memo
+      // construction to become algorithm-aware first.
+      FC_ASSERT( pq_memo_key->algorithm == fc::pq_algorithm::ml_kem_768,
+                 "The post-quantum memo key must be an ML-KEM-768 (FIPS 203) key." );
+      // pq_public_key_type performs no length checking on raw deserialization, so a malformed
+      // key would otherwise only be caught by the first sender who tried to use it.
+      pq_memo_key->validate();
+   }
 }
 
 share_type account_create_operation::calculate_fee( const fee_params_t& k )const
@@ -278,6 +296,60 @@ void account_transfer_operation::validate()const
 }
 
 } } // graphene::protocol
+
+namespace fc { namespace raw {
+
+namespace detail {
+
+// account_options is embedded in account_create_operation and account_update_operation, both on
+// chain since genesis, so pq_memo_key must not appear in the legacy encoding. Gate it the way
+// authority gates pq_key_auths, and append rather than insert, so legacy bytes stay
+// byte-identical to what a pre-PQ node produces.
+template<typename Stream>
+void pack_account_options_impl( Stream& s, const graphene::protocol::account_options& v,
+                                uint32_t _max_depth )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::pack( s, v.memo_key, _max_depth );
+   fc::raw::pack( s, v.voting_account, _max_depth );
+   fc::raw::pack( s, v.num_witness, _max_depth );
+   fc::raw::pack( s, v.num_committee, _max_depth );
+   fc::raw::pack( s, v.votes, _max_depth );
+   fc::raw::pack( s, v.extensions, _max_depth );
+   fc::raw::pack( s, v.pq_memo_key, _max_depth );   // gates itself; see fc::pq_gated
+}
+
+template<typename Stream>
+void unpack_account_options_impl( Stream& s, graphene::protocol::account_options& v,
+                                  uint32_t _max_depth )
+{ try {
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::unpack( s, v.memo_key, _max_depth );
+   fc::raw::unpack( s, v.voting_account, _max_depth );
+   fc::raw::unpack( s, v.num_witness, _max_depth );
+   fc::raw::unpack( s, v.num_committee, _max_depth );
+   fc::raw::unpack( s, v.votes, _max_depth );
+   fc::raw::unpack( s, v.extensions, _max_depth );
+   fc::raw::unpack( s, v.pq_memo_key, _max_depth );
+} FC_RETHROW_EXCEPTIONS( warn, "error unpacking account_options" ) }
+
+} // namespace detail
+
+void pack( datastream<size_t>& s, const graphene::protocol::account_options& v, uint32_t d )
+   { detail::pack_account_options_impl( s, v, d ); }
+void pack( sha256::encoder& s, const graphene::protocol::account_options& v, uint32_t d )
+   { detail::pack_account_options_impl( s, v, d ); }
+void pack( datastream<char*>& s, const graphene::protocol::account_options& v, uint32_t d )
+   { detail::pack_account_options_impl( s, v, d ); }
+void unpack( datastream<const char*>& s, graphene::protocol::account_options& v, uint32_t d )
+   { detail::unpack_account_options_impl( s, v, d ); }
+
+template std::vector<char> pack( const graphene::protocol::account_options& v, uint32_t _max_depth );
+template size_t pack_size( const graphene::protocol::account_options& v );
+
+} } // namespace fc::raw
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_params_t )

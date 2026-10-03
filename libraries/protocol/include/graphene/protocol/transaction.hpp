@@ -90,7 +90,7 @@ namespace graphene { namespace protocol {
       extensions_type    extensions;
 
       /// Calculate the digest for a transaction
-      digest_type                        digest()const;
+      digest_type                        digest( fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const;
       virtual const transaction_id_type& id()const;
       virtual void                       validate() const;
 
@@ -124,7 +124,7 @@ namespace graphene { namespace protocol {
 
    protected:
       // Calculate the digest used for signature validation
-      digest_type sig_digest( const chain_id_type& chain_id )const;
+      digest_type sig_digest( const chain_id_type& chain_id, fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const;
       mutable transaction_id_type _tx_id_buffer;
    };
 
@@ -139,10 +139,12 @@ namespace graphene { namespace protocol {
       virtual ~signed_transaction() = default;
 
       /** signs and appends to signatures */
-      const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
+      const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id,
+                                   fc::raw::pq_format fmt = fc::raw::pq_format::legacy );
 
       /** returns signature but does not append */
-      signature_type sign( const private_key_type& key, const chain_id_type& chain_id )const;
+      signature_type sign( const private_key_type& key, const chain_id_type& chain_id,
+                            fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const;
 
       /**
        *  The purpose of this method is to identify some subset of
@@ -175,6 +177,11 @@ namespace graphene { namespace protocol {
        * @param max_recursion maximum level of recursion when verifying, since an account
        *            can have another account in active authorities and/or owner authorities
        */
+      const pq_signature& sign_pq( const fc::pq_private_key& key, const chain_id_type& chain_id,
+                                    fc::raw::pq_format fmt = fc::raw::pq_format::legacy );
+      pq_signature sign_pq( const fc::pq_private_key& key, const chain_id_type& chain_id,
+                              fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const;
+
       void verify_authority(
               const chain_id_type& chain_id,
               const std::function<const authority*(account_id_type)>& get_active,
@@ -211,16 +218,27 @@ namespace graphene { namespace protocol {
        *       otherwise, the @p chain_id parameter will be ignored, and
        *       @ref _signees will be returned directly.
        */
-      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const;
+      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id,
+                        fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const;
 
       /** Signatures */
       vector<signature_type> signatures;
 
+      /** Post-quantum signatures (NIST FIPS 204 ML-DSA); empty pre-hardfork */
+      /**
+       * Post-quantum signatures. Gated at the TYPE level rather than by a hand-written pack:
+       * see fc::pq_gated. A struct that both reflects a field and hand-writes a gated pack has
+       * two serialisers for it, and which one a call site gets depends on visibility and
+       * inlining -- that divergence emitted one extra byte here under the legacy format in
+       * Release builds but not Debug ones.
+       */
+      fc::pq_gated<vector<pq_signature>> pq_signatures;
+
       /** Removes all operations and signatures */
-      void clear() { operations.clear(); signatures.clear(); }
+      void clear() { operations.clear(); signatures.clear(); pq_signatures.clear(); }
 
       /** Removes all signatures */
-      void clear_signatures() { signatures.clear(); }
+      void clear_signatures() { signatures.clear(); pq_signatures.clear(); }
    protected:
       /** Public keys extracted from signatures */
       mutable flat_set<public_key_type> _signees;
@@ -239,11 +257,19 @@ namespace graphene { namespace protocol {
 
       virtual const transaction_id_type&       id()const override;
       virtual void                             validate()const override;
-      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const override;
+      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id,
+                        fc::raw::pq_format fmt = fc::raw::pq_format::legacy )const override;
       virtual uint64_t                         get_packed_size()const override;
    protected:
       mutable bool _validated = false;
       mutable uint64_t _packed_size = 0;
+      /// Formats the cached _packed_size and _signees were computed under. Both quantities
+      /// depend on the serialization format -- pack_size() counts the post-quantum fields
+      /// only under the current format, and sig_digest() hashes different bytes -- so each
+      /// cache is valid only while its format is unchanged. See the same fix in
+      /// signed_block_header::id().
+      mutable fc::raw::pq_format _packed_size_format = fc::raw::pq_format::legacy;
+      mutable fc::raw::pq_format _signees_format = fc::raw::pq_format::legacy;
    };
 
    /**
@@ -273,8 +299,10 @@ namespace graphene { namespace protocol {
                           bool ignore_custom_operation_required_auths,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
                           bool allow_committee = false,
+                          bool allow_pq = true,
                           const flat_set<account_id_type>& active_approvals = flat_set<account_id_type>(),
-                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>() );
+                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>(),
+                          const flat_set<pq_public_key_type>& pq_sigs = flat_set<pq_public_key_type>() );
 
    /**
     *  @brief captures the result of evaluating the operations contained in the transaction
@@ -297,6 +325,12 @@ namespace graphene { namespace protocol {
 
       vector<operation_result> operation_results;
 
+      /// Unlike digest()/sig_digest(), this intentionally has no fmt parameter: its one caller
+      /// (signed_block::calculate_merkle_root(), invoked from block generation/validation)
+      /// already establishes the correct chain-state-derived fc::raw::scoped_pq_format before
+      /// calling in, and this must respect that ambient value rather than silently overriding
+      /// it with a fixed default -- self-overriding here previously made the merkle root
+      /// ignore hardfork/pq_serialization_active state entirely.
       digest_type merkle_digest()const;
    };
 
@@ -306,10 +340,36 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT( graphene::protocol::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
 // Note: not reflecting _signees field for backward compatibility; in addition, it should not be in p2p messages
-FC_REFLECT_DERIVED( graphene::protocol::signed_transaction, (graphene::protocol::transaction), (signatures) )
+FC_REFLECT_DERIVED( graphene::protocol::signed_transaction, (graphene::protocol::transaction), (signatures)(pq_signatures) )
 FC_REFLECT_DERIVED( graphene::protocol::precomputable_transaction, (graphene::protocol::signed_transaction), )
 FC_REFLECT_DERIVED( graphene::protocol::processed_transaction, (graphene::protocol::precomputable_transaction), (operation_results) )
 
+
+namespace fc { namespace raw {
+
+void pack( datastream<size_t>& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( sha256::encoder& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( datastream<char*>& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void unpack( datastream<const char*>& s, graphene::protocol::signed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+void pack( datastream<size_t>& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( sha256::encoder& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( datastream<char*>& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void unpack( datastream<const char*>& s, graphene::protocol::precomputable_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+void pack( datastream<size_t>& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( sha256::encoder& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( datastream<char*>& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void unpack( datastream<const char*>& s, graphene::protocol::processed_transaction& v, uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+extern template std::vector<char> pack( const graphene::protocol::signed_transaction& v, uint32_t _max_depth );
+extern template std::vector<char> pack( const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth );
+extern template std::vector<char> pack( const graphene::protocol::processed_transaction& v, uint32_t _max_depth );
+extern template size_t pack_size( const graphene::protocol::signed_transaction& v );
+extern template size_t pack_size( const graphene::protocol::precomputable_transaction& v );
+extern template size_t pack_size( const graphene::protocol::processed_transaction& v );
+
+} } // namespace fc::raw
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transaction)
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::signed_transaction)
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::precomputable_transaction)

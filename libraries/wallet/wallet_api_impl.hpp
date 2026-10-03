@@ -175,6 +175,8 @@ public:
 
    fc::ecc::private_key get_private_key(const public_key_type& id)const;
 
+   fc::pq_private_key get_pq_private_key(const pq_public_key_type& id)const;
+
    fc::ecc::private_key get_private_key_for_account(const account_object& account)const;
 
    // imports the private key into the wallet, and associate it in some way (?) with the
@@ -182,6 +184,15 @@ public:
    // @returns true if the key matches a current active/owner/memo key for the named
    //          account, false otherwise (but it is stored either way)
    bool import_key(string account_name_or_id, string wif_key);
+
+   bool import_pq_key(string account_name_or_id, string base58_key);
+   string generate_pq_key( const string& account_name_or_id,
+                          const string& owner_or_active_key_string,
+                          optional<uint8_t> algorithm );
+   signed_transaction migrate_wallet( const string& account_name_or_id, bool broadcast );
+   signed_transaction migrate_wallet_pq_only( const string& account_name_or_id, bool broadcast );
+   signed_transaction migrate_address_auths_pq( const string& account_name_or_id,
+                                               bool broadcast );
 
    vector< signed_transaction > import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast );
 
@@ -204,6 +215,36 @@ public:
    */
    set<public_key_type> get_owned_required_keys( signed_transaction &tx,
          bool erase_existing_sigs = true);
+
+   /** Post-quantum analogue of get_owned_required_keys(): returns the subset of
+    *  query_required_pq_keys() that this wallet holds private keys for. */
+   set<pq_public_key_type> get_owned_required_pq_keys( signed_transaction &tx,
+         bool erase_existing_sigs = true);
+
+   /** Returns the PQ keys (FIPS 204 ML-DSA) that the authorities required by
+    *  this transaction accept, fetched from the connected node. */
+   set<pq_public_key_type> query_required_pq_keys( const signed_transaction &tx )const;
+
+   /** Returns true when the given owned keys satisfy every authority required by
+    *  the transaction, counting classical and PQ key weights together. Pass an
+    *  empty set for one kind to ask whether the other kind suffices on its own.
+    *  The wallet uses this to attach only the signatures that are actually
+    *  needed: verify_authority rejects any signature that isn't used to satisfy
+    *  an authority (tx_irrelevant_sig), and a PQ signature costs ~5 KB.
+    *  Note: like the rest of this helper family, only key_auths/pq_key_auths
+    *  weights are counted -- nested account_auths are not resolved. */
+   bool keys_satisfy_authorities( const signed_transaction& tx,
+                                  const set<public_key_type>& owned_keys,
+                                  const set<pq_public_key_type>& owned_pq )const;
+
+   /** Signs @p tx with the smallest sufficient set: PQ-only when the PQ keys alone
+    *  satisfy the required authorities, classical-only when they alone suffice, and
+    *  both only for a genuine hybrid threshold. Avoids attaching signatures that the
+    *  chain would reject as irrelevant. */
+   void sign_with_minimal_key_set( signed_transaction& tx,
+                                   const set<public_key_type>& approving_key_set,
+                                   const set<pq_public_key_type>& pq_keys,
+                                   fc::raw::pq_format pq_fmt );
 
    signed_transaction add_transaction_signature( signed_transaction tx,
          bool broadcast );
@@ -286,10 +327,11 @@ public:
 
    committee_member_object get_committee_member( string owner_account );
 
-   signed_transaction create_witness(string owner_account, string url, bool broadcast );
+   signed_transaction create_witness(string owner_account, string url, bool broadcast,
+                                     string block_pq_signing_key = "" );
 
    signed_transaction update_witness(string witness_name, string url, string block_signing_key,
-         bool broadcast );
+         bool broadcast, string block_pq_signing_key = "" );
 
    signed_transaction create_worker( string owner_account, time_point_sec work_begin_date,
          time_point_sec work_end_date, share_type daily_pay, string name, string url,
@@ -339,6 +381,24 @@ public:
    vector<flat_set<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
 
    memo_data sign_memo(string from, string to, string memo);
+
+   /** Encrypts @p msg into @p md, choosing the hybrid post-quantum construction when the
+    *  recipient has published an ML-KEM memo key AND the chain has activated post-quantum
+    *  serialization. Both conditions matter: the KEM shared secret is part of the AES key,
+    *  so writing a hybrid memo while the ciphertext is still stripped on the wire would
+    *  produce a memo nobody can ever read. @p md.to must already be set. */
+   void encrypt_memo_message( memo_data& md, const fc::ecc::private_key& from_priv,
+                              const optional<pq_public_key_type>& to_pq_key, const string& msg );
+
+   /** Decrypts @p md with @p my_key, taking the post-quantum path when the memo carries a KEM
+    *  ciphertext. The memo records no hint of which ML-KEM key it was encapsulated to, so every
+    *  ML-KEM key in the wallet is tried and the memo checksum decides. */
+   string decrypt_memo_message( const memo_data& md, const fc::ecc::private_key& my_key,
+                                const public_key_type& other )const;
+
+   /** Generates an ML-KEM memo key, stores it, and publishes the public half in the account's
+    *  options so senders have somewhere to encapsulate to. */
+   signed_transaction generate_pq_memo_key( const string& account_name_or_id, bool broadcast );
 
    string read_memo(const memo_data& md);
 
@@ -407,6 +467,7 @@ public:
    wallet_data             _wallet;
 
    map<public_key_type,string> _keys;
+   map<pq_public_key_type,string> _pq_keys;
    fc::sha512                  _checksum;
 
    chain_id_type           _chain_id;
@@ -428,6 +489,18 @@ private:
    void enable_umask_protection();
 
    void disable_umask_protection();
+
+   /** True only when BOTH the PQ_0 hardfork time has passed and the committee has set
+    *  pq_serialization_active -- the same pair of conditions the chain-side evaluators
+    *  test. Both must be checked or the wallet serializes under a different format than
+    *  the chain validates under. */
+   bool is_pq_active() const;
+
+   /** Returns pq_format::current if the PQ hardfork is active, legacy otherwise. */
+   fc::raw::pq_format get_pq_format() const;
+
+   /** Asserts that PQ operations are active; throws if not. */
+   void require_pq_active() const;
 
    // This function generates derived keys starting with index 0 and keeps incrementing
    // the index until it finds a key that isn't registered in the block chain.  To be

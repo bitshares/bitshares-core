@@ -91,6 +91,7 @@ class application_impl : public net::node_delegate, public std::enable_shared_fr
       graphene::net::message get_item(const graphene::net::item_id& id) override;
 
       graphene::chain::chain_id_type get_chain_id()const override;
+      bool is_pq_active() const override;
 
       /**
        * Returns a synopsis of the blockchain used for syncing.  This consists of a list of

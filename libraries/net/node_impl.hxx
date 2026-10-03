@@ -276,6 +276,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
                                (get_block_ids) \
                                (get_item) \
                                (get_chain_id) \
+                               (is_pq_active) \
                                (get_blockchain_synopsis) \
                                (sync_status) \
                                (connection_count_changed) \
@@ -377,6 +378,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
                                              uint32_t limit = 2000) override;
       message get_item( const item_id& id ) override;
       graphene::protocol::chain_id_type get_chain_id() const override;
+      bool is_pq_active() const override;
       std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point,
                                                        uint32_t number_of_blocks_after_reference_point) override;
       void     sync_status( uint32_t item_type, uint32_t item_count ) override;

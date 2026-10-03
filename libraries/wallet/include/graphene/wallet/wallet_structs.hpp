@@ -39,6 +39,8 @@ using transaction_handle_type = uint32_t;
 struct plain_keys
 {
    map<public_key_type, string>  keys;
+   /** post-quantum private keys (FIPS 204 ML-DSA), stored in base58 form */
+   map<pq_public_key_type, string>  pq_keys;
    fc::sha512                    checksum;
 };
 
@@ -327,7 +329,7 @@ FC_REFLECT( graphene::wallet::blind_confirmation::output,
             (label)(pub_key)(decrypted_memo)(confirmation)(auth)(confirmation_receipt) )
 FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
 
-FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
+FC_REFLECT( graphene::wallet::plain_keys, (keys)(pq_keys)(checksum) )
 
 FC_REFLECT( graphene::wallet::wallet_data,
             (chain_id)

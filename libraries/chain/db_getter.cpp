@@ -69,6 +69,14 @@ time_point_sec database::head_block_time()const
    return get_dynamic_global_properties().time;
 }
 
+bool database::is_pq_serialization_active()const
+{
+   const auto& ext = get_global_properties().parameters.extensions.value;
+   return HARDFORK_PQ_0_PASSED( head_block_time() )
+          && ext.pq_serialization_active.valid()
+          && *ext.pq_serialization_active;
+}
+
 uint32_t database::head_block_num()const
 {
    return get_dynamic_global_properties().head_block_number;

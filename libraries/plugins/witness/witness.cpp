@@ -24,10 +24,13 @@
 #include <graphene/witness/witness.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/witness_object.hpp>
 
+#include <fc/io/raw.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
+#include <fc/crypto/pqc.hpp>
 #include <fc/thread/thread.hpp>
 #include <fc/io/fstream.hpp>
 
@@ -81,6 +84,9 @@ void witness_plugin::plugin_set_program_options(
           "Path to a file containing tuples of [PublicKey, WIF private key]."
           " The file has to contain exactly one tuple (i.e. private - public key pair) per line."
           " This option may be specified multiple times, thus multiple files can be provided.")
+         ("pq-private-key", bpo::value<vector<string>>()->composing()->multitoken(),
+               "Tuple of [PQ PublicKey (base58), PQ private key (base58)] used to sign blocks with a"
+               " post-quantum (NIST FIPS 204 ML-DSA) key (may specify multiple times)")
          ;
    config_file_options.add(command_line_options);
 }
@@ -113,6 +119,22 @@ void witness_plugin::add_private_key(const std::string& key_id_to_wif_pair_strin
    {
       ilog("Public Key: ${public}", ("public", key_id_to_wif_pair.first));
       _private_keys[key_id_to_wif_pair.first] = *private_key;
+   }
+}
+
+void witness_plugin::add_pq_private_key(const std::string& key_id_to_wif_pair_string)
+{
+   auto key_id_to_base58_pair = graphene::app::dejsonify<std::pair<chain::pq_public_key_type, std::string>>
+         (key_id_to_wif_pair_string, 5);
+   fc::pq_private_key pq_private_key = fc::pq_private_key::from_base58( key_id_to_base58_pair.second );
+   FC_ASSERT( chain::pq_public_key_type( pq_private_key.get_public_key() ) == key_id_to_base58_pair.first,
+              "post-quantum private key does not match its public key",
+              ("pub", key_id_to_base58_pair.first) );
+
+   if (_pq_private_keys.find(key_id_to_base58_pair.first) == _pq_private_keys.end())
+   {
+      ilog("PQ Public Key: ${public}", ("public", key_id_to_base58_pair.first.to_base58()));
+      _pq_private_keys[key_id_to_base58_pair.first] = pq_private_key;
    }
 }
 
@@ -152,6 +174,15 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          {
             FC_THROW("Failed to load private key file from ${path}", ("path", key_id_to_wif_pair_file.string()));
          }
+      }
+   }
+   if (options.count("pq-private-key") > 0)
+   {
+      const std::vector<std::string> key_id_to_base58_pair_strings =
+            options["pq-private-key"].as<std::vector<std::string>>();
+      for (const std::string& key_id_to_base58_pair_string : key_id_to_base58_pair_strings)
+      {
+         add_pq_private_key(key_id_to_base58_pair_string);
       }
    }
    if(options.count("required-participation") > 0)
@@ -327,7 +358,6 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    uint32_t slot = db.get_slot_at_time( now );
    if( slot == 0 )
    {
-      capture("next_time", db.get_slot_time(1));
       return block_production_condition::not_time_yet;
    }
 
@@ -345,7 +375,6 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    // we must control the witness scheduled to produce the next block.
    if( _witnesses.find( scheduled_witness ) == _witnesses.end() )
    {
-      capture("scheduled_witness", scheduled_witness);
       return block_production_condition::not_my_turn;
    }
 
@@ -353,36 +382,76 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    graphene::chain::public_key_type scheduled_key = *_witness_key_cache[scheduled_witness]; // should be valid
    auto private_key_itr = _private_keys.find( scheduled_key );
 
+   // A witness object may carry a post-quantum signing key (NIST FIPS 204
+   // ML-DSA); when it does, blocks MUST be PQ-signed with the matching key.
+   const chain::witness_object& scheduled_witness_obj = db.get( scheduled_witness );
+   fc::optional<fc::pq_private_key> block_pq_signing_private_key;
+   if( scheduled_witness_obj.pq_signing_key.valid() )
+   {
+      auto pq_private_key_itr = _pq_private_keys.find( *scheduled_witness_obj.pq_signing_key );
+      if( pq_private_key_itr == _pq_private_keys.end() )
+      {
+         capture("scheduled_key", scheduled_witness);
+         return block_production_condition::no_private_key;
+      }
+      block_pq_signing_private_key = pq_private_key_itr->second;
+   }
+   // The classical key is required on every path: generate_block() is called with
+   // private_key_itr->second unconditionally below (it still signs the block header's
+   // classical signature field and is checked by validate_block_header when no PQ key is
+   // registered). Checking it only in an `else` branch left a PQ-registered witness
+   // dereferencing _private_keys.end() -- undefined behaviour -- on every production slot
+   // where the operator had not also configured the classical private key.
    if( private_key_itr == _private_keys.end() )
    {
-      capture("scheduled_key", scheduled_key);
       return block_production_condition::no_private_key;
    }
 
    uint32_t prate = db.witness_participation_rate();
    if( prate < _required_witness_participation )
    {
-      capture("pct", uint32_t(100*uint64_t(prate) / GRAPHENE_1_PERCENT));
       return block_production_condition::low_participation;
    }
 
    if( llabs((scheduled_time - now).count()) > fc::milliseconds( 2500 ).count() )
    {
-      capture("scheduled_time", scheduled_time)("now", now);
       return block_production_condition::lag;
    }
 
    if( p2p_node() == nullptr )
       return block_production_condition::no_network;
 
+   // Post-quantum: decide the serialization format BEFORE generating the block.
+   //
+   // generate_block() pushes the block it produces, so afterwards head_block_time() is the
+   // new block's own timestamp, not the timestamp this block was built on. The chain
+   // computes a block's id under the format implied by the PREVIOUS head (_push_block and
+   // _apply_block both read head_block_time() before applying), and every receiving node
+   // decodes and pushes it the same way, because it has not applied this block yet either.
+   //
+   // Reading head_block_time() after generation therefore picks the wrong format for
+   // exactly one block: the activation block, whose own timestamp is past the hardfork
+   // while its predecessor's is not. For that block the producer would hash the id it
+   // advertises, and frame the bytes it sends, under the post-quantum format, while its own
+   // chain and every peer use the legacy one. The p2p layer then tracks the activation
+   // block under an id that matches no block on any chain, and sync never recovers.
+   bool pq_active = HARDFORK_PQ_0_PASSED(db.head_block_time())
+                  && db.get_global_properties().parameters.extensions.value.pq_serialization_active.valid()
+                  && *db.get_global_properties().parameters.extensions.value.pq_serialization_active;
+   const auto pq_fmt = pq_active ? fc::raw::pq_format::current : fc::raw::pq_format::legacy;
+
    auto block = db.generate_block(
       scheduled_time,
       scheduled_witness,
       private_key_itr->second,
-      _production_skip_flags
+      _production_skip_flags,
+      block_pq_signing_private_key
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
-   fc::async( [this,block](){ p2p_node()->broadcast(net::block_message(block)); } );
+   fc::async( [this,block,pq_fmt](){
+      fc::raw::scoped_pq_format scoped( pq_fmt );
+      p2p_node()->broadcast(net::block_message(block));
+   } );
 
    return block_production_condition::produced;
 }

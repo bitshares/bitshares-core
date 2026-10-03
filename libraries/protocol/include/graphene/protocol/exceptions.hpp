@@ -44,5 +44,6 @@ namespace graphene { namespace protocol {
    FC_DECLARE_DERIVED_EXCEPTION( tx_duplicate_sig,           transaction_exception, 4010005 )
    FC_DECLARE_DERIVED_EXCEPTION( invalid_committee_approval, transaction_exception, 4010006 )
    FC_DECLARE_DERIVED_EXCEPTION( insufficient_fee,           transaction_exception, 4010007 )
+   FC_DECLARE_DERIVED_EXCEPTION( tx_invalid_pq_signature,    transaction_exception, 4010008 )
 
 } } // graphene::protocol

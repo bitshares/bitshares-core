@@ -80,12 +80,13 @@ namespace graphene { namespace protocol {
       uint8_t                 max_authority_depth                 = GRAPHENE_MAX_SIG_CHECK_DEPTH;
 
       struct ext
-      {
-         optional< htlc_options > updatable_htlc_options;
-         optional< custom_authority_options_type > custom_authority_options;
-         optional< uint16_t > market_fee_network_percent;
-         optional< uint16_t > maker_fee_discount_percent;
-      };
+       {
+          optional< htlc_options > updatable_htlc_options;
+          optional< custom_authority_options_type > custom_authority_options;
+          optional< uint16_t > market_fee_network_percent;
+          optional< uint16_t > maker_fee_discount_percent;
+          optional< bool > pq_serialization_active;
+       };
 
       extension<ext> extensions;
 
@@ -128,6 +129,7 @@ FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (custom_authority_options)
       (market_fee_network_percent)
       (maker_fee_discount_percent)
+      (pq_serialization_active)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,

@@ -48,8 +48,18 @@ namespace graphene { namespace chain {
 void database::init_genesis(const genesis_state_type& genesis_state)
 { try {
    FC_ASSERT( genesis_state.initial_timestamp != time_point_sec(), "Must initialize genesis timestamp." );
-   FC_ASSERT( genesis_state.initial_timestamp.sec_since_epoch() % GRAPHENE_DEFAULT_BLOCK_INTERVAL == 0,
-              "Genesis timestamp must be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL." );
+   // Slots on this chain are spaced by the interval in its own genesis, not by the
+   // compile-time default, so that is what the timestamp has to line up with. Checking the
+   // constant instead only agrees by accident, and stops agreeing the moment a chain sets an
+   // interval of its own -- as mainnet does, and as any genesis that names block_interval may.
+   FC_ASSERT( genesis_state.initial_parameters.block_interval > 0,
+              "Genesis block_interval must be greater than zero." );
+   FC_ASSERT( genesis_state.initial_timestamp.sec_since_epoch()
+                 % genesis_state.initial_parameters.block_interval == 0,
+              "Genesis timestamp must be divisible by the genesis block_interval "
+              "(timestamp ${t}, block_interval ${i}).",
+              ("t", genesis_state.initial_timestamp.sec_since_epoch())
+              ("i", genesis_state.initial_parameters.block_interval) );
    FC_ASSERT(genesis_state.initial_witness_candidates.size() > 0,
              "Cannot start a chain with zero witnesses.");
    FC_ASSERT(genesis_state.initial_active_witnesses <= genesis_state.initial_witness_candidates.size(),

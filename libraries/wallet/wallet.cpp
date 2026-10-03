@@ -622,6 +622,67 @@ bool wallet_api::import_key( const string& account_name_or_id, const string& wif
    return false;
 }
 
+bool wallet_api::import_pq_key( const string& account_name_or_id, const string& base58_key )const
+{
+   FC_ASSERT(!is_locked());
+   fc::pq_private_key pq_priv = fc::pq_private_key::from_base58( base58_key );
+   string shorthash = base58_key.substr( 0, 8 );
+   copy_wallet_file( "before-import-pq-key-" + shorthash );
+
+   if( my->import_pq_key( account_name_or_id, base58_key ) )
+   {
+      save_wallet_file();
+      copy_wallet_file( "after-import-pq-key-" + shorthash );
+      return true;
+   }
+   return false;
+}
+
+string wallet_api::generate_pq_key( const string& account_name_or_id,
+                                    const string& owner_or_active_key_string,
+                                    const optional<uint8_t>& algorithm )const
+{
+   FC_ASSERT(!is_locked());
+   string result = my->generate_pq_key( account_name_or_id, owner_or_active_key_string, algorithm );
+   save_wallet_file();
+   return result;
+}
+
+signed_transaction wallet_api::migrate_wallet( const string& account_name_or_id, bool broadcast )const
+{
+   FC_ASSERT(!is_locked());
+   auto tx = my->migrate_wallet( account_name_or_id, broadcast );
+   save_wallet_file();
+   return tx;
+}
+
+signed_transaction wallet_api::migrate_wallet_pq_only( const string& account_name_or_id,
+                                                       bool broadcast )const
+{
+   FC_ASSERT(!is_locked());
+   auto tx = my->migrate_wallet_pq_only( account_name_or_id, broadcast );
+   save_wallet_file();
+   return tx;
+}
+
+signed_transaction wallet_api::migrate_address_auths_pq( const string& account_name_or_id,
+                                                         bool broadcast )const
+{
+   FC_ASSERT(!is_locked());
+   auto tx = my->migrate_address_auths_pq( account_name_or_id, broadcast );
+   save_wallet_file();
+   return tx;
+}
+
+signed_transaction wallet_api::generate_pq_memo_key( const string& account_name_or_id,
+                                                     bool broadcast )const
+{
+   FC_ASSERT(!is_locked());
+   auto tx = my->generate_pq_memo_key( account_name_or_id, broadcast );
+   save_wallet_file();
+   return tx;
+}
+
 map<string, bool, std::less<>> wallet_api::import_accounts( const string& filename, const string& password )const
 {
    FC_ASSERT( !is_locked() );
@@ -929,7 +990,15 @@ signed_transaction wallet_api::create_witness( const string& owner_account,
                                                const string& url,
                                                bool broadcast /* = false */ )const
 {
-   return my->create_witness(owner_account, url, broadcast);
+   return my->create_witness(owner_account, url, broadcast, "");
+}
+
+signed_transaction wallet_api::create_witness_pq( const string& owner_account,
+                                                  const string& url,
+                                                  const string& block_pq_signing_key,
+                                                  bool broadcast /* = false */ )const
+{
+   return my->create_witness(owner_account, url, broadcast, block_pq_signing_key);
 }
 
 signed_transaction wallet_api::create_worker(
@@ -960,7 +1029,17 @@ signed_transaction wallet_api::update_witness(
    const string& block_signing_key,
    bool broadcast /* = false */ )const
 {
-   return my->update_witness(witness_name, url, block_signing_key, broadcast);
+   return my->update_witness(witness_name, url, block_signing_key, broadcast, "");
+}
+
+signed_transaction wallet_api::update_witness_pq(
+   const string& witness_name,
+   const string& url,
+   const string& block_signing_key,
+   const string& block_pq_signing_key,
+   bool broadcast /* = false */ )const
+{
+   return my->update_witness(witness_name, url, block_signing_key, broadcast, block_pq_signing_key);
 }
 
 vector< vesting_balance_object_with_info > wallet_api::get_vesting_balances( const string& account_name )const
@@ -1169,6 +1248,25 @@ string wallet_api::gethelp( const string& method )const
       ss << "example: import_key \"1.3.11\" 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3\n";
       ss << "example: import_key \"usera\" 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3\n";
    }
+   else if( method == "import_pq_key" )
+   {
+      ss << "usage: import_pq_key ACCOUNT_NAME_OR_ID  BASE58_PQ_PRIVATE_KEY\n\n";
+      ss << "example: import_pq_key \"usera\" 2Pqi1...\n";
+   }
+   else if( method == "generate_pq_key" )
+   {
+      ss << "usage: generate_pq_key ACCOUNT_NAME_OR_ID [WIF_OR_PUBKEY_STRING] [ALGORITHM]\n\n";
+      ss << "Derives a post-quantum (FIPS 204 ML-DSA) key pair deterministically from\n";
+      ss << "the account's existing key and stores it in the wallet.\n";
+      ss << "example: generate_pq_key \"usera\"\n";
+   }
+   else if( method == "migrate_wallet" )
+   {
+      ss << "usage: migrate_wallet ACCOUNT_NAME_OR_ID BROADCAST\n\n";
+      ss << "Adds post-quantum keys (derived from the account's existing keys) to the\n";
+      ss << "account's owner/active authorities (hybrid migration).\n";
+      ss << "example: migrate_wallet \"usera\" true\n";
+   }
    else if( method == "transfer" )
    {
       ss << "usage: transfer FROM TO AMOUNT SYMBOL \"memo\" BROADCAST\n\n";
@@ -1258,6 +1356,7 @@ void wallet_api::lock()const
    for( auto key : my->_keys )
       key.second = key_to_wif(fc::ecc::private_key());
    my->_keys.clear();
+   my->_pq_keys.clear();
    my->_checksum = fc::sha512();
    my->self.lock_changed(true);
 } FC_CAPTURE_AND_RETHROW() }
@@ -1270,6 +1369,7 @@ void wallet_api::unlock( const string& password )const
    auto pk = fc::raw::unpack<plain_keys>(decrypted);
    FC_ASSERT(pk.checksum == pw);
    my->_keys = std::move(pk.keys);
+   my->_pq_keys = std::move(pk.pq_keys);
    my->_checksum = pk.checksum;
    my->self.lock_changed(false);
 } FC_CAPTURE_AND_RETHROW() }
@@ -1294,6 +1394,12 @@ map<public_key_type, string> wallet_api::dump_private_keys()const
 {
    FC_ASSERT(!is_locked());
    return my->_keys;
+}
+
+map<pq_public_key_type, string> wallet_api::dump_pq_private_keys()const
+{
+   FC_ASSERT(!is_locked());
+   return my->_pq_keys;
 }
 
 signed_transaction wallet_api::upgrade_account( const string& name, bool broadcast )const

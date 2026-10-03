@@ -50,6 +50,10 @@ genesis_state_type make_genesis() {
    genesis_state_type genesis_state;
 
    genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+   // State this chain's cadence rather than inheriting the production default: the tests below
+   // encode five-second timing, and the genesis timestamp above has to divide by whatever
+   // interval this genesis declares. See the same note in tests/common/database_fixture.cpp.
+   genesis_state.initial_parameters.block_interval = 5;
 
    auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    genesis_state.initial_active_witnesses = 10;

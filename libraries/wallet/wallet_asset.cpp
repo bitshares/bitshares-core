@@ -339,8 +339,8 @@ namespace graphene { namespace wallet { namespace detail {
          issue_op.memo = memo_data();
          issue_op.memo->from = issuer.options.memo_key;
          issue_op.memo->to = to.options.memo_key;
-         issue_op.memo->set_message(get_private_key(issuer.options.memo_key),
-                                    to.options.memo_key, memo);
+         encrypt_memo_message( *issue_op.memo, get_private_key(issuer.options.memo_key),
+                               to.options.pq_memo_key.value, memo );
       }
 
       signed_transaction tx;
