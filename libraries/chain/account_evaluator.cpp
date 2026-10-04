@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include <graphene/protocol/account_name_validation.hpp>
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/buyback.hpp>
 #include <graphene/chain/buyback_object.hpp>
@@ -124,6 +125,9 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
+   FC_ASSERT(graphene::protocol::account_name_validator::is_valid_account_name(op.name),
+        "Account name '${name}' matches known blockchain address pattern and cannot be registered",
+        ("name", op.name));
 
    try
    {
