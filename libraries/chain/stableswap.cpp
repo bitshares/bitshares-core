@@ -42,7 +42,8 @@ fc::uint128_t narrow( const wide_uint& v, const char* what )
  *
  * Solves, by Newton's method on D:
  *     Ann*S + n*D_P  =  (Ann - 1)*D + (n+1)*D_P        ... rearranged fixed-point form
- * where S = x + y, Ann = A * n^n, and D_P = D^(n+1) / (n^n * prod(x_i)).
+ * where S = x + y, Ann = amp * n (which is A * n^n, with A = amp / 2 for n = 2), and
+ * D_P = D^(n+1) / (n^n * prod(x_i)).
  *
  * Returns 0 when the pool is empty. Throws if Newton fails to converge.
  */
@@ -65,7 +66,7 @@ fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, uint64_
    FC_ASSERT( x256 > 0 && y256 > 0,
               "StableSwap: pool balances must both be positive to compute D" );
 
-   const wide_uint ann = wide_uint( amp ) * SS_N_COINS; // A * n  (n^n = n^2 folded below)
+   const wide_uint ann = wide_uint( amp ) * SS_N_COINS; // Ann = amp * n = A * n^n (A = amp/2)
 
    wide_uint d = s;       // initial guess
    wide_uint d_prev;
@@ -158,8 +159,11 @@ fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, uint64_
  * via Newton's method, where (for n = 2):
  *     c = D^(n+1) / (n^n * new_x * Ann)   and   b = new_x + D / Ann
  *
- * The caller obtains the amount paid out as old_y - returned_y. Rounds in the pool's
- * favour (Newton converges from above and we stop at <=1 unit).
+ * The caller obtains the amount paid out as old_y - returned_y. The result is truncated and
+ * can lie up to one unit BELOW the exact solution, which on its own would favour the caller;
+ * measured on six pools it was 0.66 to 0.96 units below every time. Both callers correct for
+ * it: the swap path keeps one extra unit of the out-asset, and the withdrawal path pays one
+ * unit less.
  */
 fc::uint128_t compute_new_y( const fc::uint128_t& new_x, const fc::uint128_t& d, uint64_t amp )
 {

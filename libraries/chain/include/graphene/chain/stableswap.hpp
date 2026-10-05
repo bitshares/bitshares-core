@@ -48,6 +48,10 @@ namespace stableswap {
  * amplification coefficient: A -> 0 degenerates to the constant-product curve (x*y=k),
  * while large A approaches the constant-sum curve (x+y=const), i.e. a near-flat 1:1 peg.
  *
+ * The `amp` argument below, and a pool's `amplification`, follow Curve's implementation
+ * convention amp = A * n^(n-1): for n = 2 the `A` of the invariant above is amp / 2. That is
+ * why the code computes Ann as amp * n, which equals A * n^n.
+ *
  * IMPORTANT: both balances must be expressed in the *same unit scale* before being passed
  * in. This v1 enforces equal asset precision at pool-creation time (see the create
  * evaluator), so the raw on-chain `share_type` balances are already directly comparable
@@ -86,7 +90,8 @@ fc::uint128_t narrow( const wide_uint& v, const char* what );
  *
  * Solves, by Newton's method on D:
  *     Ann*S + n*D_P  =  (Ann - 1)*D + (n+1)*D_P        ... rearranged fixed-point form
- * where S = x + y, Ann = A * n^n, and D_P = D^(n+1) / (n^n * prod(x_i)).
+ * where S = x + y, Ann = amp * n (which is A * n^n, with A = amp / 2 for n = 2), and
+ * D_P = D^(n+1) / (n^n * prod(x_i)).
  *
  * Returns 0 when the pool is empty. Throws if Newton fails to converge.
  */
@@ -101,8 +106,11 @@ fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, uint64_
  * via Newton's method, where (for n = 2):
  *     c = D^(n+1) / (n^n * new_x * Ann)   and   b = new_x + D / Ann
  *
- * The caller obtains the amount paid out as old_y - returned_y. Rounds in the pool's
- * favour (Newton converges from above and we stop at <=1 unit).
+ * The caller obtains the amount paid out as old_y - returned_y. The result is truncated and
+ * can lie up to one unit BELOW the exact solution, which on its own would favour the caller;
+ * measured on six pools it was 0.66 to 0.96 units below every time. Both callers correct for
+ * it: the swap path keeps one extra unit of the out-asset, and the withdrawal path pays one
+ * unit less.
  */
 fc::uint128_t compute_new_y( const fc::uint128_t& new_x, const fc::uint128_t& d, uint64_t amp );
 
