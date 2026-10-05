@@ -65,9 +65,13 @@ namespace stableswap {
  * `d_p * d` term alone can exceed 2^128 by six orders of magnitude even though D itself does
  * not. A pure fc::uint128_t (== unsigned __int128) accumulator would silently wrap on that
  * intermediate multiply, corrupting the on-chain invariant. All internal arithmetic here
- * therefore uses a 256-bit accumulator (ample headroom for any product of two ~128-bit
- * intermediates); only the final, guaranteed-to-fit result is narrowed back to
- * fc::uint128_t, with an explicit bounds assertion rather than a silent truncation.
+ * therefore uses a 256-bit accumulator; only the final, guaranteed-to-fit result is narrowed
+ * back to fc::uint128_t, with an explicit bounds assertion rather than a silent truncation.
+ *
+ * The accumulator has headroom for products of values below 2^128, which bounds the inputs:
+ * x + y must stay below 2^128. compute_d starts from d = x + y and its first step squares it,
+ * so a larger sum wraps the unchecked accumulator before any bounds check is reached. Every
+ * protocol-legal pool is inside that domain by a factor of 2^64, since balances are int64.
  */
 
 /// Number of coins in the pool. Fixed at 2 for BitShares liquidity pools.

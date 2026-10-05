@@ -59,10 +59,10 @@ fc::uint128_t compute_d( const fc::uint128_t& x, const fc::uint128_t& y, uint64_
 
    // Exactly one side empty is NOT the same as an empty pool: the D_P terms below divide by
    // each balance, so a zero here would be an integer division by zero. The invariant is
-   // undefined for a half-empty pool anyway, so reject rather than invent a value. This is
-   // reachable from the exchange evaluator's d_check, where compute_new_y() can return 0 when
-   // a swap would drain the out-asset side completely; failing closed there rejects the
-   // draining trade instead of crashing the node.
+   // undefined for a half-empty pool anyway, so reject rather than invent a value. No
+   // operation reaches this today -- every path leaves both balances at one unit or more, and
+   // the exchange evaluator's former d_check, which could, is gone -- so it stays as a guard
+   // and is tested by calling the function directly.
    FC_ASSERT( x256 > 0 && y256 > 0,
               "StableSwap: pool balances must both be positive to compute D" );
 
