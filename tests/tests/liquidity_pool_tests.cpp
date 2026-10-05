@@ -3177,3 +3177,523 @@ BOOST_AUTO_TEST_CASE( measure_how_the_stable_curve_degrades_under_depeg )
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+
+/**
+ * Every assertion the StableSwap work added, each made to fail on purpose.
+ *
+ * The existing tests check that a bad operation throws. That proves less than it seems: the
+ * operation may be stopped by a different check than the one under test, and the test still
+ * passes. Eight assertions here even share the message "Aborting due to zero outcome". So each
+ * case below requires one particular assertion -- by the file it lives in and the source text of
+ * its condition, both of which FC_ASSERT records -- and fails if anything else fires first.
+ *
+ * The inputs that reach the dust-level checks were found with an exact integer replica of the
+ * solver and of the two stable paths, then confirmed here against the real code.
+ *
+ * Eight assertions are not reachable, and so have no case here:
+ *   - liquidity_pool_evaluator.cpp, `_market_fee_a <= op.amount_a && _market_fee_b <= op.amount_b`
+ *     and `wfee <= out128`: a market fee and a withdrawal fee are at most 100%, so neither can
+ *     exceed the amount it is taken from.
+ *   - liquidity_pool_evaluator.cpp, `out < fc::uint128_t( taken_balance.value )` ("Internal
+ *     error"): out = taken_reduced - y_fee - 1, and taken_reduced <= taken_balance.
+ *   - liquidity_pool_evaluator.cpp, `new_out_balance <= fc::uint128_t( out_balance.value )`
+ *     ("Internal error"): the stable path clamps the value to out_balance just before the check,
+ *     and the constant-product path computes ceil(k / new_in) <= k / in = out_balance.
+ *   - stableswap.cpp, "StableSwap D did not converge", "StableSwap y did not converge" and
+ *     `denom_lhs > d256`: Newton starts above the root and stays within a unit of it, where the
+ *     denominator is positive. None of them fired in 60000 random calls of each solver, nor in
+ *     a sweep of compute_new_y over every new_x and d below 400.
+ *   - stableswap.cpp, narrow(), "exceeds 128 bits": D <= x + y, which for int64 balances stays
+ *     below 2^64, and y never exceeds the D it is solved from. A direct call with inputs large
+ *     enough for D to need 129 bits does not get there either: its first step squares d, and
+ *     d * d overflows the unchecked 256-bit accumulator once x + y reaches 2^128. The solver's
+ *     domain is therefore x + y < 2^128, which every protocol-legal pool satisfies by a factor
+ *     of 2^64.
+ */
+namespace {
+
+/// The fixture for the cases below: one account, two pool assets of equal precision, and
+/// helpers that push an operation with no signature checks, as the other pool tests do.
+struct stableswap_assertion_fixture : database_fixture
+{
+   account_id_type sam_id;
+   asset_id_type a;   ///< the pool's asset A; a < b, as the operation requires
+   asset_id_type b;
+   int lp_count = 0;
+
+   /// Moves to just after the liquidity-pool hardfork, or past the StableSwap hardfork as well,
+   /// and creates the account and the two assets. Only ids are kept: references to objects do
+   /// not survive the long generate_blocks() jump (see stableswap_create_test).
+   void setup( bool stableswap_active, uint16_t market_fee_percent = 0 )
+   {
+      generate_blocks( HARDFORK_CORE_2604_TIME );
+      if( stableswap_active )
+         generate_blocks( HARDFORK_STABLESWAP_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      const account_object& sam = create_account( "sam" );
+      sam_id = sam.get_id();
+      fund( sam, asset( 1000000000 ) );
+
+      const uint16_t flags = market_fee_percent > 0 ? charge_market_fee : 0;
+      const asset_id_type x = create_user_issued_asset( "SAUSD", sam, flags,
+            price( asset( 1, asset_id_type(1) ), asset( 1 ) ), 4, market_fee_percent ).get_id();
+      const asset_id_type y = create_user_issued_asset( "SAEUR", sam, flags,
+            price( asset( 1, asset_id_type(1) ), asset( 1 ) ), 4, market_fee_percent ).get_id();
+      a = std::min( x, y );
+      b = std::max( x, y );
+      issue_uia( sam_id, asset( 100000000000LL, a ) );
+      issue_uia( sam_id, asset( 100000000000LL, b ) );
+   }
+
+   /// A fresh share asset for every pool, since a share asset can back only one pool.
+   asset_id_type new_share_asset()
+   {
+      const std::string symbol = "SSLP" + std::string( 1, char( 'A' + lp_count / 26 ) )
+                                        + std::string( 1, char( 'A' + lp_count % 26 ) );
+      ++lp_count;
+      return create_user_issued_asset( symbol, sam_id(db), 0 ).get_id();
+   }
+
+   /// A stable pool with an initial deposit of (init_a, init_b) by its owner.
+   liquidity_pool_id_type stable_pool( int64_t init_a, int64_t init_b, uint64_t amp,
+                                       uint16_t taker_fee = 0, uint16_t withdrawal_fee = 0 )
+   {
+      const auto pool = create_stable_liquidity_pool( sam_id, a, b, new_share_asset(),
+                                                      taker_fee, withdrawal_fee, amp ).get_id();
+      deposit_to_liquidity_pool( sam_id, pool, asset( init_a, a ), asset( init_b, b ) );
+      return pool;
+   }
+
+   liquidity_pool_id_type constant_product_pool( int64_t init_a, int64_t init_b )
+   {
+      const auto pool = create_liquidity_pool( sam_id, a, b, new_share_asset(), 0, 0 ).get_id();
+      deposit_to_liquidity_pool( sam_id, pool, asset( init_a, a ), asset( init_b, b ) );
+      return pool;
+   }
+
+   asset shares_of( liquidity_pool_id_type pool, int64_t amount )
+   {
+      return asset( amount, pool(db).share_asset );
+   }
+
+   void push( const operation& op )
+   {
+      trx.operations.clear();
+      trx.operations.push_back( op );
+      for( auto& o : trx.operations ) db.current_fee_schedule().set_fee( o );
+      set_expiration( db, trx );
+      try
+      {
+         trx.validate();
+         PUSH_TX( db, trx, ~0 );
+      }
+      catch( ... )
+      {
+         trx.operations.clear();
+         throw;
+      }
+      trx.operations.clear();
+   }
+
+   /// Pushes a withdrawal and returns what it paid, received and was charged.
+   generic_exchange_operation_result push_withdraw( const liquidity_pool_withdraw_operation& op )
+   {
+      trx.operations.clear();
+      trx.operations.push_back( op );
+      for( auto& o : trx.operations ) db.current_fee_schedule().set_fee( o );
+      set_expiration( db, trx );
+      trx.validate();
+      const processed_transaction ptx = PUSH_TX( db, trx, ~0 );
+      trx.operations.clear();
+      return ptx.operation_results.front().get<generic_exchange_operation_result>();
+   }
+
+   /// Pushes a proposal carrying `op`. The proposal is checked when it is created, which is the
+   /// point of the hardfork checks in proposal_evaluator.cpp.
+   void propose( const operation& op )
+   {
+      proposal_create_operation prop;
+      prop.fee_paying_account = sam_id;
+      prop.expiration_time = db.head_block_time() + fc::days( 1 );
+      prop.proposed_ops.emplace_back( op );
+      push( prop );
+   }
+
+   liquidity_pool_deposit_operation deposit_op( liquidity_pool_id_type pool, int64_t amount_a,
+                                                int64_t amount_b )const
+   {
+      return make_liquidity_pool_deposit_op( sam_id, pool, asset( amount_a, a ), asset( amount_b, b ) );
+   }
+
+   liquidity_pool_withdraw_operation withdraw_op( liquidity_pool_id_type pool, int64_t shares,
+                                                  fc::optional<asset_id_type> one_asset = {} )
+   {
+      liquidity_pool_withdraw_operation op = make_liquidity_pool_withdraw_op( sam_id, pool,
+                                                                              shares_of( pool, shares ) );
+      op.extensions.value.withdraw_one_asset = one_asset;
+      return op;
+   }
+};
+
+/**
+ * Runs f and requires it to fail on one particular assertion: the one in `file` whose condition
+ * reads `condition` in the source.
+ *
+ * FC_ASSERT throws with the message "<condition>: <text>" and records where it was thrown, and
+ * the first entry of an fc exception's log is that throw site. Checking both rules out a
+ * different check stopping the operation first, which a bare BOOST_CHECK_THROW cannot.
+ */
+template< typename F >
+void require_assertion( F&& f, const char* file, const std::string& condition )
+{
+   try
+   {
+      f();
+   }
+   catch( const fc::exception& e )
+   {
+      BOOST_REQUIRE( !e.get_log().empty() );
+      const auto& origin = e.get_log().front();
+      const std::string where = origin.get_context().get_file();
+      const std::string what  = origin.get_message();
+      // fc records the file's base name, but match a full path too in case that changes.
+      const std::string suffix = std::string( "/" ) + file;
+      const bool in_file = where == file
+                           || ( where.size() > suffix.size()
+                                && 0 == where.compare( where.size() - suffix.size(), suffix.size(), suffix ) );
+      BOOST_CHECK_MESSAGE( in_file && what.find( condition ) != std::string::npos,
+                           "expected `" << condition << "` in " << file << ", but got \""
+                           << what << "\" at " << where << ":" << origin.get_context().get_line_number() );
+      return;
+   }
+   BOOST_ERROR( "expected `" << condition << "` in " << file << " to fail, but nothing was thrown" );
+}
+
+constexpr const char* PROTOCOL  = "liquidity_pool.cpp";
+constexpr const char* EVALUATOR = "liquidity_pool_evaluator.cpp";
+constexpr const char* PROPOSAL  = "proposal_evaluator.cpp";
+constexpr const char* SOLVER    = "stableswap.cpp";
+
+} // namespace
+
+BOOST_FIXTURE_TEST_SUITE( stableswap_assertion_tests, stableswap_assertion_fixture )
+
+/// liquidity_pool_create_operation::validate(): pool_type, and amplification with it.
+BOOST_AUTO_TEST_CASE( the_create_operation_validates_the_stable_options )
+{ try {
+   const auto base = make_liquidity_pool_create_op( account_id_type(), asset_id_type(1),
+                                                    asset_id_type(2), asset_id_type(3), 0, 0 );
+   const uint8_t stable = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   const uint8_t constant_product = static_cast<uint8_t>( liquidity_pool_curve_type::constant_product );
+
+   auto op = base;
+   op.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::LP_CURVE_TYPE_COUNT );
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, "LP_CURVE_TYPE_COUNT" );
+
+   const std::string paired = "is_stable == extensions.value.amplification.valid()";
+   op = base; op.extensions.value.pool_type = stable;                // stable, no amplification
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, paired );
+   op = base; op.extensions.value.amplification = 100;               // amplification, no pool_type
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, paired );
+   op = base; op.extensions.value.pool_type = constant_product;      // amplification on a non-stable pool
+   op.extensions.value.amplification = 100;
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, paired );
+
+   const std::string range = "amp >= STABLESWAP_AMP_MIN && amp <= STABLESWAP_AMP_MAX";
+   op = base; op.extensions.value.pool_type = stable;
+   op.extensions.value.amplification = STABLESWAP_AMP_MIN - 1;
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, range );
+   op.extensions.value.amplification = STABLESWAP_AMP_MAX + 1;
+   require_assertion( [&]{ op.validate(); }, PROTOCOL, range );
+
+   // and both ends of the range are accepted
+   op.extensions.value.amplification = STABLESWAP_AMP_MIN;
+   BOOST_CHECK_NO_THROW( op.validate() );
+   op.extensions.value.amplification = STABLESWAP_AMP_MAX;
+   BOOST_CHECK_NO_THROW( op.validate() );
+} FC_LOG_AND_RETHROW() }
+
+/// The three floors must be positive when they are given at all.
+BOOST_AUTO_TEST_CASE( floors_must_be_positive )
+{ try {
+   auto dop = make_liquidity_pool_deposit_op( account_id_type(), liquidity_pool_id_type(),
+                                              asset( 10, asset_id_type(1) ), asset( 10, asset_id_type(2) ) );
+   dop.extensions.value.min_to_receive = 0;
+   require_assertion( [&]{ dop.validate(); }, PROTOCOL, "*floor > 0" );
+   dop.extensions.value.min_to_receive = -5;
+   require_assertion( [&]{ dop.validate(); }, PROTOCOL, "*floor > 0" );
+
+   auto wop = make_liquidity_pool_withdraw_op( account_id_type(), liquidity_pool_id_type(),
+                                               asset( 10, asset_id_type(3) ) );
+   wop.extensions.value.min_a = 0;
+   require_assertion( [&]{ wop.validate(); }, PROTOCOL, "*min_a > 0" );
+   wop.extensions.value.min_a.reset();
+   wop.extensions.value.min_b = 0;
+   require_assertion( [&]{ wop.validate(); }, PROTOCOL, "*min_b > 0" );
+} FC_LOG_AND_RETHROW() }
+
+/// Before the hardfork each new extension is refused on presence, whatever its value.
+BOOST_AUTO_TEST_CASE( stableswap_extensions_are_refused_before_the_hardfork )
+{ try {
+   setup( false );
+   const auto pool = constant_product_pool( 100000, 100000 );
+
+   const std::string create_gate =
+         "!op.extensions.value.pool_type.valid() && !op.extensions.value.amplification.valid()";
+   auto cop = make_liquidity_pool_create_op( sam_id, a, b, new_share_asset(), 0, 0 );
+   cop.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::constant_product );
+   require_assertion( [&]{ push( cop ); }, EVALUATOR, create_gate );   // set, but to the default
+   cop.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   cop.extensions.value.amplification = 100;
+   require_assertion( [&]{ push( cop ); }, EVALUATOR, create_gate );
+
+   auto dop = deposit_op( pool, 1000, 1000 );
+   dop.extensions.value.min_to_receive = 1;
+   require_assertion( [&]{ push( dop ); }, EVALUATOR, "!op.extensions.value.min_to_receive.valid()" );
+
+   const std::string withdraw_gate = "!op.extensions.value.withdraw_one_asset.valid()";
+   auto wop = withdraw_op( pool, 1000, a );
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, withdraw_gate );
+   wop = withdraw_op( pool, 1000 ); wop.extensions.value.min_a = 1;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, withdraw_gate );
+   wop = withdraw_op( pool, 1000 ); wop.extensions.value.min_b = 1;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, withdraw_gate );
+
+   // without the extensions the same operations go through
+   BOOST_CHECK_NO_THROW( push( deposit_op( pool, 1000, 1000 ) ) );
+   BOOST_CHECK_NO_THROW( push( withdraw_op( pool, 1000 ) ) );
+} FC_LOG_AND_RETHROW() }
+
+/// The same extensions inside a proposal: refused when the proposal is created before the
+/// hardfork, accepted after it.
+BOOST_AUTO_TEST_CASE( stableswap_extensions_are_refused_in_proposals_before_the_hardfork )
+{ try {
+   setup( false );
+   const auto pool = constant_product_pool( 100000, 100000 );
+
+   auto cp_create = make_liquidity_pool_create_op( sam_id, a, b, new_share_asset(), 0, 0 );
+   cp_create.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::constant_product );
+   auto stable_create = make_liquidity_pool_create_op( sam_id, a, b, new_share_asset(), 0, 0 );
+   stable_create.extensions.value.pool_type = static_cast<uint8_t>( liquidity_pool_curve_type::stable );
+   stable_create.extensions.value.amplification = 100;
+   auto floored_deposit = deposit_op( pool, 1000, 1000 );
+   floored_deposit.extensions.value.min_to_receive = 1;
+   const auto one_sided = withdraw_op( pool, 1000, a );
+   auto floor_a = withdraw_op( pool, 1000 ); floor_a.extensions.value.min_a = 1;
+   auto floor_b = withdraw_op( pool, 1000 ); floor_b.extensions.value.min_b = 1;
+
+   const std::string create_gate =
+         "!op.extensions.value.pool_type.valid() && !op.extensions.value.amplification.valid()";
+   require_assertion( [&]{ propose( cp_create ); }, PROPOSAL, create_gate );
+   require_assertion( [&]{ propose( stable_create ); }, PROPOSAL, create_gate );
+   require_assertion( [&]{ propose( floored_deposit ); }, PROPOSAL,
+                      "!op.extensions.value.min_to_receive.valid()" );
+   const std::string withdraw_gate = "!op.extensions.value.withdraw_one_asset.valid()";
+   require_assertion( [&]{ propose( one_sided ); }, PROPOSAL, withdraw_gate );
+   require_assertion( [&]{ propose( floor_a ); }, PROPOSAL, withdraw_gate );
+   require_assertion( [&]{ propose( floor_b ); }, PROPOSAL, withdraw_gate );
+
+   // After the hardfork every one of them can be proposed.
+   generate_blocks( HARDFORK_STABLESWAP_TIME );
+   generate_block();
+   set_expiration( db, trx );
+   for( const operation& op : std::vector<operation>{ cp_create, stable_create, floored_deposit,
+                                                      one_sided, floor_a, floor_b } )
+      BOOST_CHECK_NO_THROW( propose( op ) );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( a_stable_pool_needs_two_assets_of_equal_precision )
+{ try {
+   setup( true );
+   const asset_id_type two_digits = create_user_issued_asset( "SACNY", sam_id(db), 0,
+         price( asset( 1, asset_id_type(1) ), asset( 1 ) ), 2 ).get_id();
+   const asset_id_type lo = std::min( a, two_digits ), hi = std::max( a, two_digits );
+   const auto share = new_share_asset();
+   require_assertion( [&]{ create_stable_liquidity_pool( sam_id, lo, hi, share, 0, 0, 100 ); },
+                      EVALUATOR, "asset_a_obj.precision == asset_b_obj.precision" );
+} FC_LOG_AND_RETHROW() }
+
+/// A deposit whose market fees take everything leaves the pool's balances, and so D, unchanged.
+BOOST_AUTO_TEST_CASE( a_deposit_that_does_not_raise_d_is_refused )
+{ try {
+   setup( true, GRAPHENE_100_PERCENT );   // both assets charge a 100% issuer market fee
+   const auto pool = stable_pool( 1000000, 1000000, 100 );
+   require_assertion( [&]{ push( deposit_op( pool, 1000, 1000 ) ); }, EVALUATOR, "d1 > d0" );
+} FC_LOG_AND_RETHROW() }
+
+/// The dust-level checks on the deposit path. Pool sizes and amounts are the smallest the
+/// replica found that reach each check with every earlier one passing.
+BOOST_AUTO_TEST_CASE( deposit_dust_checks )
+{ try {
+   setup( true );
+   // A one-sided deposit large enough that the imbalance fee would take all of the other side.
+   const auto p1 = stable_pool( 1, 1, 1, 30 );
+   require_assertion( [&]{ push( deposit_op( p1, 1000000, 1 ) ); }, EVALUATOR, "adj_a > 0 && adj_b > 0" );
+
+   // One unit of each, into a (1, 2) pool: after the fee, D is no larger than before.
+   const auto p2 = stable_pool( 1, 2, 1, 30 );
+   require_assertion( [&]{ push( deposit_op( p2, 1, 1 ) ); }, EVALUATOR, "d2 > d0" );
+
+   // D grows, but by less than one share's worth.
+   const auto p3 = stable_pool( 1, 2, 1, 30 );
+   require_assertion( [&]{ push( deposit_op( p3, 2, 1 ) ); }, EVALUATOR, "new_supply > 0" );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( a_deposit_cannot_exceed_the_share_assets_maximum_supply )
+{ try {
+   setup( true );
+   const auto share = new_share_asset();
+   asset_update_operation uop;
+   uop.issuer = sam_id;
+   uop.asset_to_update = share;
+   uop.new_options = share(db).options;
+   uop.new_options.max_supply = 1005;   // room for five more shares after the initial 1000
+   push( uop );
+
+   const auto pool = create_stable_liquidity_pool( sam_id, a, b, share, 0, 0, 100 ).get_id();
+   deposit_to_liquidity_pool( sam_id, pool, asset( 1000, a ), asset( 1000, b ) );
+   require_assertion( [&]{ push( deposit_op( pool, 1000, 1000 ) ); }, EVALUATOR,
+                      "new_supply <= fc::uint128_t( max_new_supply.value )" );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( the_deposit_floor_is_enforced )
+{ try {
+   setup( true );
+   const auto pool = stable_pool( 1000000, 1000000, 100 );
+   auto dop = deposit_op( pool, 1000, 1000 );
+   dop.extensions.value.min_to_receive = 1000000;
+   require_assertion( [&]{ push( dop ); }, EVALUATOR, "_account_receives.amount >= *floor" );
+} FC_LOG_AND_RETHROW() }
+
+/// The withdrawal checks that depend only on the operation and the pool.
+BOOST_AUTO_TEST_CASE( withdrawal_requests_that_cannot_be_served_are_refused )
+{ try {
+   setup( true );
+   const auto pool = stable_pool( 1000000, 1000000, 100 );
+
+   // a floor on the side a one-sided withdrawal does not pay
+   auto wop = withdraw_op( pool, 1000, a ); wop.extensions.value.min_b = 1;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "!op.extensions.value.min_b.valid()" );
+   wop = withdraw_op( pool, 1000, b ); wop.extensions.value.min_a = 1;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "!op.extensions.value.min_a.valid()" );
+
+   // one-sided from a constant-product pool
+   const auto cp = constant_product_pool( 1000000, 1000000 );
+   require_assertion( [&]{ push( withdraw_op( cp, 1000, a ) ); }, EVALUATOR, "_pool->is_stable()" );
+
+   // an asset the pool does not hold
+   require_assertion( [&]{ push( withdraw_op( pool, 1000, asset_id_type() ) ); }, EVALUATOR,
+                      "*one_asset == _pool->asset_a || *one_asset == _pool->asset_b" );
+
+   // the last shares, one-sided
+   const int64_t supply = pool(db).share_asset(db).dynamic_data(db).current_supply.value;
+   require_assertion( [&]{ push( withdraw_op( pool, supply, a ) ); }, EVALUATOR,
+                      "_share_asset_dyn_data->current_supply > op.share_amount.amount" );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( the_withdrawal_floors_are_enforced )
+{ try {
+   setup( true );
+   const auto pool = stable_pool( 1000000, 1000000, 100 );
+
+   auto wop = withdraw_op( pool, 1000 ); wop.extensions.value.min_a = 1000000;   // proportional
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "receives_a >= *min_a" );
+   wop = withdraw_op( pool, 1000 ); wop.extensions.value.min_b = 1000000;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "receives_b >= *min_b" );
+   wop = withdraw_op( pool, 1000, a ); wop.extensions.value.min_a = 1000000;     // one-sided
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "receives_a >= *min_a" );
+   wop = withdraw_op( pool, 1000, b ); wop.extensions.value.min_b = 1000000;
+   require_assertion( [&]{ push( wop ); }, EVALUATOR, "receives_b >= *min_b" );
+} FC_LOG_AND_RETHROW() }
+
+/// The dust-level checks on the one-sided withdrawal path.
+BOOST_AUTO_TEST_CASE( one_sided_withdrawal_dust_checks )
+{ try {
+   setup( true );
+   // Created at 1000 : 1, so 1000 shares stand against D = 195: burning one share does not move D.
+   const auto p1 = stable_pool( 1000, 1, 1 );
+   require_assertion( [&]{ push( withdraw_op( p1, 1, a ) ); }, EVALUATOR, "d1 > 0 && d1 < d0" );
+
+   // The same pool, ten shares: D moves, but the taken side would not shrink.
+   require_assertion( [&]{ push( withdraw_op( p1, 10, a ) ); }, EVALUATOR,
+                      "fc::uint128_t( taken_balance.value ) > y_nofee" );
+
+   // With a 0.3% fee on a (1, 2) pool, the imbalance fee leaves nothing of the kept side ...
+   const auto p2 = stable_pool( 1, 2, 1, 30 );
+   require_assertion( [&]{ push( withdraw_op( p2, 1, b ) ); }, EVALUATOR,
+                      "taken_reduced > 0 && kept_reduced > 0" );
+   // ... and taking the other side would not pay out anything.
+   require_assertion( [&]{ push( withdraw_op( p2, 1, a ) ); }, EVALUATOR, "taken_reduced > y_fee" );
+
+   // No fee: one unit would come out, and it is the unit kept back for rounding.
+   const auto p3 = stable_pool( 1, 2, 1 );
+   require_assertion( [&]{ push( withdraw_op( p3, 1, a ) ); }, EVALUATOR, "out > 0" );
+
+   // A 100% withdrawal fee leaves nothing to pay.
+   const auto p4 = stable_pool( 1, 3, 1, 0, GRAPHENE_100_PERCENT );
+   require_assertion( [&]{ push( withdraw_op( p4, 1, b ) ); }, EVALUATOR, "out128 > 0" );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( a_one_sided_withdrawal_that_the_market_fee_would_consume_is_refused )
+{ try {
+   setup( true, GRAPHENE_100_PERCENT );
+   const auto pool = stable_pool( 1000000, 1000000, 100 );
+   require_assertion( [&]{ push( withdraw_op( pool, 1000, a ) ); }, EVALUATOR, "mfee < paid_asset" );
+} FC_LOG_AND_RETHROW() }
+
+/**
+ * The pool's withdrawal fee is charged on a one-sided withdrawal too. That path used to return
+ * before the fee was applied, which made the fee optional: a member could take one side, then
+ * the other, and pay nothing for either.
+ *
+ * Two identical pools, one with a 3% withdrawal fee: the same withdrawal from each must differ
+ * by exactly that fee, rounded down, and the fee must stay in the pool.
+ */
+BOOST_AUTO_TEST_CASE( a_one_sided_withdrawal_pays_the_pools_withdrawal_fee )
+{ try {
+   setup( true );
+   const uint16_t fee_percent = 300;   // 3%
+   const auto free_pool  = stable_pool( 1000000, 1000000, 100, 0, 0 );
+   const auto taxed_pool = stable_pool( 1000000, 1000000, 100, 0, fee_percent );
+
+   const auto untaxed = push_withdraw( withdraw_op( free_pool, 10000, a ) );
+   const auto taxed   = push_withdraw( withdraw_op( taxed_pool, 10000, a ) );
+
+   // Without the fee: the full amount, nothing charged, and nothing of the other side.
+   BOOST_REQUIRE_EQUAL( untaxed.received.size(), 2u );
+   BOOST_REQUIRE_EQUAL( untaxed.fees.size(), 2u );
+   const int64_t out = untaxed.received.front().amount.value;
+   BOOST_REQUIRE_GT( out, 0 );
+   BOOST_CHECK( untaxed.fees.front() == asset( 0, a ) );
+   BOOST_CHECK( untaxed.received.back() == asset( 0, b ) );
+
+   // With it: the same amount less 3%, rounded down, reported as the withdrawal fee.
+   const int64_t fee = out * fee_percent / GRAPHENE_100_PERCENT;
+   BOOST_REQUIRE_GT( fee, 0 );
+   BOOST_REQUIRE_EQUAL( taxed.received.size(), 2u );
+   BOOST_REQUIRE_EQUAL( taxed.fees.size(), 2u );
+   BOOST_CHECK( taxed.received.front() == asset( out - fee, a ) );
+   BOOST_CHECK( taxed.fees.front() == asset( fee, a ) );
+   BOOST_CHECK( taxed.received.back() == asset( 0, b ) );
+   BOOST_CHECK( taxed.fees.back() == asset( 0, b ) );
+
+   // The fee is not paid out, so the pool keeps it: its A side fell by what it paid, not by out.
+   BOOST_CHECK_EQUAL( taxed_pool(db).balance_a.value, 1000000 - ( out - fee ) );
+   BOOST_CHECK_EQUAL( free_pool(db).balance_a.value, 1000000 - out );
+} FC_LOG_AND_RETHROW() }
+
+/// The solver's own guards, called directly. Through operations no balance is ever zero, so
+/// these are reachable only this way.
+BOOST_AUTO_TEST_CASE( the_solver_refuses_inputs_it_cannot_handle )
+{ try {
+   require_assertion( [&]{ stableswap::compute_d( 0, 5, 100 ); }, SOLVER, "x256 > 0 && y256 > 0" );
+   require_assertion( [&]{ stableswap::compute_d( 5, 0, 100 ); }, SOLVER, "x256 > 0 && y256 > 0" );
+   BOOST_CHECK( stableswap::compute_d( 0, 0, 100 ) == 0 );   // an empty pool is not an error
+
+   require_assertion( [&]{ stableswap::compute_new_y( 0, 1000, 100 ); }, SOLVER, "new_x > 0" );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_SUITE_END()
