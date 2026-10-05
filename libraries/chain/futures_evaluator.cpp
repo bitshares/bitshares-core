@@ -901,9 +901,8 @@ void_result futures_position_adjust_margin_evaluator::do_evaluate(
       // Measured against the INITIAL requirement, not the maintenance one: withdrawing down to
       // the liquidation threshold would leave a position one tick from being taken away.
       //
-      // Und einschliesslich des aufgelaufenen Fundings: do_apply rechnet es unmittelbar
-      // danach ab, also wuerde eine Pruefung ohne es dem Eigentuemer erlauben, Marge
-      // abzuziehen, die er bereits schuldet.
+      // And including accrued funding: do_apply settles it immediately afterwards, so a check
+      // without it would let the owner withdraw margin they already owe.
       const share_type equity =
             _position->equity_after_funding( mark, market.cumulative_funding );
       FC_ASSERT( equity + op.delta >= required,
@@ -1126,11 +1125,11 @@ void_result futures_liquidate_evaluator::do_evaluate( const futures_liquidate_op
    const share_type maintenance = futures_margin_required(
          _position->abs_size(), mark, _market->options.maintenance_margin_ratio );
 
-   // Aufgelaufenes Funding MUSS hier einfliessen. do_apply settelt es gleich darauf ueber
-   // settle_to_mark; wuerde die Zulaessigkeitspruefung es weglassen, waere eine Position,
-   // die allein durch Funding unter Wasser steht, dauerhaft nicht liquidierbar. Sie koennte
-   // unbegrenzt Schulden anhaeufen, und der Verlust traefe erst beim naechsten Anfassen den
-   // Fonds oder die Gegenseite -- zu einem Zeitpunkt, an dem niemand mehr eingreifen kann.
+   // Accrued funding MUST count here. do_apply settles it immediately afterwards through
+   // settle_to_mark; if this eligibility check left it out, a position that is under water
+   // through funding alone could never be liquidated. It could pile up debt without limit, and
+   // the loss would reach the fund or the counterparty only the next time the position was
+   // touched -- at a point where nobody can step in any more.
    const share_type equity = _position->equity_after_funding( mark, _market->cumulative_funding );
    FC_ASSERT( equity < maintenance,
               "Position is not liquidatable: equity ${e} still meets the maintenance "
@@ -1349,12 +1348,12 @@ void_result futures_settle_evaluator::do_apply( const futures_settle_operation& 
 { try {
    database& d = db();
 
-   // Der Preis steht bereits: update_futures_mark_price fixiert ihn bei der ersten
-   // Oracle-Publikation ab Ablauf. Hier ihn erneut zu setzen wuerde genau die Wahl
-   // zurueckgeben, die dort entzogen wurde.
+   // The price is already fixed: update_futures_mark_price sets it on the first oracle
+   // publication at or after expiry. Setting it again here would hand back exactly the
+   // choice that was taken away there.
    //
-   // Ein Markt kann abgelaufen sein, ohne dass seither publiziert wurde -- dann ist er noch
-   // nicht abgerechnet, und do_evaluate haelt das ueber live_mark_price bereits auf.
+   // A market can have expired with no publication since -- then it is not settled yet, and
+   // do_evaluate already rejects that case through live_mark_price.
    FC_ASSERT( _market->is_settled,
               "Cannot settle yet: the settlement price is fixed by the first oracle "
               "publication at or after expiry, and none has arrived" );

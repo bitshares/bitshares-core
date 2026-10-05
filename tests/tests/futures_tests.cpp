@@ -2280,16 +2280,15 @@ BOOST_AUTO_TEST_CASE( funding_still_responds_to_a_genuinely_skewed_book )
 
 
 /**
- * OEKONOMIE: wie weit darf sich der Mark bewegen, bevor der Versicherungsfonds nicht mehr
- * reicht?
+ * ECONOMICS: how far may the mark move before the insurance fund is no longer enough?
  *
- * Die vorhandenen Tests zeigen, DASS Bankrott sozialisiert wird. Was sie nicht sagen, ist
- * ab welcher Bewegung das passiert und wie gross der Fehlbetrag dann ist -- genau die Zahl,
- * an der die Fondsdimensionierung haengt. Der Test misst sie, statt sie zu behaupten.
+ * The existing tests show THAT a bankruptcy is socialised. What they do not say is at which
+ * move it happens and how large the shortfall then is -- exactly the number the size of the
+ * fund depends on. The test measures it instead of asserting it.
  *
- * Aufbau: eine Position auf dem Erhaltungsminimum, dann der Mark schrittweise gegen sie.
- * Gemessen wird, bei welchem Prozentsatz das Eigenkapital negativ wird -- ab da traegt der
- * Fonds, und darueber die Gegenseite.
+ * Setup: a position opened at 10x leverage, then the mark moved against it step by step. What
+ * is measured is the percentage at which equity turns negative -- from there the fund carries
+ * the loss, and beyond the fund the opposing side.
  */
 BOOST_AUTO_TEST_CASE( measure_the_move_that_exhausts_a_position )
 { try {
@@ -2313,8 +2312,8 @@ BOOST_AUTO_TEST_CASE( measure_the_move_that_exhausts_a_position )
    cop.contract_size    = 1;
    cop.options.initial_margin_ratio     = 1000;   // 10x
    cop.options.maintenance_margin_ratio = 500;    // 5%
-   cop.options.max_mark_move_ppm        = 0;      // fuer die Messung ungedaempft
-   cop.options.funding_interval_sec     = 86400;  // haelt Funding aus der Messung heraus
+   cop.options.max_mark_move_ppm        = 0;      // undamped for the measurement
+   cop.options.funding_interval_sec     = 86400;  // keeps funding out of the measurement
    signed_transaction ctx;
    ctx.operations.push_back( cop );
    db.current_fee_schedule().set_fee( ctx.operations.back() );
@@ -2326,44 +2325,44 @@ BOOST_AUTO_TEST_CASE( measure_the_move_that_exhausts_a_position )
    place( mid, bob_id, bob_private_key, true, 100, 100 );
    place( mid, carol_id, carol_private_key, false, 100, 100 );
    const auto bob_pos = position_of( mid, bob_id )->get_id();
-   const auto notional = 100 * 100;   // 100 Kontrakte zu Mark 100
+   const auto notional = 100 * 100;   // 100 contracts at mark 100
 
    BOOST_TEST_MESSAGE( "  Notional " << notional
-                       << ", Anfangsmarge " << bob_pos(db).margin.value
-                       << " (" << (bob_pos(db).margin.value * 100 / notional) << "% des Notionals)" );
+                       << ", initial margin " << bob_pos(db).margin.value
+                       << " (" << (bob_pos(db).margin.value * 100 / notional) << "% of notional)" );
 
    int wiped_at = 0;
    for( int pct = 1; pct <= 30 && 0 == wiped_at; ++pct )
    {
       generate_block();
       set_expiration( db, trx );
-      publish( oid, bob_id, bob_private_key, 100 - pct );   // Mark faellt gegen den Long
+      publish( oid, bob_id, bob_private_key, 100 - pct );   // the mark falls against the long
       const auto* p = position_of( mid, bob_id );
       if( nullptr == p ) break;
       const share_type mark = *mid(db).mark_price;
       const share_type eq = p->equity( mark );
       if( pct <= 12 || eq <= 0 )
          BOOST_TEST_MESSAGE( "  -" << pct << "%  Mark " << mark.value
-                             << "  Eigenkapital " << eq.value );
+                             << "  equity " << eq.value );
       if( eq <= 0 ) wiped_at = pct;
    }
 
-   BOOST_TEST_MESSAGE( "  ==> Eigenkapital erschoepft bei -" << wiped_at << "%" );
-   // Bei 10x Hebel muss das Eigenkapital ungefaehr bei der Anfangsmarge aufgebraucht sein,
-   // also nahe 10%. Deutlich frueher hiesse, dass Gebuehren oder Rundung Marge fressen;
-   // deutlich spaeter, dass die Marge nicht das ist, was sie zu sein vorgibt.
+   BOOST_TEST_MESSAGE( "  ==> equity exhausted at -" << wiped_at << "%" );
+   // At 10x leverage the equity must be used up at roughly the initial margin, so close to
+   // 10%. Much earlier would mean that fees or rounding eat margin; much later, that the margin
+   // is not what it claims to be.
    BOOST_CHECK_MESSAGE( wiped_at >= 9 && wiped_at <= 12,
-                        "Eigenkapital bei -" + std::to_string( wiped_at )
-                        + "% erschoepft, erwartet 9-12%" );
+                        "equity exhausted at -" + std::to_string( wiped_at )
+                        + "%, expected 9-12%" );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * OEKONOMIE: eine Kaskade. Mehrere Positionen mit unterschiedlichem Hebel, eine einzige
- * Bewegung, die sie gemeinsam unter Wasser setzt.
+ * ECONOMICS: a cascade. Several positions with different leverage, and a single move that
+ * puts all of them under water.
  *
- * Geprueft wird nicht, ob eine einzelne Liquidation funktioniert -- das tun andere Tests --
- * sondern ob der Markt danach noch aufgeht: Summe der Positionsgroessen null, Open Interest
- * stimmig, und aus dem Nichts entstandener Wert nirgends.
+ * What is checked is not whether a single liquidation works -- other tests do that -- but
+ * whether the market still balances afterwards: position sizes summing to zero, open interest
+ * consistent, and no value created out of nothing anywhere.
  */
 BOOST_AUTO_TEST_CASE( a_cascade_leaves_the_market_balanced )
 { try {
@@ -2397,7 +2396,7 @@ BOOST_AUTO_TEST_CASE( a_cascade_leaves_the_market_balanced )
    const futures_market_id_type mid {
       PUSH_TX( db, ctx ).operation_results.front().get<object_id_type>() };
 
-   // Drei Longs unterschiedlicher Groesse gegen einen Short.
+   // Three longs of different size against one short.
    place( mid, bob_id,   bob_private_key,   true, 100, 50 );
    place( mid, carol_id, carol_private_key, false, 100, 50 );
    place( mid, dan_id,   dan_private_key,   true, 100, 30 );
@@ -2405,16 +2404,16 @@ BOOST_AUTO_TEST_CASE( a_cascade_leaves_the_market_balanced )
    place( mid, erin_id,  erin_private_key,  true, 100, 20 );
    place( mid, carol_id, carol_private_key, false, 100, 20 );
 
-   BOOST_TEST_MESSAGE( "  Open Interest vor der Bewegung: " << mid(db).open_interest.value );
+   BOOST_TEST_MESSAGE( "  open interest before the move: " << mid(db).open_interest.value );
    check_market_is_balanced( mid );
 
    const auto fund_before = mid(db).insurance_fund;
 
    generate_block();
    set_expiration( db, trx );
-   publish( oid, bob_id, bob_private_key, 80 );   // -20%: alle drei Longs unter Wasser
+   publish( oid, bob_id, bob_private_key, 80 );   // -20%: all three longs under water
 
-   BOOST_TEST_MESSAGE( "  Mark auf 80 (-20%), Fonds vorher " << fund_before.value );
+   BOOST_TEST_MESSAGE( "  mark at 80 (-20%), fund before " << fund_before.value );
 
    int liquidated = 0;
    for( auto who : {bob_id, dan_id, erin_id} )
@@ -2428,25 +2427,25 @@ BOOST_AUTO_TEST_CASE( a_cascade_leaves_the_market_balanced )
          liquidate( pid, alice_id, alice_private_key );
          ++liquidated;
       } catch( const fc::exception& e ) {
-         BOOST_TEST_MESSAGE( "  Liquidation abgelehnt: "
+         BOOST_TEST_MESSAGE( "  liquidation refused: "
                              << e.to_string().substr( 0, 90 ) );
       }
    }
-   BOOST_TEST_MESSAGE( "  liquidiert: " << liquidated << " von 3" );
-   BOOST_TEST_MESSAGE( "  Fonds nachher: " << mid(db).insurance_fund.value
-                       << "  (Veraenderung " << ( mid(db).insurance_fund - fund_before ).value << ")" );
+   BOOST_TEST_MESSAGE( "  liquidated: " << liquidated << " of 3" );
+   BOOST_TEST_MESSAGE( "  fund after: " << mid(db).insurance_fund.value
+                       << "  (change " << ( mid(db).insurance_fund - fund_before ).value << ")" );
 
-   // Der eigentliche Punkt: nach der Kaskade muss der Markt noch aufgehen.
+   // The actual point: after the cascade the market must still balance.
    check_market_is_balanced( mid );
-   BOOST_CHECK_MESSAGE( liquidated > 0, "keine einzige Liquidation ging durch" );
+   BOOST_CHECK_MESSAGE( liquidated > 0, "not a single liquidation went through" );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * OEKONOMIE: kann aufgelaufenes Funding allein eine Position liquidierbar machen?
+ * ECONOMICS: can accrued funding alone make a position liquidatable?
  *
- * Der Satz ist pro Intervall gedeckelt, aber er laeuft auf. Bei 0,075% je acht Stunden sind
- * das rund 0,225% am Tag; gegen eine Marge von 10% des Notionals ist die Frage, nach wie
- * vielen Intervallen die Position faellt, ohne dass sich der Markt bewegt hat.
+ * The rate is capped per interval, but it accumulates. At 0.075% per eight hours that is about
+ * 0.225% a day; against a margin of 10% of notional, the question is after how many intervals
+ * the position falls without the market having moved.
  */
 BOOST_AUTO_TEST_CASE( measure_how_long_funding_alone_takes_to_drain_a_position )
 { try {
@@ -2471,8 +2470,8 @@ BOOST_AUTO_TEST_CASE( measure_how_long_funding_alone_takes_to_drain_a_position )
    cop.options.initial_margin_ratio     = 1000;
    cop.options.maintenance_margin_ratio = 500;
    cop.options.max_mark_move_ppm        = 0;
-   cop.options.funding_interval_sec     = 60;      // damit der Test Intervalle durchlaufen kann
-   cop.options.max_funding_rate_ppm     = 10000;   // 1% je Intervall, der zugelassene Hoechstwert
+   cop.options.funding_interval_sec     = 60;      // so that the test can run through intervals
+   cop.options.max_funding_rate_ppm     = 10000;   // 1% per interval, the highest value allowed
    cop.options.impact_size              = 2;
    signed_transaction ctx;
    ctx.operations.push_back( cop );
@@ -2486,72 +2485,72 @@ BOOST_AUTO_TEST_CASE( measure_how_long_funding_alone_takes_to_drain_a_position )
    place( mid, carol_id, carol_private_key, false, 100, 100 );
    const auto bob_pos = position_of( mid, bob_id )->get_id();
 
-   // Ein Buch dauerhaft ueber dem Mark, mit echter Tiefe, damit der Satz am Deckel klebt
-   // und der Long zahlt.
+   // A book permanently above the mark, with real depth, so that the rate sits at the cap
+   // and the long pays.
    place( mid, dan_id,   dan_private_key,   true, 108, 5 );
    place( mid, alice_id, alice_private_key, false, 112, 5 );
 
    const auto margin0 = bob_pos(db).margin;
-   BOOST_TEST_MESSAGE( "  Marge zu Beginn: " << margin0.value );
+   BOOST_TEST_MESSAGE( "  margin at the start: " << margin0.value );
 
    int intervals = 0;
    for( ; intervals < 40; ++intervals )
    {
       generate_blocks( db.head_block_time() + 70 );
       set_expiration( db, trx );
-      publish( oid, bob_id, bob_private_key, 100 );   // Mark unveraendert
+      publish( oid, bob_id, bob_private_key, 100 );   // mark unchanged
       const auto* p = position_of( mid, bob_id );
       if( nullptr == p ) break;
-      // Verhaltensbasiert statt nachgerechnet: die Position ist genau dann faellig, wenn
-      // die Kette eine Liquidation zulaesst. Das umgeht die interne Margenformel und misst
-      // das, worauf es ankommt.
-      // Jede Ausnahme als "noch gesund" zu lesen waere falsch: eine Liquidation kann auch
-      // aus Gruenden scheitern, die nichts mit der Gesundheit der Position zu tun haben.
-      // Deshalb die Begruendung mitschreiben und die Marge mitfuehren.
+      // Measured by behaviour instead of recomputed: the position is due exactly when the
+      // chain allows a liquidation. That bypasses the internal margin formula and measures
+      // what matters.
+      // Reading every exception as "still healthy" would be wrong: a liquidation can also
+      // fail for reasons that have nothing to do with the position's health. So the reason
+      // is logged, and the margin tracked alongside.
       if( intervals < 3 || 0 == intervals % 10 )
-         BOOST_TEST_MESSAGE( "  Intervall " << intervals
-                             << "  Marge " << p->margin.value
-                             << "  Groesse " << p->size.value
-                             << "  kum.Funding " << mid(db).cumulative_funding.value );
+         BOOST_TEST_MESSAGE( "  interval " << intervals
+                             << "  margin " << p->margin.value
+                             << "  size " << p->size.value
+                             << "  cum. funding " << mid(db).cumulative_funding.value );
       bool liquidatable = false;
       try {
          liquidate( p->get_id(), carol_id, carol_private_key );
          liquidatable = true;
       } catch( const fc::exception& e ) {
          if( intervals < 3 || 0 == intervals % 10 )
-            BOOST_TEST_MESSAGE( "    Liquidation abgelehnt: "
+            BOOST_TEST_MESSAGE( "    liquidation refused: "
                                 << e.to_string().substr( 0, 100 ) );
       }
       if( liquidatable ) break;
    }
-   BOOST_TEST_MESSAGE( "  kumuliertes Funding: " << mid(db).cumulative_funding.value );
-   BOOST_TEST_MESSAGE( "  ==> nach " << intervals
-                       << " Intervallen unter der Erhaltungsmarge (Mark unveraendert)" );
+   BOOST_TEST_MESSAGE( "  cumulative funding: " << mid(db).cumulative_funding.value );
+   BOOST_TEST_MESSAGE( "  ==> below the maintenance margin after " << intervals
+                       << " intervals (mark unchanged)" );
 
-   // Funding allein MUSS eine Position irgendwann faellig machen. Vor der Korrektur an
-   // do_evaluate blieb equity() ueber alle 40 Intervalle bei 1000 stehen, waehrend die
-   // Schuld auf 4000 anwuchs: die Position war nie liquidierbar und haette unbegrenzt
-   // Schulden angehaeuft. Der Deckel nach oben haelt fest, dass der Satz nicht so hoch
-   // sein darf, dass eine gesunde Position binnen weniger Intervalle faellt.
+   // Funding alone MUST eventually make a position due. Before the fix to do_evaluate,
+   // equity() stayed at 1000 across all 40 intervals while the debt grew to 4000: the
+   // position was never liquidatable and would have piled up debt without limit. The upper
+   // bound pins down that the rate must not be so high that a healthy position falls within
+   // a few intervals.
    BOOST_CHECK_MESSAGE( intervals < 40,
-                        "Funding allein machte die Position in 40 Intervallen NIE faellig "
-                        "-- die Zulaessigkeitspruefung ignoriert aufgelaufenes Funding" );
+                        "funding alone NEVER made the position due in 40 intervals "
+                        "-- the eligibility check ignores accrued funding" );
    BOOST_CHECK_MESSAGE( intervals >= 5,
-                        "Funding allein liquidiert schon nach "
-                        + std::to_string( intervals ) + " Intervallen" );
+                        "funding alone liquidates after only "
+                        + std::to_string( intervals ) + " intervals" );
 } FC_LOG_AND_RETHROW() }
 
 
 /**
- * OEKONOMIE: was kostet es, den Funding-Satz zu bewegen -- und was kauft impact_size?
+ * ECONOMICS: what does it cost to move the funding rate -- and what does impact_size buy?
  *
- * impact_size steht auf 10, weil ich diese Zahl gewaehlt habe, nicht weil sie aus etwas
- * folgt. Der Test misst, was sie kostet.
+ * impact_size is set to 10 because that number was chosen, not because it follows from
+ * anything. The test measures what it costs.
  *
- * Ein erster Anlauf liess den Angreifer einfach hoch bieten und mass nichts: ein Gebot ueber
- * dem besten Brief KREUZT und wird gefuellt, statt im Buch zu liegen. Das ist der Kern der
- * Sache -- um den Impact-Preis zu heben, muss der Angreifer die ehrliche Tiefe erst
- * AUFKAUFEN und dann eigene Tiefe stellen. Beides kostet, und genau das wird hier gezaehlt.
+ * A first attempt simply had the attacker bid high and measured nothing: a bid above the best
+ * ask CROSSES and is filled instead of resting in the book. That is the heart of the matter --
+ * to raise the impact price, the attacker first has to BUY UP the honest depth and then post
+ * depth of their own. Both cost money, and that is exactly what is counted here.
  */
 BOOST_AUTO_TEST_CASE( measure_what_impact_size_costs_an_attacker )
 { try {
@@ -2567,11 +2566,11 @@ BOOST_AUTO_TEST_CASE( measure_what_impact_size_costs_an_attacker )
    const auto oid = make_oracle( alice_id, alice_private_key, bob_id );
    publish( oid, bob_id, bob_private_key, 100 );
 
-   const int64_t honest_depth = 20;   // ehrliche Kontrakte auf der Briefseite bei 101
+   const int64_t honest_depth = 20;   // honest contracts on the ask side at 101
 
-   BOOST_TEST_MESSAGE( "  Mark 100.  Ehrliches Buch: 20 Gebote bei 99, 20 Briefe bei 101." );
-   BOOST_TEST_MESSAGE( "  Der Angreifer will den Impact-Brief anheben. Dazu muss er die" );
-   BOOST_TEST_MESSAGE( "  ehrlichen Briefe aufkaufen und eigene Tiefe stellen." );
+   BOOST_TEST_MESSAGE( "  mark 100.  honest book: 20 bids at 99, 20 asks at 101." );
+   BOOST_TEST_MESSAGE( "  The attacker wants to raise the impact ask. To do so they must" );
+   BOOST_TEST_MESSAGE( "  buy up the honest asks and post depth of their own." );
 
    for( uint32_t impact : { 2u, 10u, 40u } )
    {
@@ -2603,37 +2602,37 @@ BOOST_AUTO_TEST_CASE( measure_what_impact_size_costs_an_attacker )
 
       const int64_t before = get_balance( mallory_id, core_id );
 
-      // Schritt 1: die ehrlichen Briefe wegkaufen. Der Angreifer zahlt 101 fuer etwas,
-      // das der Mark mit 100 bewertet -- ein Verlust von 1 je Kontrakt, sofort.
+      // Step 1: buy up the honest asks. The attacker pays 101 for something the mark values
+      // at 100 -- a loss of 1 per contract, immediately.
       generate_block();
       set_expiration( db, trx );
       place( mid, mallory_id, mallory_private_key, true, 101, honest_depth );
 
-      // Schritt 2: eigene Tiefe hoch stellen, mindestens impact_size Kontrakte, sonst
-      // mischt der Impact-Preis noch ehrliche Ware bei.
+      // Step 2: post depth of their own, high, at least impact_size contracts, or the impact
+      // price still mixes in honest orders.
       generate_block();
       set_expiration( db, trx );
       place( mid, mallory_id, mallory_private_key, false, 130,
              static_cast<int64_t>( impact ) );
 
-      // Das Premium ist ZEITGEWICHTET ueber das Intervall. Ein Buch, das erst in der
-      // letzten Sekunde manipuliert wird, geht im Mittel unter -- der erste Anlauf mass
-      // deshalb Funding 0, obwohl der Impact-Mid bei 114 lag. Der Angreifer muss sein
-      // Buch also ueber das Intervall HALTEN, und genau das kostet ihn die Exponierung.
+      // The premium is TIME-WEIGHTED over the interval. A book manipulated only in the last
+      // second disappears in the average -- which is why the first attempt measured funding
+      // of 0 although the impact mid was at 114. So the attacker has to HOLD the book over the
+      // interval, and that exposure is exactly what it costs them.
       for( int k = 0; k < 3; ++k )
       {
          generate_blocks( db.head_block_time() + 40 );
          set_expiration( db, trx );
          publish( oid, bob_id, bob_private_key, 100 );
-         BOOST_TEST_MESSAGE( "     nach Schritt " << k
+         BOOST_TEST_MESSAGE( "     after step " << k
                              << ": premium_avg=" << mid(db).premium_avg.value
                              << " premium_last=" << mid(db).premium_last.value
-                             << " kum.Funding=" << mid(db).cumulative_funding.value );
+                             << " cum. funding=" << mid(db).cumulative_funding.value );
       }
 
-      // Diagnose: liegt der Brief des Angreifers ueberhaupt im Buch, und was sieht der
-      // Premium-Sampler? Ohne das waere "Funding 0" nicht von "Angriff wirkungslos"
-      // zu unterscheiden.
+      // Diagnostics: is the attacker's ask in the book at all, and what does the premium
+      // sampler see? Without this, "funding 0" could not be told apart from "the attack had
+      // no effect".
       {
          const auto& book = db.get_index_type<futures_order_index>().indices()
                               .get<by_market_book>();
@@ -2644,82 +2643,51 @@ BOOST_AUTO_TEST_CASE( measure_what_impact_size_costs_an_attacker )
             if( it->is_long ) { nbid += it->size.value; bestbid = it->price_per_contract; }
             else { if( 0 == nask ) bestask = it->price_per_contract; nask += it->size.value; }
          }
-         BOOST_TEST_MESSAGE( "     Buch: " << nbid << " Gebote (bestes " << bestbid.value
-                             << "), " << nask << " Briefe (bestes " << bestask.value << ")"
+         BOOST_TEST_MESSAGE( "     book: " << nbid << " bids (best " << bestbid.value
+                             << "), " << nask << " asks (best " << bestask.value << ")"
                              << "  mark=" << ( mid(db).mark_price.valid()
                                                ? mid(db).mark_price->value : -1 ) );
       }
       const int64_t spent = before - get_balance( mallory_id, core_id );
       BOOST_TEST_MESSAGE( "  impact_size " << impact
-                          << ":  gebundenes Kapital " << spent
+                          << ":  capital committed " << spent
                           << "  premium_last " << mid(db).premium_last.value
                           << "  premium_avg " << mid(db).premium_avg.value
-                          << "  kum.Funding " << mid(db).cumulative_funding.value );
+                          << "  cum. funding " << mid(db).cumulative_funding.value );
 
-      // Erkennung greift sofort: der Impact-Preis sieht das manipulierte Buch und der
-      // Momentanwert steht am Deckel.
+      // Detection is immediate: the impact price sees the manipulated book, and the
+      // instantaneous value sits at the cap.
       BOOST_CHECK_MESSAGE( mid(db).premium_last.value > 0,
-                           "Impact-Preis hat die Manipulation nicht bemerkt" );
-      // Wirkung greift NICHT sofort: der zeitgewichtete Mittelwert hinkt nach, und genau
-      // das zwingt den Angreifer, sein Buch ueber das Intervall zu halten statt es fuer
-      // einen Augenblick zu stellen.
+                           "the impact price did not notice the manipulation" );
+      // The effect is NOT immediate: the time-weighted average lags behind, and that is
+      // exactly what forces the attacker to hold the book over the interval instead of
+      // posting it for a moment.
       BOOST_CHECK_MESSAGE( mid(db).premium_avg.value <= mid(db).premium_last.value,
-                           "der Mittelwert eilte dem Momentanwert voraus" );
+                           "the average ran ahead of the instantaneous value" );
       check_market_is_balanced( mid );
    }
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  ==> Gemessen: der Angriff kostet drei Dinge gleichzeitig." );
-   BOOST_TEST_MESSAGE( "      1. die ehrliche Tiefe aufkaufen -- feste Kosten" );
-   BOOST_TEST_MESSAGE( "      2. impact_size eigene Kontrakte exponiert stellen --" );
-   BOOST_TEST_MESSAGE( "         waechst linear mit dem Parameter (246 / 350 / 740)" );
-   BOOST_TEST_MESSAGE( "      3. das alles ueber das Funding-Intervall HALTEN, weil das" );
-   BOOST_TEST_MESSAGE( "         Premium zeitgewichtet ist: premium_last steht sofort am" );
-   BOOST_TEST_MESSAGE( "         Deckel, premium_avg braucht das ganze Intervall dorthin." );
+   BOOST_TEST_MESSAGE( "  ==> measured: the attack costs three things at once." );
+   BOOST_TEST_MESSAGE( "      1. buying up the honest depth -- a fixed cost" );
+   BOOST_TEST_MESSAGE( "      2. exposing impact_size contracts of one's own --" );
+   BOOST_TEST_MESSAGE( "         grows linearly with the parameter (246 / 350 / 740)" );
+   BOOST_TEST_MESSAGE( "      3. HOLDING all of it over the funding interval, because the" );
+   BOOST_TEST_MESSAGE( "         premium is time-weighted: premium_last hits the cap at once," );
+   BOOST_TEST_MESSAGE( "         premium_avg needs the whole interval to get there." );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * MMEV, Schritt 1: den Nachweis fuehren, bevor gehaertet wird.
+ * MMEV against settlement: who decides the price at which EVERYONE settles?
  *
- * Ein Witness, der zwei aufeinanderfolgende Bloecke produziert, hat ein Fenster, in dem
- * niemand gegen ihn handeln kann: er stellt sein Buch im ersten Block, niemand darf
- * dazwischen, und im zweiten raeumt er es wieder ab. Innerhalb dieses Fensters ist er
- * risikolos -- kein Gegenhandel, keine Liquidation, kein Arbitrageur.
+ * It used to be the first caller after expiry, at the mark in that caller's block. A block
+ * producer chooses its own blocks, so it had a free option on whichever published value suited
+ * it best -- and that price applies to everyone in the contract, fixed once and never touched
+ * again. Unlike funding, there is neither a cap nor time-weighting here to damp it.
  *
- * Die Frage ist nicht ob er das Buch verzerren kann (offensichtlich ja), sondern wieviel
- * Funding er damit bewegt. Das Premium ist zeitgewichtet, und jede Spanne zaehlt mit dem
- * Premium an ihrem ANFANG. Ein Fenster von zwei Bloecken traegt also hoechstens seine
- * eigene Dauer zum Intervallmittel bei.
- *
- * Gemessen wird gegen eine ehrliche Vergleichslinie im selben Aufbau: einmal mit
- * unveraendertem Buch, einmal mit einem Angreifer, der genau zwei Bloecke lang verzerrt.
- */
-/**
- * MMEV gegen den Oracle: was ein Witness durch Zensur erreicht.
- *
- * Ein Witness kann Oracle-Publikationen aus seinen Bloecken heraushalten. Er kann den Wert
- * nicht faelschen -- dazu braeuchte er die Mehrheit der Produzenten --, aber er kann ihn
- * ALT werden lassen. Die Frage ist, was die Kette dann tut: auf dem alten Preis
- * weiterrechnen, oder aufhoeren.
- *
- * Gemessen wird an derselben Position zum selben Preis; nur die Frische unterscheidet sich.
- * Faellt die Liquidation bei altem Wert aus und geht bei frischem durch, dann faellt das
- * System geschlossen aus -- Zensur kann eine Liquidation VERHINDERN, aber keine falsche
- * ausloesen. Das ist die richtige Richtung: der Zensor schadet sich selbst, wenn er eine
- * Liquidation aufhaelt, die ihn betrifft, statt fremde Positionen zu Unrecht zu reissen.
- */
-/**
- * MMEV gegen die Abrechnung: wer bestimmt den Preis, zu dem ALLE abrechnen?
- *
- * Frueher der erste Aufrufer nach Ablauf, und zwar auf den Mark in dessen Block. Ein
- * Blockbauer waehlt seine eigenen Bloecke, hatte damit also eine kostenlose Option auf den
- * fuer ihn guenstigsten der veroeffentlichten Werte -- und der Preis gilt fuer jeden im
- * Kontrakt, ein einziges Mal fixiert und nie wieder angefasst. Anders als beim Funding gibt
- * es hier weder Deckel noch Zeitgewichtung, die das daempfen.
- *
- * Jetzt fixiert ihn die erste Oracle-Publikation ab Ablauf. Geprueft wird beides: dass ohne
- * Publikation gar nicht abgerechnet werden kann, und dass der Preis danach derjenige der
- * Publikation ist und nicht derjenige, den ein spaeterer Aufrufer haette waehlen koennen.
+ * Now the first oracle publication at or after expiry fixes it. Both are checked: that without
+ * a publication nothing can be settled at all, and that the price afterwards is the
+ * publication's and not one a later caller could have chosen.
  */
 BOOST_AUTO_TEST_CASE( the_oracle_fixes_the_settlement_price_not_the_first_caller )
 { try {
@@ -2735,7 +2703,7 @@ BOOST_AUTO_TEST_CASE( the_oracle_fixes_the_settlement_price_not_the_first_caller
    const auto oid = make_oracle( alice_id, alice_private_key, bob_id );
    publish( oid, bob_id, bob_private_key, 100 );
 
-   // Datierter Kontrakt, der bald ablaeuft.
+   // A dated contract that expires soon.
    const auto expiry = db.head_block_time() + 300;
    const auto mid = make_market( alice_id, alice_private_key, oid, 1, expiry,
                                  "SET-PERP", undamped() );
@@ -2743,40 +2711,53 @@ BOOST_AUTO_TEST_CASE( the_oracle_fixes_the_settlement_price_not_the_first_caller
    place( mid, bob_id,   bob_private_key,   true,  100, 10 );
    place( mid, carol_id, carol_private_key, false, 100, 10 );
 
-   // Ueber den Ablauf hinaus, ohne dass der Oracle etwas sagt.
+   // Past expiry, with the oracle saying nothing.
    generate_blocks( expiry + 30 );
    set_expiration( db, trx );
    BOOST_REQUIRE( db.head_block_time() > *mid(db).expiry );
    BOOST_CHECK_MESSAGE( !mid(db).is_settled,
-                        "der Markt galt als abgerechnet, ohne dass der Oracle publiziert hat" );
+                        "the market counted as settled although the oracle had not published" );
 
-   // Ohne Publikation darf niemand abrechnen -- auch nicht, wer den Block baut.
+   // Without a publication nobody may settle -- not even whoever builds the block.
    GRAPHENE_REQUIRE_THROW( settle_market( mid, dan_id, dan_private_key ), fc::exception );
-   BOOST_TEST_MESSAGE( "  nach Ablauf, ohne Publikation: Abrechnung abgelehnt" );
+   BOOST_TEST_MESSAGE( "  after expiry, without a publication: settlement refused" );
 
-   // Die erste Publikation ab Ablauf fixiert den Preis, ohne dass jemand etwas aufruft.
+   // The first publication at or after expiry fixes the price, without anyone calling anything.
    publish( oid, bob_id, bob_private_key, 88 );
    BOOST_REQUIRE( mid(db).is_settled );
    BOOST_REQUIRE( mid(db).settlement_price.valid() );
    BOOST_CHECK_EQUAL( mid(db).settlement_price->value, 88 );
-   BOOST_TEST_MESSAGE( "  erste Publikation ab Ablauf fixiert den Preis auf 88" );
+   BOOST_TEST_MESSAGE( "  the first publication after expiry fixes the price at 88" );
 
-   // Ein spaeterer, guenstigerer Wert aendert daran nichts mehr -- genau die Wahl, die dem
-   // ersten Aufrufer frueher offenstand.
+   // A later, more favourable value changes nothing any more -- exactly the choice the first
+   // caller used to have.
    publish( oid, bob_id, bob_private_key, 120 );
    BOOST_CHECK_EQUAL( mid(db).settlement_price->value, 88 );
-   BOOST_TEST_MESSAGE( "  spaeterer Wert 120 aendert den Abrechnungspreis nicht" );
+   BOOST_TEST_MESSAGE( "  a later value of 120 does not change the settlement price" );
 
    settle_market( mid, dan_id, dan_private_key );
-   BOOST_TEST_MESSAGE( "  Abrechnung laeuft zum fixierten Preis" );
+   BOOST_TEST_MESSAGE( "  settlement runs at the fixed price" );
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Befund: der Zeitpunkt gehoert dem Oracle, nicht dem Aufrufer." );
-   BOOST_TEST_MESSAGE( "  Was bleibt: ein Produzent kann die erste Publikation nach Ablauf" );
-   BOOST_TEST_MESSAGE( "  um die von ihm gebauten Bloecke verzoegern -- Sekunden, nicht" );
-   BOOST_TEST_MESSAGE( "  beliebig lange." );
+   BOOST_TEST_MESSAGE( "  finding: the timing belongs to the oracle, not to the caller." );
+   BOOST_TEST_MESSAGE( "  What remains: a producer can delay the first publication after" );
+   BOOST_TEST_MESSAGE( "  expiry by the blocks it builds itself -- seconds, not" );
+   BOOST_TEST_MESSAGE( "  indefinitely." );
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * MMEV against the oracle: what a witness achieves by censorship.
+ *
+ * A witness can keep oracle publications out of its blocks. It cannot falsify the value --
+ * that would take a majority of the producers -- but it can let the value go STALE. The
+ * question is what the chain then does: keep computing on the old price, or stop.
+ *
+ * The same position at the same price is measured twice; only the freshness differs. If the
+ * liquidation fails on a stale value and goes through on a fresh one, the system fails closed:
+ * censorship can PREVENT a liquidation, but it cannot trigger a wrong one. That is the right
+ * direction. The most a censor can do is hold a liquidation up, never wrongly seize someone
+ * else's position.
+ */
 BOOST_AUTO_TEST_CASE( a_censored_oracle_stops_liquidation_rather_than_faking_it )
 { try {
    generate_blocks( HARDFORK_FUTURES_TIME );
@@ -2788,7 +2769,7 @@ BOOST_AUTO_TEST_CASE( a_censored_oracle_stops_liquidation_rather_than_faking_it 
    fund( alice, asset(10000000) ); fund( bob, asset(10000000) );
    fund( carol, asset(10000000) ); fund( dan, asset(10000000) );
 
-   // Kurze Lebensdauer, damit der Wert im Test altern kann.
+   // A short lifetime, so that the value can age within the test.
    const uint32_t lifetime = 300;
    const auto oid = make_oracle( alice_id, alice_private_key, bob_id, "CEN.CORE", lifetime );
    publish( oid, bob_id, bob_private_key, 100 );
@@ -2798,42 +2779,42 @@ BOOST_AUTO_TEST_CASE( a_censored_oracle_stops_liquidation_rather_than_faking_it 
    place( mid, carol_id, carol_private_key, false, 100, 10 );
    const auto pid = position_of( mid, bob_id )->get_id();
 
-   // Unter Wasser: Eigenkapital 20 gegen eine Erhaltungsanforderung von 46.
+   // Under water: equity 20 against a maintenance requirement of 46.
    publish( oid, bob_id, bob_private_key, 92 );
    BOOST_REQUIRE( mid(db).mark_price.valid() );
    BOOST_CHECK_EQUAL( pid(db).equity( 92 ).value, 20 );
 
-   // Jetzt schweigt der Oracle laenger als seine Lebensdauer -- genau das, was ein Witness
-   // durch Zensur erreicht.
+   // Now the oracle stays silent for longer than its lifetime -- exactly what a witness
+   // achieves by censorship.
    generate_blocks( db.head_block_time() + int( lifetime ) + 30 );
    set_expiration( db, trx );
 
-   BOOST_TEST_MESSAGE( "  Oracle veraltet: mark_price im Objekt noch gesetzt? "
-                       << ( mid(db).mark_price.valid() ? "ja" : "nein" ) );
+   BOOST_TEST_MESSAGE( "  oracle stale: is mark_price still set in the object? "
+                       << ( mid(db).mark_price.valid() ? "yes" : "no" ) );
 
-   // Der zwischengespeicherte Mark steht noch im Objekt -- er verfaellt nicht von selbst.
-   // Trotzdem darf die Liquidation nicht laufen, denn gelesen wird ueber den Lebendtest.
+   // The cached mark is still in the object -- it does not expire by itself. The liquidation
+   // must still not run, because reads go through the liveness test.
    GRAPHENE_REQUIRE_THROW( liquidate( pid, dan_id, dan_private_key ), fc::exception );
-   BOOST_TEST_MESSAGE( "  bei altem Wert: Liquidation abgelehnt" );
+   BOOST_TEST_MESSAGE( "  on a stale value: liquidation refused" );
 
-   // Frischer Wert, gleicher Preis, gleiche Position: jetzt muss sie durchgehen. Ohne diese
-   // Haelfte waere "abgelehnt" nicht von "war nie liquidierbar" zu unterscheiden.
+   // Fresh value, same price, same position: now it has to go through. Without this half,
+   // "refused" could not be told apart from "was never liquidatable".
    publish( oid, bob_id, bob_private_key, 92 );
    liquidate( pid, dan_id, dan_private_key );
-   BOOST_TEST_MESSAGE( "  bei frischem Wert, selber Preis: Liquidation geht durch" );
+   BOOST_TEST_MESSAGE( "  on a fresh value at the same price: liquidation goes through" );
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Befund: Zensur des Oracles kann eine Liquidation aufhalten, aber" );
-   BOOST_TEST_MESSAGE( "  keine falsche ausloesen. Das System faellt geschlossen aus." );
+   BOOST_TEST_MESSAGE( "  finding: censoring the oracle can hold up a liquidation, but it" );
+   BOOST_TEST_MESSAGE( "  cannot trigger a wrong one. The system fails closed." );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * MMEV gegen eine ruhende Order: kann der Blockbauer sie schlechter fuellen als ihr Limit?
+ * MMEV against a resting order: can the block producer fill it worse than its limit?
  *
- * Er bestimmt, welche Order auf welche trifft. Wenn die Zuteilung eine ruhende Order zu
- * einem schlechteren Preis als ihrem eigenen fuellen koennte, waere jede Limit-Order im
- * Buch Freiwild. Geprueft wird beides: dass eine Gegenorder jenseits des Limits NICHT
- * matcht, und dass genau am Limit gefuellt wird.
+ * The producer decides which order meets which. If matching could fill a resting order at a
+ * worse price than its own, every limit order in the book would be fair game. Both are
+ * checked: that a counter-order beyond the limit does NOT match, and that it fills exactly at
+ * the limit.
  */
 BOOST_AUTO_TEST_CASE( a_resting_order_never_fills_worse_than_its_limit )
 { try {
@@ -2850,49 +2831,48 @@ BOOST_AUTO_TEST_CASE( a_resting_order_never_fills_worse_than_its_limit )
    publish( oid, bob_id, bob_private_key, 100 );
    const auto mid = make_market( alice_id, alice_private_key, oid, 1 );
 
-   // Bob bietet 100. Mehr als 100 je Kontrakt will er nicht zahlen.
+   // Bob bids 100: no more than 100 per contract.
    place( mid, bob_id, bob_private_key, true, 100, 10 );
    BOOST_REQUIRE( !position_of( mid, bob_id ) );
 
-   // Carol will zu 110 verkaufen -- schlechter fuer Bob als sein Limit. Das darf nicht
-   // matchen, egal in welcher Reihenfolge der Blockbauer die beiden legt.
+   // Carol wants to sell at 110 -- worse for Bob than Bob's limit. That must not match,
+   // whatever order the block producer puts the two in.
    place( mid, carol_id, carol_private_key, false, 110, 10 );
    BOOST_CHECK_MESSAGE( !position_of( mid, bob_id ),
-                        "eine Gegenorder jenseits des Limits hat die ruhende Order gefuellt" );
+                        "a counter-order beyond the limit filled the resting order" );
    BOOST_CHECK_MESSAGE( !position_of( mid, carol_id ),
-                        "eine Gegenorder jenseits des Limits hat sich selbst gefuellt" );
-   BOOST_TEST_MESSAGE( "  Gegenorder zu 110 gegen Gebot 100: kein Fill" );
+                        "a counter-order beyond the limit was filled itself" );
+   BOOST_TEST_MESSAGE( "  counter-order at 110 against a bid of 100: no fill" );
 
-   // Genau am Limit muss es fuellen, sonst misst der Test nur eine kaputte Zuteilung.
+   // It has to fill exactly at the limit, or the test only measures broken matching.
    place( mid, carol_id, carol_private_key, false, 100, 10 );
    BOOST_REQUIRE( position_of( mid, bob_id ) );
-   // entry_value ist die laufende Summe Groesse x Preis; bei 10 Kontrakten zu 100 also
-   // genau 1000. Faellt der Fill schlechter aus, steht hier mehr.
+   // entry_value is the running sum of size x price, so 10 contracts at 100 give exactly
+   // 1000. A worse fill would show more here.
    BOOST_CHECK_EQUAL( position_of( mid, bob_id )->size.value, 10 );
    BOOST_CHECK_EQUAL( position_of( mid, bob_id )->entry_value.value, 1000 );
-   BOOST_TEST_MESSAGE( "  Gegenorder zu 100: gefuellt, entry_value exakt 1000" );
+   BOOST_TEST_MESSAGE( "  counter-order at 100: filled, entry_value exactly 1000" );
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Befund: das Limit ist die Untergrenze, nicht die Reihenfolge." );
+   BOOST_TEST_MESSAGE( "  finding: the limit is the bound, not the ordering." );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * Was bringt es, das Wettrennen um eine Liquidation zu gewinnen?
+ * What is winning the race for a liquidation worth?
  *
- * Diese Flaeche laesst sich nicht wegkonstruieren. Der Liquidator verdient die Strafgebuehr
- * auf den uebernommenen Teil -- das ist der Anreiz, der ueberhaupt dafuer sorgt, dass jemand
- * unterdeckte Positionen aufraeumt, bevor sie die Versicherung kosten. Und wer den Block
- * baut, gewinnt jedes Wettrennen um diesen Anreiz, weil er die Reihenfolge bestimmt.
+ * This surface cannot be designed away. The liquidator earns the penalty on the part taken
+ * over -- that is the incentive that makes anyone clean up undercollateralised positions
+ * before they cost the insurance fund. And whoever builds the block wins every race for that
+ * incentive, because the block producer decides the order.
  *
- * Die Frage ist also nicht, ob ein Witness hier verdient. Er verdient. Die Frage ist, wieviel
- * und wodurch es begrenzt ist -- und das gehoert gemessen, nicht behauptet.
+ * So the question is not whether a witness earns here. It does. The question is how much, and
+ * what limits it -- and that should be measured, not asserted.
  *
- * Zwei Begrenzungen stehen zur Debatte:
- *   1. liquidation_penalty_ratio, ein Marktparameter: die Obergrenze pro uebernommener
- *      Notionale. Der Marktbetreiber setzt damit die Decke.
- *   2. Die Teilliquidation: genommen wird nur, was noetig ist, um die Position wieder auf
- *      volle Initial-Margin zu bringen. Der Rest bleibt beim Eigentuemer und ist der
- *      Bemessungsgrundlage entzogen.
+ * Two limits are in question:
+ *   1. liquidation_penalty_ratio, a market parameter: the cap per unit of notional taken over.
+ *      The market operator sets the ceiling with it.
+ *   2. Partial liquidation: only what is needed to bring the position back to full initial
+ *      margin is taken. The rest stays with the owner and is outside the penalty's base.
  */
 BOOST_AUTO_TEST_CASE( measure_what_winning_a_liquidation_race_is_worth )
 { try {
@@ -2912,74 +2892,90 @@ BOOST_AUTO_TEST_CASE( measure_what_winning_a_liquidation_race_is_worth )
    publish( oid, bob_id, bob_private_key, MARK );
    const auto mid = make_market( alice_id, alice_private_key, oid, 1, {}, "BTC-PERP", undamped() );
 
-   // bob long SIZE, carol short SIZE, beide auf Initial-Margin
+   // bob long SIZE, carol short SIZE, both at initial margin
    place( mid, bob_id,   bob_private_key,   true,  MARK, SIZE );
    place( mid, carol_id, carol_private_key, false, MARK, SIZE );
    const auto pid = position_of( mid, bob_id )->get_id();
 
    const auto& opts = mid(db).options;
-   const share_type voll_notional = share_type( SIZE ) * MARK;
+   const share_type full_notional = share_type( SIZE ) * MARK;
 
-   // Der Mark faellt, bis bob unter die Erhaltungsschwelle rutscht.
+   // The mark falls until bob slips below the maintenance threshold.
    publish( oid, bob_id, bob_private_key, 94 );
    BOOST_REQUIRE( mid(db).mark_price.valid() );
-   const share_type mark_jetzt = *mid(db).mark_price;
+   const share_type mark_now = *mid(db).mark_price;
 
-   const share_type groesse_vorher = pid(db).abs_size();
-   const share_type equity_vorher  = pid(db).equity( mark_jetzt );
+   const share_type size_before = pid(db).abs_size();
+   const share_type equity_before  = pid(db).equity( mark_now );
 
-   // mallory gewinnt das Rennen -- in einem Block, den sie selbst baut, immer.
-   const auto vorher = db.get_balance( mallory_id, core_id ).amount;
+   // mallory wins the race -- always, in a block of mallory's own.
+   const auto balance_before = db.get_balance( mallory_id, core_id ).amount;
    liquidate( pid, mallory_id, mallory_private_key );
-   const auto nachher = db.get_balance( mallory_id, core_id ).amount;
+   const auto balance_after = db.get_balance( mallory_id, core_id ).amount;
 
    const auto* pos = position_of( mid, mallory_id );
    BOOST_REQUIRE( nullptr != pos );
 
-   const share_type genommen  = pos->abs_size();
-   const share_type bezahlt   = vorher - nachher;
-   const share_type erhalten  = pos->margin;
+   const share_type taken  = pos->abs_size();
+   const share_type paid   = balance_before - balance_after;
+   const share_type received  = pos->margin;
 
-   // Was mallory herausholt, ist genau die Differenz: sie bekommt Margin, fuer die sie nicht
-   // bezahlt hat. Das IST die Strafgebuehr.
-   const share_type gewinn = erhalten - bezahlt;
-   const share_type strafe = futures_margin_required( genommen, mark_jetzt,
+   // What mallory extracts is exactly the difference: margin received but not paid for. That
+   // IS the penalty.
+   const share_type profit = received - paid;
+   const share_type penalty = futures_margin_required( taken, mark_now,
                                                       opts.liquidation_penalty_ratio );
-   BOOST_CHECK_EQUAL( gewinn.value, strafe.value );
+   BOOST_CHECK_EQUAL( profit.value, penalty.value );
 
-   // Und der Instrumententest: die Messung darf nicht deshalb klein sein, weil nichts
-   // passiert ist.
-   BOOST_REQUIRE_GT( genommen.value, 0 );
-   BOOST_REQUIRE_GT( gewinn.value, 0 );
+   // And the instrument check: the measurement must not be small merely because nothing
+   // happened.
+   BOOST_REQUIRE_GT( taken.value, 0 );
+   BOOST_REQUIRE_GT( profit.value, 0 );
 
-   // --- Begrenzung 1: der Marktparameter ------------------------------------------------
-   // Der Gewinn liegt auf der uebernommenen Notionale, gedeckelt durch das Verhaeltnis.
-   const share_type genommene_notional = genommen * mark_jetzt;
-   BOOST_CHECK_LE( gewinn.value,
-                   ( genommene_notional.value * opts.liquidation_penalty_ratio + 9999 ) / 10000 );
+   // --- Limit 1: the market parameter -----------------------------------------------------
+   // The profit lies on the notional taken over, capped by the ratio.
+   const share_type taken_notional = taken * mark_now;
+   BOOST_CHECK_LE( profit.value,
+                   ( taken_notional.value * opts.liquidation_penalty_ratio + 9999 ) / 10000 );
 
-   // --- Begrenzung 2: was die Teilliquidation abzieht ------------------------------------
-   // Haette die Uebernahme die ganze Position erfasst, laege die Strafe auf der vollen
-   // Notionale. Die Differenz ist, was die Teilliquidation dem Fenster nimmt.
-   const share_type strafe_bei_ganz = futures_margin_required(
-         groesse_vorher, mark_jetzt, opts.liquidation_penalty_ratio );
-   BOOST_CHECK_LT( gewinn.value, strafe_bei_ganz.value );
+   // --- Limit 2: what partial liquidation takes off ----------------------------------------
+   // Had the takeover covered the whole position, the penalty would lie on the full notional.
+   // The difference is what partial liquidation takes away from the window.
+   const share_type penalty_if_whole = futures_margin_required(
+         size_before, mark_now, opts.liquidation_penalty_ratio );
+   BOOST_CHECK_LT( profit.value, penalty_if_whole.value );
 
-   BOOST_TEST_MESSAGE( "MMEV-Liquidation:"
-      << "  Position " << groesse_vorher.value << " Kontrakte, Equity " << equity_vorher.value
-      << ", Mark " << mark_jetzt.value );
-   BOOST_TEST_MESSAGE( "  uebernommen " << genommen.value << " von " << groesse_vorher.value
-      << " (" << ( 100 * genommen.value / groesse_vorher.value ) << " %)" );
-   BOOST_TEST_MESSAGE( "  Gewinn des Gewinners " << gewinn.value
-      << " auf " << voll_notional.value << " Notionale gesamt"
-      << " = " << ( 10000 * gewinn.value / voll_notional.value ) << " ppm" );
-   BOOST_TEST_MESSAGE( "  bei voller Uebernahme waeren es " << strafe_bei_ganz.value
-      << " gewesen -- die Teilliquidation nimmt " << ( strafe_bei_ganz - gewinn ).value
-      << " davon weg" );
+   BOOST_TEST_MESSAGE( "MMEV liquidation:"
+      << "  position " << size_before.value << " contracts, equity " << equity_before.value
+      << ", mark " << mark_now.value );
+   BOOST_TEST_MESSAGE( "  taken over " << taken.value << " of " << size_before.value
+      << " (" << ( 100 * taken.value / size_before.value ) << " %)" );
+   BOOST_TEST_MESSAGE( "  the winner's profit " << profit.value
+      << " on " << full_notional.value << " total notional"
+      << " = " << ( 10000 * profit.value / full_notional.value ) << " bp" );
+   BOOST_TEST_MESSAGE( "  with a full takeover it would have been " << penalty_if_whole.value
+      << " -- partial liquidation takes " << ( penalty_if_whole - profit ).value
+      << " off it" );
 
    check_market_is_balanced( mid );
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * MMEV, step 1: establish the evidence before hardening anything.
+ *
+ * A witness that produces two consecutive blocks has a window in which nobody can trade
+ * against it: it posts its book in the first block, nobody gets in between, and in the second
+ * it clears the book again. Within that window it carries no risk -- no counter-trade, no
+ * liquidation, no arbitrageur.
+ *
+ * The question is not whether it can distort the book (obviously it can), but how much
+ * funding that moves. The premium is time-weighted, and every span counts with the premium at
+ * its START. A window of two blocks therefore contributes at most its own duration to the
+ * interval average.
+ *
+ * It is measured against an honest baseline in the same setup: once with the book left
+ * alone, once with an attacker who distorts it for exactly two blocks.
+ */
 BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
 { try {
    generate_blocks( HARDFORK_FUTURES_TIME );
@@ -2991,18 +2987,18 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
    for( auto a : {alice_id, bob_id, carol_id, mallory_id} )
       fund( a(db), asset(4000000000) );
 
-   // Realistische Groessenordnung. Bei einem Mark von 100 klemmt der Premium-Deckel
-   // (1% = 1 Einheit) so hart, dass die Zeitgewichtung anschliessend auf 0 rundet -- die
-   // Null waere dann ein Artefakt der kleinen Zahlen und nicht der Mechanik. Bei 1e6
-   // betraegt der Deckel 10000 Einheiten und der Anteil des Fensters bleibt sichtbar.
+   // A realistic order of magnitude. At a mark of 100 the premium cap (1% = 1 unit) clamps so
+   // hard that the time-weighting then rounds to 0 -- the zero would be an artefact of small
+   // numbers, not of the mechanism. At 1e6 the cap is 10000 units and the window's share stays
+   // visible.
    const int64_t MARK = 1000000;
 
    const auto oid = make_oracle( alice_id, alice_private_key, bob_id );
    publish( oid, bob_id, bob_private_key, MARK );
 
-   // Realistische Intervalle: eine Stunde, wie es Perpetuals ueblicherweise fahren, und
-   // eine Minute als Gegenprobe -- je kuerzer das Intervall, desto mehr Gewicht traegt
-   // ein Fenster fester Laenge.
+   // Realistic intervals: one hour, as perpetuals usually run, and one minute as a
+   // cross-check -- the shorter the interval, the more weight a window of fixed length
+   // carries.
    std::map<uint32_t, int64_t> moved_by_interval, cost_by_interval;
 
    for( uint32_t interval : { 60u, 3600u } )
@@ -3034,7 +3030,7 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
          const futures_market_id_type mid {
             PUSH_TX( db, ctx ).operation_results.front().get<object_id_type>() };
 
-         // Ein ehrliches, symmetrisches Buch: kein Premium, also auch kein Funding.
+         // An honest, symmetric book: no premium, and so no funding.
          place( mid, bob_id,   bob_private_key,   true,  MARK, 50 );
          place( mid, carol_id, carol_private_key, false, MARK, 50 );
          place( mid, carol_id, carol_private_key, true,  MARK - MARK/100, 20 );
@@ -3044,21 +3040,21 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
 
          if( attacked )
          {
-            // Block 1 des Fensters: ehrliche Briefe wegkaufen und eigene Tiefe hoch
-            // stellen. Beides in EINEM Block, weil der Angreifer den Block baut.
+            // Block 1 of the window: buy up the honest asks and post depth of their own,
+            // high. Both in ONE block, because the attacker builds the block.
             generate_block();
             set_expiration( db, trx );
             place( mid, mallory_id, mallory_private_key, true,  MARK + MARK/100, 20 );
             place( mid, mallory_id, mallory_private_key, false, MARK + MARK*3/10, 10 );
 
-            // Der Oracle publiziert unabhaengig vom Angreifer weiter; genau diese
-            // Publikation tastet das Premium ab. Ohne sie waere das Fenster wirkungslos
-            // und der Test wuerde nur beweisen, dass niemand hingesehen hat.
+            // The oracle keeps publishing independently of the attacker; it is this
+            // publication that samples the premium. Without it the window would have no
+            // effect, and the test would only prove that nobody was looking.
             generate_block();
             set_expiration( db, trx );
             publish( oid, bob_id, bob_private_key, MARK );
             in_window_premium = mid(db).premium_last.value;
-            BOOST_TEST_MESSAGE( "     im Fenster: premium_last="
+            BOOST_TEST_MESSAGE( "     in the window: premium_last="
                                 << mid(db).premium_last.value
                                 << " premium_avg=" << mid(db).premium_avg.value );
             {
@@ -3068,12 +3064,12 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
                for( auto it = book.begin(); it != book.end(); ++it )
                   if( it->market_id == mid && !it->is_long )
                   { if( 0 == nask ) bestask = it->price_per_contract; nask += it->size.value; }
-               BOOST_TEST_MESSAGE( "     im Fenster: " << nask << " Briefe, bestes "
+               BOOST_TEST_MESSAGE( "     in the window: " << nask << " asks, best "
                                    << bestask.value );
             }
 
-            // Block 2 des Fensters: wieder abraeumen. Zwischen diesen beiden Bloecken
-            // konnte niemand handeln -- das ist der ganze Vorteil.
+            // Block 2 of the window: clear it again. Between these two blocks nobody could
+            // trade -- that is the whole advantage.
             generate_block();
             set_expiration( db, trx );
             std::vector<futures_order_id_type> mine;
@@ -3088,8 +3084,8 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
                cancel( o, mallory_id, mallory_private_key );
          }
 
-         // Das Intervall zu Ende laufen lassen und schliessen. Der Oracle publiziert
-         // weiter, denn jede Publikation setzt den Mark neu und tastet das Premium ab.
+         // Let the interval run to its end and close it. The oracle keeps publishing,
+         // because every publication resets the mark and samples the premium.
          const auto interval_end = db.head_block_time() + int( interval ) + 10;
          while( db.head_block_time() < interval_end )
          {
@@ -3098,7 +3094,7 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
             publish( oid, bob_id, bob_private_key, MARK );
          }
 
-         BOOST_TEST_MESSAGE( "     am Intervallende: premium_last="
+         BOOST_TEST_MESSAGE( "     at the end of the interval: premium_last="
                              << mid(db).premium_last.value
                              << " premium_avg=" << mid(db).premium_avg.value );
          const int64_t cum = mid(db).cumulative_funding.value;
@@ -3112,46 +3108,46 @@ BOOST_AUTO_TEST_CASE( measure_what_two_consecutive_blocks_are_worth )
       }
 
       const int64_t moved = funding_attacked - funding_honest;
-      BOOST_TEST_MESSAGE( "  Funding-Intervall " << interval << "s:" );
-      BOOST_TEST_MESSAGE( "     Funding ehrlich          " << funding_honest );
-      BOOST_TEST_MESSAGE( "     Funding nach 2 Bloecken  " << funding_attacked );
-      BOOST_TEST_MESSAGE( "     bewegt                   " << moved );
-      BOOST_TEST_MESSAGE( "     Kapital des Angreifers   " << attacker_cost );
+      BOOST_TEST_MESSAGE( "  funding interval " << interval << "s:" );
+      BOOST_TEST_MESSAGE( "     funding, honest          " << funding_honest );
+      BOOST_TEST_MESSAGE( "     funding after 2 blocks   " << funding_attacked );
+      BOOST_TEST_MESSAGE( "     moved                    " << moved );
+      BOOST_TEST_MESSAGE( "     attacker's capital       " << attacker_cost );
 
       moved_by_interval[interval] = moved;
       cost_by_interval[interval] = attacker_cost;
 
-      // Die Erkennung muss sofort greifen: der Impact-Preis sieht das verzerrte Buch und
-      // die Momentanaufnahme steht am Deckel. Ohne diese Zusicherung waere ein Funding von
-      // 0 nicht von "niemand hat hingesehen" zu unterscheiden.
+      // Detection must be immediate: the impact price sees the distorted book, and the
+      // instantaneous sample sits at the cap. Without this assertion, funding of 0 could not
+      // be told apart from "nobody was looking".
       BOOST_CHECK_MESSAGE( in_window_premium >= int64_t( 10000 ),
-                           "der Impact-Preis hat die Verzerrung im Fenster nicht bemerkt: "
+                           "the impact price did not notice the distortion in the window: "
                            << in_window_premium );
    }
 
-   // Der eigentliche Befund, als Verhaeltnis statt als Absolutwert: das Fenster hat feste
-   // Laenge, also faellt sein Anteil am zeitgewichteten Mittel umgekehrt zum Intervall.
-   // Von 60s auf 3600s sind das 60x weniger; geprueft wird die Haelfte davon, damit
-   // Rundung nicht als Verletzung durchgeht.
+   // The actual finding, as a ratio rather than an absolute value: the window has a fixed
+   // length, so its share of the time-weighted average falls in inverse proportion to the
+   // interval. From 60s to 3600s that is 60x less; half of that is checked, so that rounding
+   // does not pass for a violation.
    BOOST_CHECK_MESSAGE( moved_by_interval[3600] * 30 <= moved_by_interval[60],
-                        "das Fenster verlor beim laengeren Intervall nicht an Gewicht: "
-                        << moved_by_interval[60] << " bei 60s gegen "
-                        << moved_by_interval[3600] << " bei 3600s" );
+                        "the window did not lose weight with the longer interval: "
+                        << moved_by_interval[60] << " at 60s against "
+                        << moved_by_interval[3600] << " at 3600s" );
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Befund: zwei aufeinanderfolgende Bloecke reichen, um den" );
-   BOOST_TEST_MESSAGE( "  Impact-Preis an den Deckel zu treiben -- die Erkennung greift" );
-   BOOST_TEST_MESSAGE( "  sofort -- aber nicht, um das zeitgewichtete Mittel zu bewegen." );
-   BOOST_TEST_MESSAGE( "  Zwei Mechanismen zusammen: der Deckel macht aus einer 30-Prozent-" );
-   BOOST_TEST_MESSAGE( "  Verzerrung eine Stichprobe von 1 Prozent, und die Gewichtung" );
-   BOOST_TEST_MESSAGE( "  macht daraus den Bruchteil Fensterdauer/Intervall." );
-   BOOST_TEST_MESSAGE( "  Gemessen: " << moved_by_interval[60] << " bei 60s Intervall, "
-                       << moved_by_interval[3600] << " bei 3600s -- bei "
-                       << cost_by_interval[60] << " gebundenem Kapital." );
-   BOOST_TEST_MESSAGE( "  Nicht gemessen: was der Angreifer daran VERDIENT. Funding wird" );
-   BOOST_TEST_MESSAGE( "  zwischen den Seiten umgelegt, er muesste also die passende Seite" );
-   BOOST_TEST_MESSAGE( "  halten -- und er kauft hier die ehrlichen Briefe ueber dem Mark," );
-   BOOST_TEST_MESSAGE( "  zahlt also erst einmal drauf." );
+   BOOST_TEST_MESSAGE( "  finding: two consecutive blocks are enough to drive the impact" );
+   BOOST_TEST_MESSAGE( "  price to the cap -- detection is immediate -- but not enough to" );
+   BOOST_TEST_MESSAGE( "  move the time-weighted average." );
+   BOOST_TEST_MESSAGE( "  Two mechanisms together: the cap turns a 30 percent distortion" );
+   BOOST_TEST_MESSAGE( "  into a sample of 1 percent, and the weighting turns that into" );
+   BOOST_TEST_MESSAGE( "  the fraction window/interval." );
+   BOOST_TEST_MESSAGE( "  measured: " << moved_by_interval[60] << " at a 60s interval, "
+                       << moved_by_interval[3600] << " at 3600s -- with "
+                       << cost_by_interval[60] << " capital committed." );
+   BOOST_TEST_MESSAGE( "  Not measured: what the attacker EARNS from it. Funding is moved" );
+   BOOST_TEST_MESSAGE( "  between the sides, so they would have to hold the right side --" );
+   BOOST_TEST_MESSAGE( "  and here they buy the honest asks above the mark, so they start" );
+   BOOST_TEST_MESSAGE( "  at a loss." );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
