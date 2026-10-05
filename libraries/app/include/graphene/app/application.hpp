@@ -81,6 +81,8 @@ namespace graphene { namespace app {
          uint32_t api_limit_get_liquidity_pools = 101;
          uint32_t api_limit_get_samet_funds = 101;
          uint32_t api_limit_get_credit_offers = 101;
+         uint32_t api_limit_get_oracles = 101;
+         uint32_t api_limit_get_futures = 101;
          uint32_t api_limit_get_storage_info = 101;
 
          static constexpr application_options get_default()
@@ -214,6 +216,8 @@ FC_REFLECT( graphene::app::application_options,
             ( api_limit_get_liquidity_pools )
             ( api_limit_get_samet_funds )
             ( api_limit_get_credit_offers )
+            ( api_limit_get_oracles )
+            ( api_limit_get_futures )
             ( api_limit_get_storage_info )
           )
 

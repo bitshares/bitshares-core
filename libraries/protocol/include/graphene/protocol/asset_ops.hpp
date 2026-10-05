@@ -150,6 +150,11 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
          // https://github.com/bitshares/bitshares-core/issues/2467
          fc::optional<uint8_t> black_swan_response_method;
+         /// When set, the settlement price comes from this oracle instead of from the
+         /// legacy price feeds. The oracle must be quoted as <this asset>/<backing asset>.
+         /// Only settable via asset_update_bitasset, never at asset creation: the oracle's
+         /// base asset has to be the smartcoin itself, which does not exist yet at creation.
+         fc::optional<oracle_id_type> price_oracle_id;
       };
 
       /// Time before a price feed expires
@@ -645,6 +650,7 @@ FC_REFLECT( graphene::protocol::bitasset_options::ext,
             (margin_call_fee_ratio)
             (force_settle_fee_percent)
             (black_swan_response_method)
+            (price_oracle_id)
           )
 
 FC_REFLECT( graphene::protocol::bitasset_options,

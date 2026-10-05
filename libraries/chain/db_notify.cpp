@@ -21,6 +21,8 @@
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/credit_offer_object.hpp>
+#include <graphene/chain/oracle_object.hpp>
+#include <graphene/chain/futures_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -386,6 +388,54 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const oracle_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const oracle_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const oracle_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const oracle_publish_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // producer
+   }
+   void operator()( const futures_market_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const futures_market_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const futures_order_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const futures_order_cancel_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const futures_fill_operation& op )
+   {
+      _impacted.insert( op.account_id );
+   }
+   void operator()( const futures_position_adjust_margin_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner
+   }
+   void operator()( const futures_liquidate_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // liquidator
+   }
+   void operator()( const futures_settle_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+   }
    void operator()( const credit_deal_expired_operation& op )
    {
       _impacted.insert( op.offer_owner );
@@ -509,6 +559,26 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
            const auto* aobj = dynamic_cast<const credit_deal_object*>( obj );
            accounts.insert( aobj->offer_owner );
            accounts.insert( aobj->borrower );
+           break;
+        } case futures_market_object_type:{
+           const auto* aobj = dynamic_cast<const futures_market_object*>( obj );
+           accounts.insert( aobj->owner );
+           break;
+        } case futures_position_object_type:{
+           const auto* aobj = dynamic_cast<const futures_position_object*>( obj );
+           accounts.insert( aobj->owner );
+           break;
+        } case futures_order_object_type:{
+           const auto* aobj = dynamic_cast<const futures_order_object*>( obj );
+           accounts.insert( aobj->owner );
+           break;
+        } case oracle_object_type:{
+           const auto* aobj = dynamic_cast<const oracle_object*>( obj );
+           accounts.insert( aobj->owner );
+           // Producers are impacted too: an account learns that an oracle it publishes to
+           // was reconfigured or removed from under it.
+           for( const auto& p : aobj->options.producers )
+              accounts.insert( p.first );
            break;
         }
         // Do not have a default fallback so that there will be a compiler warning when a new type is added

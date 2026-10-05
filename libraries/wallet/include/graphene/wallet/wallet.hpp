@@ -25,6 +25,7 @@
 
 #include <fc/optional.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/oracle_object.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include "wallet_structs.hpp"
@@ -1167,6 +1168,83 @@ class wallet_api
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction updating the bitasset
        */
+      /** Looks up an oracle by name or id.
+       *
+       * @param name_or_id the oracle's name (e.g. "BTC.USD") or its object id
+       * @returns the oracle
+       */
+      oracle_object get_oracle( const string& name_or_id )const;
+
+      /** Creates a named price series that consumers can reference by id.
+       *
+       *  An oracle is not tied to any asset: several consumers can reference the same series,
+       *  and a price that is not the settlement price of any smartcoin has somewhere to live.
+       *  To feed a smartcoin from it afterwards, set \c price_oracle_id in the asset's
+       *  bitasset options with \c update_bitasset().
+       *
+       * @param owner the account that will administer the oracle and pay the fee
+       * @param name unique, e.g. "BTC.USD"; uppercase letters, digits, '.' and '-'
+       * @param description free text
+       * @param base_symbol symbol of the base asset of the quoted price
+       * @param quote_symbol symbol of the quote asset of the quoted price
+       * @param options producers and their weights, quorum, staleness, aggregation method
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction create_oracle( const string& owner, const string& name,
+                                        const string& description, const string& base_symbol,
+                                        const string& quote_symbol,
+                                        const oracle_options& options, bool broadcast );
+
+      /** Changes an oracle's description or policy.
+       *
+       *  Takes effect immediately: dropping a producer or tightening the quorum recomputes the
+       *  value at once, and any asset fed by the oracle sees the change in the same block,
+       *  rather than at whatever time someone next publishes.
+       *
+       *  The quoted asset pair and the name cannot be changed. Consumers reference an oracle
+       *  by id and would have no way to notice that what it measures had changed underneath
+       *  them.
+       *
+       * @param owner the oracle's owner
+       * @param name_or_id the oracle's name or id
+       * @param new_description new description, or null to leave it alone
+       * @param new_options new policy, or null to leave it alone
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction update_oracle( const string& owner, const string& name_or_id,
+                                        const optional<string>& new_description,
+                                        const optional<oracle_options>& new_options,
+                                        bool broadcast );
+
+      /** Removes an oracle.
+       *
+       *  Refused while any market-issued asset still names it as its price source; clear
+       *  those assets' \c price_oracle_id first, or they would be left unable to margin call.
+       *
+       * @param owner the oracle's owner
+       * @param name_or_id the oracle's name or id
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction delete_oracle( const string& owner, const string& name_or_id,
+                                        bool broadcast );
+
+      /** Submits one value to an oracle, as one of its producers.
+       *
+       *  The price must be quoted as the oracle's base/quote pair; an inverted price is
+       *  rejected rather than silently flipped.
+       *
+       * @param producer the publishing account, which must be a producer of this oracle
+       * @param name_or_id the oracle's name or id
+       * @param value the price
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction
+       */
+      signed_transaction publish_oracle_value( const string& producer, const string& name_or_id,
+                                               const price& value, bool broadcast );
+
       signed_transaction update_bitasset( const string& symbol_or_id,
                                           const bitasset_options& new_options,
                                           bool broadcast = false )const;
@@ -1874,6 +1952,11 @@ FC_API( graphene::wallet::wallet_api,
         (update_asset)
         (update_asset_issuer)
         (update_bitasset)
+        (get_oracle)
+        (create_oracle)
+        (update_oracle)
+        (delete_oracle)
+        (publish_oracle_value)
         (get_htlc)
         (update_asset_feed_producers)
         (publish_asset_feed)

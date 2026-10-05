@@ -1,0 +1,14 @@
+// Futures: margin-traded perpetual and dated contracts settled against an oracle.
+// Enables futures_market_create / futures_market_update and the objects behind them.
+//
+// DEPENDS ON THE ORACLE HARDFORK. A futures market's mark price comes from an oracle, and
+// a market created before oracles exist could never be given one. This date must therefore
+// be strictly after HARDFORK_ORACLE_TIME -- deliberately so rather than equal to it, since
+// equal dates would make the dependency impossible to test and easy to break later.
+//
+// Placeholder date -- the real value is set by the committee when the feature is
+// scheduled for a particular network. Whatever they choose, keep the ordering.
+#ifndef HARDFORK_FUTURES_TIME
+#define HARDFORK_FUTURES_TIME (fc::time_point_sec( 1924992000 )) // 2031-01-01T00:00:00Z
+#define HARDFORK_FUTURES_PASSED(now) (now >= HARDFORK_FUTURES_TIME)
+#endif

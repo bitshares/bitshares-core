@@ -28,6 +28,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/oracle_object.hpp>
 #include <graphene/chain/is_authorized_asset.hpp>
 
 #include <functional>
@@ -127,6 +128,14 @@ namespace detail {
       }
    }
 
+   void check_bitasset_options_hf_oracle( const fc::time_point_sec& block_time,
+                                          const bitasset_options& options )
+   {
+      FC_ASSERT( !options.extensions.value.price_oracle_id.valid()
+                 || HARDFORK_ORACLE_PASSED( block_time ),
+                 "A BitAsset's price oracle cannot be set before the oracle hardfork" );
+   }
+
    void check_bitasset_options_hf_bsip87(const fc::time_point_sec& block_time, const bitasset_options& options)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
@@ -199,6 +208,13 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       detail::check_bitasset_options_hf_bsip_48_75( now, *op.bitasset_opts );
       detail::check_bitasset_options_hf_bsip74( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts ); // HF_REMOVABLE
+      detail::check_bitasset_options_hf_oracle( now, *op.bitasset_opts );
+      // An oracle feeding a smartcoin must be quoted as <that smartcoin>/<backing asset>, and
+      // the smartcoin does not exist yet here, so there is nothing to check the orientation
+      // against. Bind with asset_update_bitasset once the asset has an id.
+      FC_ASSERT( !op.bitasset_opts->extensions.value.price_oracle_id.valid(),
+                 "A price oracle cannot be bound when creating an asset; use "
+                 "asset_update_bitasset once the asset exists" );
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_opts_hf_core2467( next_maint_time, *op.bitasset_opts ); // HF_REMOVABLE
    }
@@ -732,6 +748,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    detail::check_bitasset_options_hf_bsip74( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip77( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
+   detail::check_bitasset_options_hf_oracle( now, op.new_options );
    detail::check_bitasset_opts_hf_core2467( next_maint_time, op.new_options ); // HF_REMOVABLE
 
    const asset_object& asset_obj = op.asset_to_update(d);
@@ -778,6 +795,27 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
       FC_ASSERT( !mssr_changed, "No permission to update MSSR" );
    }
+   // Validate a newly bound oracle. Orientation is checked here, once, rather than every time
+   // the feed is read: a smartcoin fed by an inverted price would margin-call everyone.
+   const auto& new_oracle = op.new_options.extensions.value.price_oracle_id;
+   const auto& old_oracle = current_bitasset_data.options.extensions.value.price_oracle_id;
+   const bool oracle_changed = ( ( old_oracle.valid() != new_oracle.valid() )
+                                 || ( old_oracle.valid() && *old_oracle != *new_oracle ) );
+   if( new_oracle.valid() && oracle_changed )
+   {
+      const oracle_object& o = (*new_oracle)(d);
+      FC_ASSERT( o.base_asset == op.asset_to_update,
+                 "Oracle '${n}' is quoted with base asset ${b}, but must be quoted against "
+                 "this asset (${a})", ("n", o.name)("b", o.base_asset)("a", op.asset_to_update) );
+      FC_ASSERT( o.quote_asset == op.new_options.short_backing_asset,
+                 "Oracle '${n}' is quoted with quote asset ${q}, but must be quoted against "
+                 "the backing asset (${s})",
+                 ("n", o.name)("q", o.quote_asset)("s", op.new_options.short_backing_asset) );
+      FC_ASSERT( o.subscribers.size() < size_t( GRAPHENE_ORACLE_MAX_SUBSCRIBERS ),
+                 "Oracle '${n}' already has the maximum of ${m} subscribed assets",
+                 ("n", o.name)("m", GRAPHENE_ORACLE_MAX_SUBSCRIBERS) );
+   }
+
    // check if BSRM will change
    const auto old_bsrm = current_bitasset_data.get_black_swan_response_method();
    const auto new_bsrm = op.new_options.get_black_swan_response_method();
@@ -1029,12 +1067,40 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       auto& db_conn = db();
       bool to_check_call_orders = false;
 
+      // Captured before the modify below overwrites the options.
+      const auto old_oracle = bitasset_to_update->options.extensions.value.price_oracle_id;
+      const auto& new_oracle = op.new_options.extensions.value.price_oracle_id;
+      const bool oracle_changed = ( ( old_oracle.valid() != new_oracle.valid() )
+                                    || ( old_oracle.valid() && *old_oracle != *new_oracle ) );
+
       db_conn.modify( *bitasset_to_update,
                       [&op, &to_check_call_orders, &db_conn, this]( asset_bitasset_data_object& bdo )
       {
          to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, *asset_to_update,
                                                                 update_feeds_due_to_bsrm_change );
       });
+
+      if( oracle_changed )
+      {
+         // Keep the oracle's subscriber set in step. It exists so that publishing can refresh
+         // bound assets without walking every bitasset on the chain, and so that deleting an
+         // oracle something depends on can be refused in constant time.
+         if( old_oracle.valid() )
+         {
+            const oracle_object* old_obj = db_conn.find( *old_oracle );
+            if( nullptr != old_obj )
+               db_conn.modify( *old_obj, [&op]( oracle_object& oo )
+                               { oo.subscribers.erase( op.asset_to_update ); } );
+         }
+         if( new_oracle.valid() )
+            db_conn.modify( (*new_oracle)(db_conn), [&op]( oracle_object& oo )
+                            { oo.subscribers.insert( op.asset_to_update ); } );
+
+         // The price source itself changed, so the feed has to be recomputed now rather than
+         // at the next publish -- and the new price may put existing positions under water.
+         db_conn.update_bitasset_current_feed( *bitasset_to_update );
+         to_check_call_orders = true;
+      }
 
       if( to_check_call_orders )
          // Process margin calls, allow black swan, not for a new limit order

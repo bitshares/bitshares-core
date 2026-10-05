@@ -30,6 +30,8 @@
 #include <graphene/protocol/committee_member.hpp>
 #include <graphene/protocol/confidential.hpp>
 #include <graphene/protocol/credit_offer.hpp>
+#include <graphene/protocol/oracle.hpp>
+#include <graphene/protocol/futures.hpp>
 #include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
@@ -130,7 +132,19 @@ namespace graphene { namespace protocol {
             /* 74 */ credit_deal_expired_operation,   // VIRTUAL
             /* 75 */ liquidity_pool_update_operation,
             /* 76 */ credit_deal_update_operation,
-            /* 77 */ limit_order_update_operation
+            /* 77 */ limit_order_update_operation,
+            /* 78 */ oracle_create_operation,
+            /* 79 */ oracle_update_operation,
+            /* 80 */ oracle_delete_operation,
+            /* 81 */ oracle_publish_operation,
+            /* 82 */ futures_market_create_operation,
+            /* 83 */ futures_market_update_operation,
+            /* 84 */ futures_order_create_operation,
+            /* 85 */ futures_order_cancel_operation,
+            /* 86 */ futures_fill_operation,          // VIRTUAL
+            /* 87 */ futures_position_adjust_margin_operation,
+            /* 88 */ futures_liquidate_operation,
+            /* 89 */ futures_settle_operation
          >;
 
    /**
