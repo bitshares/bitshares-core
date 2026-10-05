@@ -29,6 +29,8 @@
 #include <graphene/protocol/asset.hpp>
 #include <graphene/protocol/liquidity_pool.hpp>
 
+#include <graphene/chain/stableswap.hpp>
+
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
@@ -51,11 +53,24 @@ class liquidity_pool_object : public abstract_object<liquidity_pool_object, prot
       asset_id_type   share_asset;                 ///< Type of the share asset aka the LP token
       uint16_t        taker_fee_percent = 0;       ///< Taker fee percent
       uint16_t        withdrawal_fee_percent = 0;  ///< Withdrawal fee percent
-      fc::uint128_t   virtual_value = 0;           ///< Virtual value of the pool
+      fc::uint128_t   virtual_value = 0;           ///< Invariant of the pool (k for constant-product, D for stable)
+
+      /// Pricing curve used by the pool. Appended for the StableSwap hardfork; defaults to the
+      /// original constant-product behaviour so pre-hardfork pools are unaffected.
+      liquidity_pool_curve_type pool_type = liquidity_pool_curve_type::constant_product;
+      /// Amplification coefficient A for stable pools. Unused (0) for constant-product pools.
+      uint64_t        amplification = 0;
+
+      bool is_stable()const { return pool_type == liquidity_pool_curve_type::stable; }
 
       void update_virtual_value()
       {
-         virtual_value = fc::uint128_t( balance_a.value ) * balance_b.value;
+         if( is_stable() )
+            virtual_value = stableswap::compute_d( fc::uint128_t( balance_a.value ),
+                                                   fc::uint128_t( balance_b.value ),
+                                                   amplification );
+         else
+            virtual_value = fc::uint128_t( balance_a.value ) * balance_b.value;
       }
 };
 
@@ -114,6 +129,8 @@ FC_REFLECT_DERIVED( graphene::chain::liquidity_pool_object, (graphene::db::objec
                     (taker_fee_percent)
                     (withdrawal_fee_percent)
                     (virtual_value)
+                    (pool_type)
+                    (amplification)
                   )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::liquidity_pool_object )

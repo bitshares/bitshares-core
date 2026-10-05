@@ -1,0 +1,6 @@
+// StableSwap liquidity pools
+#ifndef HARDFORK_STABLESWAP_TIME
+// Placeholder date; the real value is set by the committee when the feature is scheduled.
+#define HARDFORK_STABLESWAP_TIME (fc::time_point_sec( 1893456000 )) // Wednesday, January 1, 2030 00:00:00 UTC
+#define HARDFORK_STABLESWAP_PASSED(now) (now >= HARDFORK_STABLESWAP_TIME)
+#endif

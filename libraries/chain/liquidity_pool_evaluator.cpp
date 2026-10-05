@@ -42,9 +42,34 @@ void_result liquidity_pool_create_evaluator::do_evaluate(const liquidity_pool_cr
 
    FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
 
-   op.asset_a(d); // Make sure it exists
-   op.asset_b(d); // Make sure it exists
+   // Before the hardfork the whole extensions field has to be absent, not merely harmless.
+   // Gating on the VALUE let pool_type = constant_product through untouched, and an operation
+   // carrying a set-but-default extension serialises differently from one carrying none --
+   // which is the part that has to hold across a replay, whatever the value happens to mean.
+   if( !HARDFORK_STABLESWAP_PASSED( block_time ) )
+   {
+      FC_ASSERT( !op.extensions.value.pool_type.valid() && !op.extensions.value.amplification.valid(),
+                 "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+   }
+
+   const asset_object& asset_a_obj = op.asset_a(d); // Make sure it exists
+   const asset_object& asset_b_obj = op.asset_b(d); // Make sure it exists
    _share_asset = &op.share_asset(d);
+
+   // StableSwap pools: validate the new options and the equal-precision requirement.
+   const auto& opt_pool_type = op.extensions.value.pool_type;
+   if( ( opt_pool_type.valid() && *opt_pool_type != static_cast<uint8_t>( liquidity_pool_curve_type::constant_product ) )
+       || op.extensions.value.amplification.valid() )
+   {
+      // The shape of the options -- stable implies amplification, amplification implies
+      // stable, and the coefficient's range -- is checked in validate(). None of it depends
+      // on chain state, so none of it belongs here.
+
+      // v1 keeps the on-chain integer math simple by requiring the two assets to share a
+      // precision, so the raw balances are directly comparable on a 1:1 curve.
+      FC_ASSERT( asset_a_obj.precision == asset_b_obj.precision,
+                 "A stable pool requires both assets to have the same precision" );
+   }
 
    FC_ASSERT( _share_asset->issuer == op.account,
               "Only the asset owner can set an asset as the share asset of a liquidity pool" );
@@ -72,6 +97,12 @@ generic_operation_result liquidity_pool_create_evaluator::do_apply(const liquidi
       obj.share_asset = op.share_asset;
       obj.taker_fee_percent = op.taker_fee_percent;
       obj.withdrawal_fee_percent = op.withdrawal_fee_percent;
+      if( op.extensions.value.pool_type.valid()
+          && *op.extensions.value.pool_type == static_cast<uint8_t>( liquidity_pool_curve_type::stable ) )
+      {
+         obj.pool_type = liquidity_pool_curve_type::stable;
+         obj.amplification = *op.extensions.value.amplification;
+      }
    });
    result.new_objects.insert( new_liquidity_pool_object.id );
 
@@ -156,7 +187,21 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
 { try {
    const database& d = db();
 
+   // Checked first, and on presence rather than on value: an extension that exists at all
+   // changes how the operation serialises, so it cannot be carried before the hardfork.
+   if( !HARDFORK_STABLESWAP_PASSED( d.head_block_time() ) )
+   {
+      FC_ASSERT( !op.extensions.value.min_to_receive.valid(),
+                 "The min_to_receive extension is not allowed until the StableSwap hardfork" );
+   }
+
    _pool = &op.pool(d);
+
+   // Typed to the pool's assets up front: they are added to _pool_receives_* below, and
+   // asset::operator+ asserts on a mismatched asset_id, so a default-constructed CORE zero
+   // would throw for every pool that does not happen to hold CORE.
+   _market_fee_a = asset( 0, _pool->asset_a );
+   _market_fee_b = asset( 0, _pool->asset_b );
 
    FC_ASSERT( op.amount_a.asset_id == _pool->asset_a, "Asset type A mismatch" );
    FC_ASSERT( op.amount_b.asset_id == _pool->asset_b, "Asset type B mismatch" );
@@ -196,6 +241,92 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
       _pool_receives_b = op.amount_b;
       _account_receives = asset( share_amount, _pool->share_asset );
    }
+   else if( _pool->is_stable() )
+   {
+      // A stable pool prices liquidity off the invariant, so it can take the two sides in any
+      // proportion -- including one side only. That is the defining property of the curve as an
+      // LP venue, and the proportional path below cannot express it: it takes the limiting side
+      // and silently leaves the rest of the deposit with the depositor.
+      //
+      // Shares are the growth in D, and an imbalanced deposit pays a fee on how far it pushes
+      // each side away from where the invariant says it should sit. Without that fee, depositing
+      // one side and withdrawing proportionally would be a free swap around the pool's own fee.
+      const fc::uint128_t supply128( _share_asset_dyn_data->current_supply.value );
+      const share_type max_new_supply =
+            share_asset_obj.options.max_supply - _share_asset_dyn_data->current_supply;
+
+      // The pool already knows its invariant: update_virtual_value() runs after every balance
+      // change, so virtual_value is D for a stable pool and is never stale -- the exchange path
+      // reads it for exactly that reason. Solving it again was a Newton iteration per deposit
+      // for an answer already sitting on the object.
+      const fc::uint128_t d0 = _pool->virtual_value;
+
+      // Issuer market fees, because this is where a deposit behaves like a trade.
+      //
+      // A stable pool takes the two sides in any proportion, and the imbalanced part of that
+      // is a swap: deposit one side, withdraw the other, and you have traded without ever
+      // calling exchange. The pool's own imbalance fee below already charges for that, but the
+      // asset issuer's market fee did not -- so the route around exchange was also a route
+      // around the issuer. liquidity_pool_exchange_evaluator charges it on what the pool
+      // receives, and this is the same event.
+      //
+      // Charged here and not in the two paths beside this one: an empty-pool deposit and a
+      // proportional deposit into a constant-product pool are not trades, and both predate
+      // this hardfork. Their behaviour is not changed.
+      const asset_object& asset_obj_a = _pool->asset_a(d);
+      const asset_object& asset_obj_b = _pool->asset_b(d);
+      _market_fee_a = d.calculate_market_fee( asset_obj_a, op.amount_a, true );
+      _market_fee_b = d.calculate_market_fee( asset_obj_b, op.amount_b, true );
+      FC_ASSERT( _market_fee_a <= op.amount_a && _market_fee_b <= op.amount_b,
+                 "Aborting since the market fee of a deposited asset is too high" );
+      const asset pool_gets_a = op.amount_a - _market_fee_a;
+      const asset pool_gets_b = op.amount_b - _market_fee_b;
+
+      // The whole deposit is taken, not the limiting share of it -- less what the issuer took,
+      // which never reaches the pool and so cannot count toward the shares issued for it.
+      const share_type new_a = _pool->balance_a + pool_gets_a.amount;
+      const share_type new_b = _pool->balance_b + pool_gets_b.amount;
+      const fc::uint128_t d1 = stableswap::compute_d( fc::uint128_t( new_a.value ),
+                                                      fc::uint128_t( new_b.value ),
+                                                      _pool->amplification );
+      FC_ASSERT( d1 > d0, "Aborting due to zero outcome" );
+
+      // Curve's imbalance fee, which for a two-coin pool is half the trading fee: the pool
+      // charges its swap fee on the portion of the deposit that behaves like a swap.
+      const uint64_t fee_ppm = uint64_t( _pool->taker_fee_percent ) * 100 / 2;
+
+      const auto after_fee = [&]( share_type actual, share_type old_balance ) -> fc::uint128_t
+      {
+         // Where this side would sit if the deposit had been perfectly balanced.
+         const fc::uint128_t ideal = d1 * old_balance.value / d0;
+         const fc::uint128_t act( actual.value );
+         const fc::uint128_t diff = act > ideal ? act - ideal : ideal - act;
+         // Rounded up, so the fee is never silently zero and always favours the pool.
+         const fc::uint128_t fee = ( diff * fee_ppm + 999999 ) / 1000000;
+         return act > fee ? act - fee : fc::uint128_t( 0 );
+      };
+
+      const fc::uint128_t adj_a = after_fee( new_a, _pool->balance_a );
+      const fc::uint128_t adj_b = after_fee( new_b, _pool->balance_b );
+      FC_ASSERT( adj_a > 0 && adj_b > 0, "Aborting due to zero outcome" );
+
+      const fc::uint128_t d2 = stableswap::compute_d( adj_a, adj_b, _pool->amplification );
+      FC_ASSERT( d2 > d0, "Aborting due to zero outcome" );
+
+      // The fee stays in the pool, so it accrues to the existing holders rather than to nobody.
+      fc::uint128_t new_supply = supply128 * ( d2 - d0 ) / d0;
+      FC_ASSERT( new_supply > 0, "Aborting due to zero outcome" );
+      FC_ASSERT( new_supply <= fc::uint128_t( max_new_supply.value ),
+                 "Would exceed the maximum supply of the share asset" );
+
+      // d1 is the invariant of the balances this deposit actually leaves behind, which is
+      // exactly what update_virtual_value() would solve for again in do_apply.
+      _new_virtual_value = d1;
+
+      _pool_receives_a  = pool_gets_a;
+      _pool_receives_b  = pool_gets_b;
+      _account_receives = asset( static_cast<int64_t>( new_supply ), _pool->share_asset );
+   }
    else
    {
       share_type max_new_supply = share_asset_obj.options.max_supply - _share_asset_dyn_data->current_supply;
@@ -218,6 +349,18 @@ void_result liquidity_pool_deposit_evaluator::do_evaluate(const liquidity_pool_d
       _account_receives = asset( static_cast<int64_t>( new_supply ), _pool->share_asset );
    }
 
+   // Enforce the depositor's floor. An unbalanced deposit pays a fee that depends on the
+   // pool balances at the moment of execution, and those are in the hands of whoever builds
+   // the block. As with a swap and with a withdrawal, the depositor has to be able to say how
+   // much of a shortfall they will accept.
+   const auto& floor = op.extensions.value.min_to_receive;
+   if( floor.valid() )
+   {
+      FC_ASSERT( _account_receives.amount >= *floor,
+                 "Deposit would mint ${g} shares but the minimum is ${m}",
+                 ("g", _account_receives.amount)("m", *floor) );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
@@ -227,14 +370,26 @@ generic_exchange_operation_result liquidity_pool_deposit_evaluator::do_apply(
    database& d = db();
    generic_exchange_operation_result result;
 
-   d.adjust_balance( op.account, -_pool_receives_a );
-   d.adjust_balance( op.account, -_pool_receives_b );
+   // The depositor pays what the pool gets plus what the issuer takes; the fees are zero
+   // outside the stable path, so this is unchanged for every pool that existed before.
+   d.adjust_balance( op.account, -( _pool_receives_a + _market_fee_a ) );
+   d.adjust_balance( op.account, -( _pool_receives_b + _market_fee_b ) );
    d.adjust_balance( op.account, _account_receives );
+
+   if( _market_fee_a.amount > 0 )
+      d.pay_market_fees( &_pool->share_asset(d).issuer(d), _pool->asset_a(d),
+                         _pool_receives_a + _market_fee_a, true, _market_fee_a );
+   if( _market_fee_b.amount > 0 )
+      d.pay_market_fees( &_pool->share_asset(d).issuer(d), _pool->asset_b(d),
+                         _pool_receives_b + _market_fee_b, true, _market_fee_b );
 
    d.modify( *_pool, [this]( liquidity_pool_object& lpo ){
       lpo.balance_a += _pool_receives_a.amount;
       lpo.balance_b += _pool_receives_b.amount;
-      lpo.update_virtual_value();
+      if( _new_virtual_value.valid() )
+         lpo.virtual_value = *_new_virtual_value;
+      else
+         lpo.update_virtual_value();
    });
 
    d.modify( *_share_asset_dyn_data, [this]( asset_dynamic_data_object& data ){
@@ -244,9 +399,13 @@ generic_exchange_operation_result liquidity_pool_deposit_evaluator::do_apply(
    FC_ASSERT( _pool->balance_a > 0 && _pool->balance_b > 0, "Internal error" );
    FC_ASSERT( _share_asset_dyn_data->current_supply > 0, "Internal error" );
 
-   result.paid.emplace_back( _pool_receives_a );
-   result.paid.emplace_back( _pool_receives_b );
+   result.paid.emplace_back( _pool_receives_a + _market_fee_a );
+   result.paid.emplace_back( _pool_receives_b + _market_fee_b );
    result.received.emplace_back( _account_receives );
+   if( _market_fee_a.amount > 0 )
+      result.fees.emplace_back( _market_fee_a );
+   if( _market_fee_b.amount > 0 )
+      result.fees.emplace_back( _market_fee_b );
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
@@ -255,7 +414,63 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
 { try {
    const database& d = db();
 
+   // Same rule, and first for the same reason: presence of any of the three, not what they
+   // say. Checking it here rather than deducing it from a later condition also means the
+   // cheap test runs before anything is computed.
+   if( !HARDFORK_STABLESWAP_PASSED( d.head_block_time() ) )
+   {
+      FC_ASSERT( !op.extensions.value.withdraw_one_asset.valid()
+                 && !op.extensions.value.min_a.valid()
+                 && !op.extensions.value.min_b.valid(),
+                 "The StableSwap extensions are not allowed until the StableSwap hardfork" );
+   }
+
    _pool = &op.pool(d);
+
+   // Typed to the pool's assets, for the same reason as on the deposit side: asset arithmetic
+   // asserts on a mismatched asset_id, so a default-constructed CORE zero would throw for
+   // every pool that does not hold CORE.
+   _market_fee_a = asset( 0, _pool->asset_a );
+   _market_fee_b = asset( 0, _pool->asset_b );
+
+   // A floor on a side that a single-asset withdrawal never pays out could not be met by any
+   // outcome. That is not a weaker guarantee but one that always fails, while reading like
+   // protection, so it is refused rather than accepted.
+   //
+   // Checked here because it depends only on the operation and the pool's asset ids -- nothing
+   // that has to be computed first -- and so has no business running after compute_d().
+   const auto& one_asset = op.extensions.value.withdraw_one_asset;
+   if( one_asset.valid() )
+   {
+      if( *one_asset == _pool->asset_a )
+         FC_ASSERT( !op.extensions.value.min_b.valid(),
+                    "A minimum on asset B cannot be met: this withdrawal pays out only asset A" );
+      else if( *one_asset == _pool->asset_b )
+         FC_ASSERT( !op.extensions.value.min_a.valid(),
+                    "A minimum on asset A cannot be met: this withdrawal pays out only asset B" );
+   }
+
+   // What is left of the floors: two comparisons, run once the payouts are known. A lambda
+   // rather than a member function, because two asserts are not worth one.
+   const auto check_floors = [&]()
+   {
+      // Against what the account actually receives, which is what the pool pays less the
+      // issuer's market fee. Comparing the floor with the gross would let a withdrawal satisfy
+      // a minimum and still hand over less than it -- the fee is deducted after this point,
+      // so the guarantee has to be stated in the same terms the withdrawer gets paid in.
+      const auto& min_a = op.extensions.value.min_a;
+      const auto& min_b = op.extensions.value.min_b;
+      const share_type receives_a = _pool_pays_a.amount - _market_fee_a.amount;
+      const share_type receives_b = _pool_pays_b.amount - _market_fee_b.amount;
+      if( min_a.valid() )
+         FC_ASSERT( receives_a >= *min_a,
+                    "Withdrawal would pay ${p} of asset A but the minimum is ${m}",
+                    ("p", receives_a)("m", *min_a) );
+      if( min_b.valid() )
+         FC_ASSERT( receives_b >= *min_b,
+                    "Withdrawal would pay ${p} of asset B but the minimum is ${m}",
+                    ("p", receives_b)("m", *min_b) );
+   };
 
    FC_ASSERT( op.share_amount.asset_id == _pool->share_asset, "Share asset type mismatch" );
 
@@ -274,6 +489,101 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
 
    FC_ASSERT( _share_asset_dyn_data->current_supply >= op.share_amount.amount,
               "Can not withdraw an amount that is more than the current supply" );
+
+   if( one_asset.valid() )
+   {
+      // --- single-sided exit ------------------------------------------------------------
+      // Only a stable pool can quote this: the invariant is what says how much of ONE asset
+      // is worth the shares being burned. A constant-product pool has no such answer that is
+      // not simply a swap, and pretending otherwise would price it wrongly.
+      FC_ASSERT( _pool->is_stable(),
+                 "Only a stable pool can pay a withdrawal in a single asset" );
+      FC_ASSERT( *one_asset == _pool->asset_a || *one_asset == _pool->asset_b,
+                 "Asset ${a} is not in this pool", ("a", *one_asset) );
+      FC_ASSERT( _share_asset_dyn_data->current_supply > op.share_amount.amount,
+                 "The last shares cannot be withdrawn one-sided; the pool would be emptied "
+                 "on one side and the invariant is undefined there" );
+
+      const bool want_a = ( *one_asset == _pool->asset_a );
+      const share_type kept_balance  = want_a ? _pool->balance_b : _pool->balance_a;
+      const share_type taken_balance = want_a ? _pool->balance_a : _pool->balance_b;
+
+      // Read, not re-solved: see the same point on the deposit path.
+      const fc::uint128_t d0 = _pool->virtual_value;
+      // Burning shares shrinks the invariant in proportion.
+      const fc::uint128_t supply128( _share_asset_dyn_data->current_supply.value );
+      const fc::uint128_t burned( op.share_amount.amount.value );
+      const fc::uint128_t d1 = d0 - ( d0 * burned / supply128 );
+      FC_ASSERT( d1 > 0 && d1 < d0, "Aborting due to zero outcome" );
+
+      // Where the taken side must sit for the smaller invariant to hold with the other side
+      // untouched. compute_new_y solves exactly that.
+      const fc::uint128_t y_nofee = stableswap::compute_new_y( fc::uint128_t( kept_balance.value ),
+                                                               d1, _pool->amplification );
+      FC_ASSERT( fc::uint128_t( taken_balance.value ) > y_nofee, "Aborting due to zero outcome" );
+
+      // The same imbalance fee a one-sided deposit pays. Without it, depositing one side and
+      // withdrawing the other is a swap that never touched the trading fee.
+      const uint64_t fee_ppm = uint64_t( _pool->taker_fee_percent ) * 100 / 2;
+      const auto reduce = [&]( share_type balance, bool is_taken ) -> fc::uint128_t
+      {
+         const fc::uint128_t bal( balance.value );
+         const fc::uint128_t ideal = d1 * balance.value / d0;
+         const fc::uint128_t expected = is_taken
+               ? ( ideal > y_nofee ? ideal - y_nofee : fc::uint128_t( 0 ) )
+               : ( bal > ideal ? bal - ideal : fc::uint128_t( 0 ) );
+         const fc::uint128_t fee = ( expected * fee_ppm + 999999 ) / 1000000;
+         return bal > fee ? bal - fee : fc::uint128_t( 0 );
+      };
+      const fc::uint128_t taken_reduced = reduce( taken_balance, true );
+      const fc::uint128_t kept_reduced  = reduce( kept_balance, false );
+      FC_ASSERT( taken_reduced > 0 && kept_reduced > 0, "Aborting due to zero outcome" );
+
+      const fc::uint128_t y_fee = stableswap::compute_new_y( kept_reduced, d1,
+                                                            _pool->amplification );
+      FC_ASSERT( taken_reduced > y_fee, "Aborting due to zero outcome" );
+
+      // One unit back to the pool, as everywhere else here: rounding never favours the caller.
+      fc::uint128_t out = taken_reduced - y_fee;
+      out = out > 1 ? out - 1 : fc::uint128_t( 0 );
+      FC_ASSERT( out > 0, "Aborting due to zero outcome" );
+      FC_ASSERT( out < fc::uint128_t( taken_balance.value ), "Internal error" );
+
+      // The pool's own withdrawal fee, which the proportional path below charges and this one
+      // did not. Two single-asset withdrawals are a way out of the pool just as much as one
+      // proportional withdrawal is, so leaving it off here made the fee optional: a member
+      // could take one side, then the other, and pay nothing for either.
+      //
+      // The imbalance fee above is a separate thing and is NOT charged again here -- it is
+      // already priced into `out`, by being left in the pool before solving for what the
+      // shares are worth. Only this fee is reported as the withdrawal fee, for the same
+      // reason: reporting the imbalance twice would overstate what the operation cost.
+      fc::uint128_t out128( out );
+      const fc::uint128_t wfee = out128 * _pool->withdrawal_fee_percent / GRAPHENE_100_PERCENT;
+      FC_ASSERT( wfee <= out128, "Withdrawal fee percent of the pool is too high" );
+      out128 -= wfee;
+      FC_ASSERT( out128 > 0, "Aborting due to zero outcome" );
+
+      const share_type paid{ static_cast<int64_t>( out128 ) };
+      const share_type charged{ static_cast<int64_t>( wfee ) };
+      _pool_pays_a = asset( want_a ? paid : share_type( 0 ), _pool->asset_a );
+      _pool_pays_b = asset( want_a ? share_type( 0 ) : paid, _pool->asset_b );
+      _fee_a = asset( want_a ? charged : share_type( 0 ), _pool->asset_a );
+      _fee_b = asset( want_a ? share_type( 0 ) : charged, _pool->asset_b );
+
+      // Issuer market fee, taker side, for the same reason the deposit path now charges one:
+      // taking a single asset out is the other half of the route around exchange. The
+      // proportional path below is not a trade and is left alone -- it predates this hardfork.
+      const asset_object& paid_asset_obj = want_a ? _pool->asset_a(d) : _pool->asset_b(d);
+      const asset& paid_asset = want_a ? _pool_pays_a : _pool_pays_b;
+      const asset mfee = d.calculate_market_fee( paid_asset_obj, paid_asset, false );
+      FC_ASSERT( mfee < paid_asset, "Aborting since the market fee of the withdrawn asset is too high" );
+      if( want_a ) _market_fee_a = mfee; else _market_fee_b = mfee;
+
+      check_floors();
+
+      return void_result();
+   }
 
    if( _share_asset_dyn_data->current_supply == op.share_amount.amount )
    {
@@ -302,6 +612,8 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
       _fee_b = asset( static_cast<int64_t>( fee_b ), _pool->asset_b );
    }
 
+   check_floors();
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) } // GCOVR_EXCL_LINE
 
@@ -313,10 +625,17 @@ generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(
 
    d.adjust_balance( op.account, -op.share_amount );
 
+   // The pool pays _pool_pays_*; the account receives that less the issuer's market fee,
+   // which is zero on every path that is not a single-asset withdrawal.
    if( _pool_pays_a.amount > 0 )
-      d.adjust_balance( op.account, _pool_pays_a );
+      d.adjust_balance( op.account, _pool_pays_a - _market_fee_a );
    if( _pool_pays_b.amount > 0 )
-      d.adjust_balance( op.account, _pool_pays_b );
+      d.adjust_balance( op.account, _pool_pays_b - _market_fee_b );
+
+   if( _market_fee_a.amount > 0 )
+      d.pay_market_fees( fee_paying_account, _pool->asset_a(d), _pool_pays_a, false, _market_fee_a );
+   if( _market_fee_b.amount > 0 )
+      d.pay_market_fees( fee_paying_account, _pool->asset_b(d), _pool_pays_b, false, _market_fee_b );
 
    d.modify( *_share_asset_dyn_data, [&op]( asset_dynamic_data_object& data ){
       data.current_supply -= op.share_amount.amount;
@@ -400,25 +719,48 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
               "Aborting since the maker market fee of the selling asset is too high" );
    _pool_receives = op.amount_to_sell - _maker_market_fee;
 
-   fc::uint128_t delta;
-   if( op.amount_to_sell.asset_id == _pool->asset_a )
+   const bool selling_a = ( op.amount_to_sell.asset_id == _pool->asset_a );
+   const share_type in_balance  = selling_a ? _pool->balance_a : _pool->balance_b;
+   const share_type out_balance = selling_a ? _pool->balance_b : _pool->balance_a;
+   _pool_pays_asset = selling_a ? &asset_obj_b : &asset_obj_a;
+
+   const share_type new_in_balance = in_balance + _pool_receives.amount;
+
+   fc::uint128_t new_out_balance;
+   if( _pool->is_stable() )
    {
-      share_type new_balance_a = _pool->balance_a + _pool_receives.amount;
-      // round up
-      fc::uint128_t new_balance_b = ( _pool->virtual_value + new_balance_a.value - 1 ) / new_balance_a.value;
-      FC_ASSERT( new_balance_b <= _pool->balance_b, "Internal error" );
-      delta = fc::uint128_t( _pool->balance_b.value ) - new_balance_b;
-      _pool_pays_asset = &asset_obj_b;
+      // Hold the StableSwap invariant D constant and solve for the new out-asset balance.
+      // Precision is guaranteed equal at creation time, so raw balances are comparable.
+      new_out_balance = stableswap::compute_new_y( fc::uint128_t( new_in_balance.value ),
+                                                   _pool->virtual_value,
+                                                   _pool->amplification );
+      // Always keep one extra unit of the out-asset, unconditionally.
+      //
+      // The obvious cheaper rule -- recompute D for the proposed balances and only nudge when
+      // it comes out below the stored invariant -- does not work, because compute_d is itself
+      // only accurate to a unit. Newton stops once two iterates differ by <= 1, so the check
+      // and the value being checked carry the same error, and a swap can leave the pool
+      // genuinely worse off while the recomputed D compares equal. Measured on small pools,
+      // that let a trader round-trip a unit out and repeat: 41 of 250 randomised grinds
+      // profited, the worst taking 32 units off an (2192, 282) pool. Tightening the check by
+      // iterating it changed nothing, for the same reason. Rounding down unconditionally
+      // closed it completely -- 0 of 250 -- because it no longer depends on D's precision.
+      //
+      // The cost is one unit of the smallest denomination per trade, which goes to the
+      // liquidity providers, and a dust trade too small to pay out a unit is now rejected by
+      // the min_to_receive check rather than filled for nothing.
+      new_out_balance += 1;
+      if( new_out_balance > fc::uint128_t( out_balance.value ) )
+         new_out_balance = fc::uint128_t( out_balance.value );
    }
    else
    {
-      share_type new_balance_b = _pool->balance_b + _pool_receives.amount;
-      // round up
-      fc::uint128_t new_balance_a = ( _pool->virtual_value + new_balance_b.value - 1 ) / new_balance_b.value;
-      FC_ASSERT( new_balance_a <= _pool->balance_a, "Internal error" );
-      delta = fc::uint128_t( _pool->balance_a.value ) - new_balance_a;
-      _pool_pays_asset = &asset_obj_a;
+      // Constant product: new_out = k / new_in, rounded up in the pool's favour.
+      new_out_balance = ( _pool->virtual_value + new_in_balance.value - 1 ) / new_in_balance.value;
    }
+
+   FC_ASSERT( new_out_balance <= fc::uint128_t( out_balance.value ), "Internal error" );
+   const fc::uint128_t delta = fc::uint128_t( out_balance.value ) - new_out_balance;
 
    fc::uint128_t pool_taker_fee = delta * _pool->taker_fee_percent / GRAPHENE_100_PERCENT;
    FC_ASSERT( pool_taker_fee <= delta, "Taker fee percent of the pool is too high" );

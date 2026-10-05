@@ -81,8 +81,18 @@ namespace graphene { namespace chain {
          const liquidity_pool_object* _pool = nullptr;
          const asset_dynamic_data_object* _share_asset_dyn_data = nullptr;
          asset _account_receives;
-         asset _pool_receives_a;
-         asset _pool_receives_b;
+         asset _pool_receives_a;   ///< net of any market fee
+         asset _pool_receives_b;   ///< net of any market fee
+         /// Issuer market fees. Non-zero only for an imbalanced deposit into a stable pool,
+         /// which is the part of a deposit that behaves like a trade.
+         /// @{
+         asset _market_fee_a;
+         asset _market_fee_b;
+         /// @}
+         /// The pool's invariant after this deposit, solved once in do_evaluate. Set only
+         /// where solving it is expensive -- a stable pool -- so do_apply does not repeat a
+         /// Newton iteration it already has the answer to.
+         fc::optional<fc::uint128_t> _new_virtual_value;
    };
 
    class liquidity_pool_withdraw_evaluator : public evaluator<liquidity_pool_withdraw_evaluator>
@@ -94,12 +104,23 @@ namespace graphene { namespace chain {
          generic_exchange_operation_result do_apply( const liquidity_pool_withdraw_operation& op );
 
       private:
+
          const liquidity_pool_object* _pool = nullptr;
          const asset_dynamic_data_object* _share_asset_dyn_data = nullptr;
          asset _pool_pays_a;
          asset _pool_pays_b;
+         /// The pool's own withdrawal fee.
+         /// @{
          asset _fee_a;
          asset _fee_b;
+         /// @}
+         /// Issuer market fees. Non-zero only for a single-asset withdrawal, which is the
+         /// part of a withdrawal that behaves like a trade. The pool pays _pool_pays_*; the
+         /// account receives that less these.
+         /// @{
+         asset _market_fee_a;
+         asset _market_fee_b;
+         /// @}
    };
 
    class liquidity_pool_exchange_evaluator : public evaluator<liquidity_pool_exchange_evaluator>
