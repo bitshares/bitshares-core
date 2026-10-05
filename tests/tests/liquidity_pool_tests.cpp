@@ -1808,15 +1808,14 @@ BOOST_AUTO_TEST_CASE( stableswap_exchange_test )
    } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 /**
- * OEKONOMIE: kann ein Haendler durch wiederholtes Hin- und Hertauschen Wert aus dem Pool
- * ziehen?
+ * ECONOMICS: can a trader extract value from the pool by swapping back and forth repeatedly?
  *
- * Jede Rundung im Pool muss zugunsten des Pools ausfallen, sonst sammelt ein Bot mit vielen
- * kleinen Runden das Kapital der Liquiditaetsgeber ein. Der Test macht genau das: 200 Runden
- * A->B->A ohne Gebuehren, und prueft danach, dass der Haendler nicht mehr hat als vorher.
+ * Every rounding in the pool has to favour the pool, or a bot running many small rounds
+ * collects the liquidity providers' capital. The test does exactly that: 200 rounds A->B->A
+ * with no fees, and then checks that the trader holds no more than before.
  *
- * Ohne Gebuehren, weil eine Gebuehr den Effekt verdecken wuerde: sie macht jede Runde
- * teuer genug, dass Rundungsgewinne darin untergehen. Der Angriff waere trotzdem da.
+ * No fees, because a fee would hide the effect: it makes every round expensive enough that
+ * rounding gains disappear in it. The attack would still be there.
  */
 BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
 { try {
@@ -1844,14 +1843,14 @@ BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
 
    const int64_t liq = 1000000;
    const liquidity_pool_object& lpo =
-         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );  // gebuehrenfrei
+         create_stable_liquidity_pool( sam_id, a, b, slp.get_id(), 0, 0, 100 );  // fee-free
    const liquidity_pool_id_type pid = lpo.get_id();
    deposit_to_liquidity_pool( sam_id, pid, asset( liq, a ), asset( liq, b ) );
 
    const int64_t ted_a0 = get_balance( ted_id, a );
    const int64_t ted_b0 = get_balance( ted_id, b );
    const fc::uint128_t d0 = pid(db).virtual_value;
-   BOOST_TEST_MESSAGE( "  Ted vorher: a=" << ted_a0 << " b=" << ted_b0 );
+   BOOST_TEST_MESSAGE( "  Ted before: a=" << ted_a0 << " b=" << ted_b0 );
 
    const int64_t step = 1000;
    int rounds = 0;
@@ -1870,56 +1869,35 @@ BOOST_AUTO_TEST_CASE( round_trip_swaps_never_extract_value_from_the_pool )
 
    const int64_t ted_a1 = get_balance( ted_id, a );
    const int64_t ted_b1 = get_balance( ted_id, b );
-   BOOST_TEST_MESSAGE( "  Ted nachher (" << rounds << " Runden): a=" << ted_a1
+   BOOST_TEST_MESSAGE( "  Ted after (" << rounds << " rounds): a=" << ted_a1
                        << " b=" << ted_b1 );
-   BOOST_TEST_MESSAGE( "  Veraenderung: a=" << ( ted_a1 - ted_a0 )
+   BOOST_TEST_MESSAGE( "  change: a=" << ( ted_a1 - ted_a0 )
                        << "  b=" << ( ted_b1 - ted_b0 ) );
-   // fc::uint128_t ist __int128 unsigned und hat weder Stringkonstruktor noch operator<<.
-   // Fuer die Anzeige reicht der 64-Bit-Anteil: D liegt hier bei rund 2 Millionen.
+   // fc::uint128_t is an unsigned __int128 with neither a string constructor nor operator<<.
+   // The low 64 bits are enough to display: D is around two million here.
    const uint64_t d0_disp = static_cast<uint64_t>( d0 );
    const uint64_t d1_disp = static_cast<uint64_t>( pid(db).virtual_value );
-   BOOST_TEST_MESSAGE( "  D vorher " << d0_disp << "  nachher " << d1_disp );
+   BOOST_TEST_MESSAGE( "  D before " << d0_disp << "  after " << d1_disp );
 
-   // Der Haendler darf nach einer Rundreise nie mehr haben als vorher -- in keinem Asset.
+   // After a round trip the trader must never hold more than before, in either asset.
    BOOST_CHECK_MESSAGE( ted_a1 <= ted_a0,
-                        "Haendler gewann " + std::to_string( ted_a1 - ted_a0 ) + " von Asset a" );
+                        "trader gained " + std::to_string( ted_a1 - ted_a0 ) + " of asset a" );
    BOOST_CHECK_MESSAGE( ted_b1 <= ted_b0,
-                        "Haendler gewann " + std::to_string( ted_b1 - ted_b0 ) + " von Asset b" );
-   // Und die Invariante darf durch Rundreisen nicht schrumpfen.
+                        "trader gained " + std::to_string( ted_b1 - ted_b0 ) + " of asset b" );
+   // And round trips must not shrink the invariant.
    BOOST_CHECK_MESSAGE( pid(db).virtual_value >= d0,
-                        "D schrumpfte von " + std::to_string( d0_disp ) + " auf "
+                        "D shrank from " + std::to_string( d0_disp ) + " to "
                         + std::to_string( d1_disp ) );
 } FC_LOG_AND_RETHROW() }
 
 /**
- * MMEV gegen eine einseitige Auszahlung, und was die Untergrenze daran aendert.
+ * The other half: a proportional withdrawal pays out BOTH sides, and a floor on one leg says
+ * nothing about the other.
  *
- * Eine einseitige Auszahlung ist ein Swap -- der Kommentar an withdraw_one_asset sagt es
- * selbst. Ihr Preis haengt an den Poolstaenden in dem Augenblick, in dem sie ausgefuehrt
- * wird, und wer den Block baut, bestimmt was unmittelbar davor geschieht. Ein Witness kann
- * also den Pool verschieben, die Auszahlung zum verschobenen Preis laufen lassen und
- * anschliessend zurueckschieben. Innerhalb seines eigenen Blocks kann ihm dabei niemand
- * dazwischenkommen.
- *
- * Gemessen wird dreimal derselbe Vorgang: unbehelligt, im Sandwich, und im Sandwich mit
- * einer Untergrenze. Die dritte Variante muss scheitern statt zum verschobenen Preis
- * auszufuehren -- das ist der ganze Zweck der Untergrenze.
- */
-/**
- * Dasselbe fuer die Einzahlung. Eine unausgewogene Einzahlung zahlt eine Gebuehr, die daran
- * haengt, wie weit sie den Pool aus der Balance schiebt -- also am Poolstand im Augenblick
- * der Ausfuehrung. Wer den Block baut, bestimmt was unmittelbar davor geschieht: schiebt er
- * den Pool in dieselbe Richtung vor, schiebt die Einzahlung weiter und zahlt mehr.
- */
-/**
- * Die andere Haelfte: eine proportionale Auszahlung zahlt BEIDE Seiten aus, und eine Grenze
- * auf einem Bein sagt ueber das andere nichts.
- *
- * Hier geht es nicht um Abschoepfung. Anteile sind ein Bruchteil des Pools; wer den Pool
- * verschiebt, aendert die MISCHUNG, die eine Auszahlung ausgibt, nicht ihren Wert -- die
- * Handelsgebuehr laesst der Angreifer sogar drin. Aber wer ein bestimmtes Asset braucht,
- * etwa um eine Schuld darin zu bedienen, dem hilft "der Wert stimmt schon" nicht. Genau das
- * konnte er bisher nicht sagen.
+ * This is not about extraction. Shares are a fraction of the pool; moving the pool changes the
+ * MIX a withdrawal pays out, not its value -- the attacker even leaves the trading fee in. But
+ * for someone who needs a particular asset, for example to service a debt in it, "the value is
+ * fine" does not help. Until now they had no way to say so.
  */
 BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
 { try {
@@ -1956,7 +1934,7 @@ BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
                                         asset( 100000, a ), asset( 100000, b ) ).received.front();
    };
 
-   // Proportional, also ohne withdraw_one_asset; beide Untergrenzen sind erlaubt.
+   // Proportional, so without withdraw_one_asset; both floors are allowed.
    const auto exit_proportional = [&]( liquidity_pool_id_type pool, asset shares,
                                        fc::optional<share_type> fa,
                                        fc::optional<share_type> fb ) {
@@ -1974,7 +1952,7 @@ BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
       PUSH_TX( db, tx );
    };
 
-   // --- unbehelligt ---------------------------------------------------------------------
+   // --- undisturbed ---------------------------------------------------------------------
    const auto p1 = make_pool( "PRLP1" );
    const auto sh1 = stake( p1 );
    const auto a1 = get_balance( ted_id, a ), b1 = get_balance( ted_id, b );
@@ -1982,9 +1960,9 @@ BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
    const int64_t honest_a = get_balance( ted_id, a ) - a1;
    const int64_t honest_b = get_balance( ted_id, b ) - b1;
 
-   // --- der Pool wird vorher verschoben --------------------------------------------------
-   // Der Angreifer kauft B heraus, also wird B im Pool knapp: die Auszahlung gibt weniger B
-   // und mehr A. Der Wert bleibt ungefaehr gleich, die Mischung nicht.
+   // --- the pool is moved first ------------------------------------------------------------
+   // The attacker buys B out, so B becomes scarce in the pool: the withdrawal then pays less B
+   // and more A. The value stays about the same; the mix does not.
    const auto p2 = make_pool( "PRLP2" );
    const auto sh2 = stake( p2 );
    exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
@@ -1993,44 +1971,50 @@ BOOST_AUTO_TEST_CASE( a_proportional_withdrawal_can_bound_both_sides )
    const int64_t shifted_a = get_balance( ted_id, a ) - a2;
    const int64_t shifted_b = get_balance( ted_id, b ) - b2;
 
-   BOOST_TEST_MESSAGE( "  unbehelligt : " << honest_a << " A, " << honest_b << " B" );
-   BOOST_TEST_MESSAGE( "  verschoben  : " << shifted_a << " A, " << shifted_b << " B" );
-   BOOST_TEST_MESSAGE( "  B-Seite verliert: " << ( honest_b - shifted_b ) );
+   BOOST_TEST_MESSAGE( "  undisturbed: " << honest_a << " A, " << honest_b << " B" );
+   BOOST_TEST_MESSAGE( "  moved      : " << shifted_a << " A, " << shifted_b << " B" );
+   BOOST_TEST_MESSAGE( "  B side loses: " << ( honest_b - shifted_b ) );
 
    BOOST_CHECK_MESSAGE( shifted_b < honest_b,
-                        "die Verschiebung hat die B-Seite nicht getroffen: " << shifted_b
-                        << " gegen " << honest_b << " -- dann misst dieser Test nichts" );
+                        "moving the pool did not hit the B side: " << shifted_b
+                        << " against " << honest_b << " -- then this test measures nothing" );
    BOOST_CHECK_MESSAGE( shifted_a > honest_a,
-                        "die A-Seite haette wachsen muessen: " << shifted_a
-                        << " gegen " << honest_a );
+                        "the A side should have grown: " << shifted_a
+                        << " against " << honest_a );
 
-   // --- eine Grenze auf A allein sieht davon nichts --------------------------------------
-   // Das ist der Punkt: die alte, einbeinige Fassung haette hier durchgewunken.
+   // --- a floor on A alone sees none of it ------------------------------------------------
+   // That is the point: the older one-sided version would have let this through.
    const auto p3 = make_pool( "PRLP3" );
    const auto sh3 = stake( p3 );
    exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
    exit_proportional( p3, sh3, share_type( honest_a ), {} );
-   BOOST_TEST_MESSAGE( "  Grenze nur auf A: geht durch, obwohl B einbricht" );
+   BOOST_TEST_MESSAGE( "  floor on A only: goes through although B collapses" );
 
-   // --- eine Grenze auf B haelt ----------------------------------------------------------
+   // --- a floor on B holds -----------------------------------------------------------------
    const auto p4 = make_pool( "PRLP4" );
    const auto sh4 = stake( p4 );
    const share_type floor_b{ honest_b - honest_b / 1000 };
    exchange_with_liquidity_pool( mal_id, p4, asset( 400000, a ), asset( 1, b ) );
    GRAPHENE_REQUIRE_THROW( exit_proportional( p4, sh4, {}, floor_b ), fc::exception );
-   BOOST_TEST_MESSAGE( "  Grenze auf B (" << floor_b.value << "): abgelehnt" );
+   BOOST_TEST_MESSAGE( "  floor on B (" << floor_b.value << "): refused" );
 
-   // Und ohne Verschiebung geht dieselbe Grenze durch.
+   // And without the move the same floor goes through.
    const auto p5 = make_pool( "PRLP5" );
    const auto sh5 = stake( p5 );
    exit_proportional( p5, sh5, {}, floor_b );
-   BOOST_TEST_MESSAGE( "  dieselbe Grenze ohne Verschiebung: geht durch" );
+   BOOST_TEST_MESSAGE( "  the same floor without the move: goes through" );
 
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Befund: der Wert bleibt, die Mischung nicht. Wer ein bestimmtes" );
-   BOOST_TEST_MESSAGE( "  Asset braucht, kann das jetzt sagen -- vorher nicht." );
+   BOOST_TEST_MESSAGE( "  finding: the value stays, the mix does not. Whoever needs a" );
+   BOOST_TEST_MESSAGE( "  particular asset can now say so -- before, they could not." );
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * MMEV against a one-sided deposit. An unbalanced deposit pays a fee that depends on how far it
+ * pushes the pool out of balance -- so on the pool's state at the moment it executes. Whoever
+ * builds the block decides what happens immediately before: by pushing the pool the same way
+ * first, they make the deposit push it further and pay more.
+ */
 BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
 { try {
    generate_blocks( HARDFORK_STABLESWAP_TIME );
@@ -2064,8 +2048,8 @@ BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
       return id;
    };
 
-   // Einseitig einzahlen: nur A. Das schiebt den Pool aus der Balance und kostet die
-   // Ungleichgewichtsgebuehr -- genau der Betrag, den ein Sandwich vergroessern kann.
+   // Deposit one side only, A. That pushes the pool out of balance and costs the imbalance
+   // fee -- which is precisely the amount a sandwich can enlarge.
    const auto deposit_one_sided = [&]( liquidity_pool_id_type pool,
                                        fc::optional<share_type> floor ) {
       liquidity_pool_deposit_operation dop;
@@ -2082,16 +2066,16 @@ BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
       return PUSH_TX( db, tx );
    };
 
-   // --- unbehelligt ---------------------------------------------------------------------
+   // --- undisturbed ---------------------------------------------------------------------
    const auto p1 = make_pool( "DPLP1" );
    const auto r1 = deposit_one_sided( p1, fc::optional<share_type>() );
    const int64_t honest =
          r1.operation_results.front().get<generic_exchange_operation_result>()
            .received.front().amount.value;
 
-   // --- im Sandwich ---------------------------------------------------------------------
-   // Der Angreifer schiebt A vorher schon hinein. Teds A-Einzahlung schiebt dann weiter aus
-   // der Balance und praegt weniger Anteile.
+   // --- sandwiched ----------------------------------------------------------------------
+   // The attacker pushes A in first. Ted's A deposit then pushes the pool further out of
+   // balance and mints fewer shares.
    const auto p2 = make_pool( "DPLP2" );
    exchange_with_liquidity_pool( mal_id, p2, asset( 400000, a ), asset( 1, b ) );
    const auto r2 = deposit_one_sided( p2, fc::optional<share_type>() );
@@ -2099,32 +2083,45 @@ BOOST_AUTO_TEST_CASE( a_deposit_floor_bounds_what_a_sandwich_can_take )
          r2.operation_results.front().get<generic_exchange_operation_result>()
            .received.front().amount.value;
 
-   BOOST_TEST_MESSAGE( "  einseitige Einzahlung unbehelligt : " << honest << " Anteile" );
-   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched << " Anteile" );
-   BOOST_TEST_MESSAGE( "  dem Einzahler entgangen           : " << ( honest - sandwiched ) );
+   BOOST_TEST_MESSAGE( "  one-sided deposit, undisturbed : " << honest << " shares" );
+   BOOST_TEST_MESSAGE( "  the same, sandwiched           : " << sandwiched << " shares" );
+   BOOST_TEST_MESSAGE( "  lost to the depositor          : " << ( honest - sandwiched ) );
 
    BOOST_CHECK_MESSAGE( sandwiched < honest,
-                        "das Sandwich hat der Einzahlung nichts genommen: " << sandwiched
-                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+                        "the sandwich took nothing from the deposit: " << sandwiched
+                        << " against " << honest << " -- then this test measures nothing" );
 
-   // --- im Sandwich, mit Untergrenze ----------------------------------------------------
+   // --- sandwiched, with a floor -------------------------------------------------------
    const auto p3 = make_pool( "DPLP3" );
    const share_type floor_shares = honest - honest / 1000;
    exchange_with_liquidity_pool( mal_id, p3, asset( 400000, a ), asset( 1, b ) );
    GRAPHENE_REQUIRE_THROW( deposit_one_sided( p3, floor_shares ), fc::exception );
-   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_shares.value
-                       << " scheitert die Einzahlung, statt weniger Anteile hinzunehmen." );
+   BOOST_TEST_MESSAGE( "  with a floor of " << floor_shares.value
+                       << " the deposit fails instead of accepting fewer shares." );
 
-   // Und ohne Angriff geht dieselbe Untergrenze durch.
+   // And without an attack the same floor goes through.
    const auto p4 = make_pool( "DPLP4" );
    deposit_one_sided( p4, floor_shares );
-   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+   BOOST_TEST_MESSAGE( "  without an attack the same floor goes through." );
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * MMEV against a one-sided withdrawal, and what the floor changes about it.
+ *
+ * A one-sided withdrawal is a swap -- the comment on withdraw_one_asset says so itself. Its
+ * price depends on the pool balances at the moment it executes, and whoever builds the block
+ * decides what happens immediately before. A witness can therefore move the pool, let the
+ * withdrawal run at the moved price, and move the pool back afterwards. Within its own block,
+ * nobody can get in between.
+ *
+ * The same operation is measured three times: undisturbed, sandwiched, and sandwiched with a
+ * floor. The third has to fail instead of executing at the moved price -- that is the whole
+ * purpose of the floor.
+ */
 BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
 { try {
-   // Ohne den Vorlauf lehnt der Evaluator schon die Poolerzeugung ab, und der Test
-   // stuerbe an der Infrastruktur statt am Gegenstand.
+   // Without this preparation the evaluator refuses to create the pool at all, and the test
+   // would die on its scaffolding rather than on its subject.
    generate_blocks( HARDFORK_STABLESWAP_TIME );
    generate_block();
    set_expiration( db, trx );
@@ -2148,7 +2145,7 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
 
    const int64_t liq = 1000000;
 
-   // Drei identische Pools, damit die drei Durchlaeufe sich nicht gegenseitig faerben.
+   // Three identical pools, so that the three runs cannot colour one another.
    const auto make_pool = [&]( const char* sym ) {
       const asset_object& lp = create_user_issued_asset( sym, sam, 0 );
       const liquidity_pool_object& p =
@@ -2171,8 +2168,8 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
       wop.pool         = pool;
       wop.share_amount = shares;
       wop.extensions.value.withdraw_one_asset = a;
-      // Ausgezahlt wird A, also gilt die Untergrenze der A-Seite. Eine auf B waere hier
-      // nie erfuellbar, und der Evaluator lehnt sie ausdruecklich ab.
+      // A is what gets paid out, so the floor on the A side is the one that applies. One on B
+      // could never be met here, and the evaluator refuses it outright.
       wop.extensions.value.min_a = floor;
       signed_transaction tx;
       tx.operations.push_back( wop );
@@ -2182,18 +2179,18 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
       PUSH_TX( db, tx );
    };
 
-   // --- 1. unbehelligt ------------------------------------------------------------------
+   // --- 1. undisturbed ------------------------------------------------------------------
    const auto p1 = make_pool( "MYLP1" );
    const auto sh1 = stake( p1 );
    const auto before1 = get_balance( ted_id, a );
    exit_one_sided( p1, sh1, fc::optional<share_type>() );
    const int64_t honest = get_balance( ted_id, a ) - before1;
 
-   // --- 2. im Sandwich ------------------------------------------------------------------
-   // Der Angreifer macht A im Pool KNAPP: er verkauft B hinein und zieht A heraus. Eine
-   // Auszahlung, die in A ausgezahlt wird, bekommt dann weniger Einheiten. Danach dreht er
-   // zurueck. (Andersherum -- A hineinverkaufen -- verbilligt A und zahlt dem Auszahler
-   // MEHR aus; ein erster Anlauf lief so und schadete nur dem Angreifer selbst.)
+   // --- 2. sandwiched -------------------------------------------------------------------
+   // The attacker makes A SCARCE in the pool: sells B into it and takes A out. A withdrawal
+   // paid in A then receives fewer units. Afterwards they reverse the move. (The other way
+   // round -- selling A in -- makes A cheaper and pays the withdrawer MORE; a first attempt
+   // ran that way and harmed only the attacker.)
    const auto p2 = make_pool( "MYLP2" );
    const auto sh2 = stake( p2 );
    const auto before2 = get_balance( ted_id, a );
@@ -2209,46 +2206,45 @@ BOOST_AUTO_TEST_CASE( a_withdrawal_floor_bounds_what_a_sandwich_can_take )
    const int64_t attacker_a = get_balance( mal_id, a ) - mal_a_before;
    const int64_t attacker_b = get_balance( mal_id, b ) - mal_b_before;
 
-   BOOST_TEST_MESSAGE( "  einseitige Auszahlung unbehelligt : " << honest );
-   BOOST_TEST_MESSAGE( "  dieselbe im Sandwich              : " << sandwiched );
-   BOOST_TEST_MESSAGE( "  dem Auszahler entgangen           : " << ( honest - sandwiched ) );
-   BOOST_TEST_MESSAGE( "  beim Angreifer haengengeblieben   : " << attacker_a
-                       << " von A, " << attacker_b << " von B" );
+   BOOST_TEST_MESSAGE( "  one-sided withdrawal, undisturbed : " << honest );
+   BOOST_TEST_MESSAGE( "  the same, sandwiched              : " << sandwiched );
+   BOOST_TEST_MESSAGE( "  lost to the withdrawer            : " << ( honest - sandwiched ) );
+   BOOST_TEST_MESSAGE( "  left with the attacker            : " << attacker_a
+                       << " of A, " << attacker_b << " of B" );
 
    BOOST_CHECK_MESSAGE( sandwiched < honest,
-                        "das Sandwich hat der Auszahlung nichts genommen: " << sandwiched
-                        << " gegen " << honest << " -- dann misst dieser Test nichts" );
+                        "the sandwich took nothing from the withdrawal: " << sandwiched
+                        << " against " << honest << " -- then this test measures nothing" );
 
-   // --- 3. im Sandwich, aber mit Untergrenze --------------------------------------------
-   // Ted verlangt fast so viel wie ohne Angriff. Die Auszahlung muss scheitern statt zum
-   // verschobenen Preis durchzugehen.
+   // --- 3. sandwiched, but with a floor ------------------------------------------------
+   // Ted asks for almost as much as without the attack. The withdrawal has to fail instead
+   // of going through at the moved price.
    const auto p3 = make_pool( "MYLP3" );
    const auto sh3 = stake( p3 );
-   const share_type floor_amount{ honest - honest / 1000 };  // ein Promille Nachgiebigkeit
+   const share_type floor_amount{ honest - honest / 1000 };  // one per mille of slack
 
    exchange_with_liquidity_pool( mal_id, p3, asset( 400000, b ), asset( 1, a ) );
    GRAPHENE_REQUIRE_THROW(
          exit_one_sided( p3, sh3, share_type( floor_amount ) ), fc::exception );
 
-   BOOST_TEST_MESSAGE( "  mit Untergrenze " << floor_amount.value
-                       << " scheitert die Auszahlung, statt zum verschobenen Preis zu laufen." );
+   BOOST_TEST_MESSAGE( "  with a floor of " << floor_amount.value
+                       << " the withdrawal fails instead of running at the moved price." );
 
-   // Und ohne Angriff laesst dieselbe Untergrenze die Auszahlung durch -- sonst waere sie
-   // nur eine Blockade und keine Absicherung.
+   // And with no attack the same floor lets the withdrawal through -- otherwise it would be
+   // an obstruction rather than a protection.
    const auto p4 = make_pool( "MYLP4" );
    const auto sh4 = stake( p4 );
    const auto before4 = get_balance( ted_id, a );
    exit_one_sided( p4, sh4, share_type( floor_amount ) );
    BOOST_CHECK_GT( get_balance( ted_id, a ) - before4, 0 );
-   BOOST_TEST_MESSAGE( "  ohne Angriff geht dieselbe Untergrenze durch." );
+   BOOST_TEST_MESSAGE( "  without an attack the same floor goes through." );
    BOOST_TEST_MESSAGE( "" );
-   BOOST_TEST_MESSAGE( "  Einordnung: der entzogene Betrag faellt an den POOL, nicht an den" );
-   BOOST_TEST_MESSAGE( "  Angreifer -- der zahlt auf dem Hin- und Rueckweg zweimal die" );
-   BOOST_TEST_MESSAGE( "  Handelsgebuehr und geht hier mit Verlust heraus. Das ist" );
-   BOOST_TEST_MESSAGE( "  Schaedigung, nicht Abschoepfung, solange er nicht selbst Anteile" );
-   BOOST_TEST_MESSAGE( "  am Pool haelt. Die Untergrenze ist trotzdem richtig: wem der" );
-   BOOST_TEST_MESSAGE( "  Verlust zugutekommt, aendert nichts daran, dass der Auszahlende" );
-   BOOST_TEST_MESSAGE( "  ihn ungefragt traegt." );
+   BOOST_TEST_MESSAGE( "  context: the amount taken goes to the POOL, not to the attacker," );
+   BOOST_TEST_MESSAGE( "  who pays the trading fee twice, on the way in and out, and leaves" );
+   BOOST_TEST_MESSAGE( "  here at a loss. That is harm, not extraction, as long as the" );
+   BOOST_TEST_MESSAGE( "  attacker holds no shares in the pool. The floor is still right:" );
+   BOOST_TEST_MESSAGE( "  who benefits from the loss does not change that the withdrawer" );
+   BOOST_TEST_MESSAGE( "  bears it without being asked." );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -3132,24 +3128,23 @@ BOOST_FIXTURE_TEST_CASE( depositing_one_side_and_withdrawing_the_other_is_not_fr
 
 
 /**
- * OEKONOMIE: wie bricht die Kurve, wenn ein Asset seinen Peg verliert?
+ * ECONOMICS: how does the curve break when an asset loses its peg?
  *
- * Der vorhandene Test deckt die numerische Robustheit von A bis uint64_t::max() ab. Was er
- * nicht sagt, ist das wirtschaftliche Verhalten: eine Stable-Kurve haelt den Kurs flach,
- * SOLANGE der Pool halbwegs ausgewogen ist, und faellt danach steil ab. Wo dieser Knick
- * liegt, entscheidet daruber, ab wann Liquiditaetsgeber bei einem Depeg Geld verlieren --
- * und das ist die Zahl, die eine Dimensionierung braucht.
+ * The existing test covers numerical robustness for A up to uint64_t::max(). What it does not
+ * say is the economic behaviour: a stable curve holds the price flat AS LONG AS the pool is
+ * reasonably balanced, and falls steeply after that. Where that knee lies decides from what
+ * point liquidity providers lose money in a depeg -- and that is the number sizing needs.
  *
- * Gemessen an der reinen Funktion, nicht am Pool: so ist das Ergebnis frei von Gebuehren
- * und Rundung der Evaluatoren und zeigt allein die Kurve.
+ * Measured on the pure function, not on a pool: the result is then free of the evaluators'
+ * fees and rounding, and shows the curve alone.
  */
 BOOST_AUTO_TEST_CASE( measure_how_the_stable_curve_degrades_under_depeg )
 {
    const uint64_t amp = 100;
-   const int64_t start = 1000000;      // 1:1 ausgewogen
+   const int64_t start = 1000000;      // balanced 1:1
 
-   BOOST_TEST_MESSAGE( "  Pool 1.000.000 / 1.000.000, A = " << amp );
-   BOOST_TEST_MESSAGE( "  Ungleichgewicht -> was 10.000 des reichlichen Assets einbringen" );
+   BOOST_TEST_MESSAGE( "  pool 1,000,000 / 1,000,000, A = " << amp );
+   BOOST_TEST_MESSAGE( "  imbalance -> what 10,000 of the abundant asset bring in" );
 
    int64_t x = start, y = start;
    const fc::uint128_t d = stableswap::compute_d( fc::uint128_t(x), fc::uint128_t(y), amp );
@@ -3157,28 +3152,28 @@ BOOST_AUTO_TEST_CASE( measure_how_the_stable_curve_degrades_under_depeg )
    int knee = 0;
    for( int pct = 10; pct <= 90; pct += 10 )
    {
-      // Pool auf pct% Ungleichgewicht bringen: x waechst, y schrumpft, D bleibt.
+      // Bring the pool to pct% imbalance: x grows, y shrinks, D stays.
       const int64_t xi = start + start * pct / 100;
       const fc::uint128_t yi = stableswap::compute_new_y( fc::uint128_t(xi), d, amp );
-      if( yi == 0 ) { BOOST_TEST_MESSAGE( "  " << pct << "%  Pool erschoepft" ); break; }
+      if( yi == 0 ) { BOOST_TEST_MESSAGE( "  " << pct << "%  pool exhausted" ); break; }
 
-      // Was bringt ein Tausch von 10.000 x an dieser Stelle?
+      // What does a swap of 10,000 x bring in at this point?
       const fc::uint128_t y_after =
             stableswap::compute_new_y( fc::uint128_t(xi + 10000), d, amp );
       const int64_t out = static_cast<int64_t>( yi - y_after );
 
       BOOST_TEST_MESSAGE( "  " << pct << "%  y=" << static_cast<int64_t>(yi)
-                          << "  10.000 x -> " << out << " y" );
-      // Der Knick: das erste Mal, dass ein Tausch weniger als 90% des Nennwerts bringt.
+                          << "  10,000 x -> " << out << " y" );
+      // The knee: the first time a swap returns less than 90% of face value.
       if( 0 == knee && out < 9000 ) knee = pct;
    }
 
-   BOOST_TEST_MESSAGE( "  ==> unter 90% Auszahlung ab " << knee << "% Ungleichgewicht" );
-   // Der Zweck der flachen Kurve ist, das lange durchzuhalten. Bricht sie schon unter 30%,
-   // schuetzt A=100 nicht mehr als eine Constant-Product-Kurve und ist Etikettenschwindel.
+   BOOST_TEST_MESSAGE( "  ==> below 90% payout from " << knee << "% imbalance" );
+   // The point of the flat curve is to hold that off for a long time. If it breaks below 30%
+   // already, A=100 protects no better than a constant-product curve and the label is a lie.
    BOOST_CHECK_MESSAGE( 0 == knee || knee >= 30,
-                        "Stable-Kurve faellt bereits bei " + std::to_string( knee )
-                        + "% Ungleichgewicht unter 90% Auszahlung" );
+                        "the stable curve already falls below 90% payout at "
+                        + std::to_string( knee ) + "% imbalance" );
 }
 
 BOOST_AUTO_TEST_SUITE_END()
