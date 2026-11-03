@@ -21,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <graphene/protocol/account_name_validation.hpp>
 #include <graphene/protocol/account.hpp>
 
 #include <fc/io/raw.hpp>
@@ -63,6 +64,12 @@ namespace graphene { namespace protocol {
  */
 bool is_valid_name( const string& name )
 { try {
+
+   if( not is_valid_account_name(name) )
+   {
+      return false;
+   }
+
    const size_t len = name.size();
 
    if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )

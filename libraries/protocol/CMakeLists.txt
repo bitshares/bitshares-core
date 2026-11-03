@@ -1,6 +1,7 @@
 file(GLOB HEADERS "include/graphene/protocol/*.hpp")
 
 list(APPEND SOURCES account.cpp
+                    account_name_validation.cpp
                     assert.cpp
                     asset_ops.cpp
                     block.cpp
