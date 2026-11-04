@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
    auto node = std::make_unique<graphene::app::application>();
    fc::oexception unhandled_exception;
    try {
-      bpo::options_description app_options("BitShares Witness Node");
+      bpo::options_description app_options("BitShares Witness Node\n\nOptions");
       bpo::options_description cfg_options("BitShares Witness Node");
       std::string default_plugins = "witness account_history market_history grouped_orders "
                                     "api_helper_indexes custom_operations";
