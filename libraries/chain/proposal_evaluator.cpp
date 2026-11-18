@@ -25,6 +25,7 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/protocol/confidential.hpp>
 
 namespace graphene { namespace chain {
 
@@ -321,6 +322,16 @@ struct proposal_operation_hardfork_visitor
    // Note: credit_deal_expired_operation is a virtual operation thus no need to add code here
    void operator()(const graphene::chain::credit_deal_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
+   }
+
+   // Same range-proof check as the evaluators, so a proposal cannot skip it.
+   void operator()(const graphene::chain::transfer_to_blind_operation& op) const {
+      if( HARDFORK_CORE_2605_PASSED(block_time) )
+         verify_blind_output_range_proofs( op.outputs );
+   }
+   void operator()(const graphene::chain::blind_transfer_operation& op) const {
+      if( HARDFORK_CORE_2605_PASSED(block_time) )
+         verify_blind_output_range_proofs( op.outputs );
    }
 
    // loop and self visit in proposals
