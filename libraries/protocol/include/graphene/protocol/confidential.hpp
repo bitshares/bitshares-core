@@ -258,6 +258,14 @@ struct blind_transfer_operation : public base_operation
    }
 };
 
+/**
+ * Verify range proofs on blind outputs.
+ *
+ * Evaluators call this after HARDFORK_CORE_2605. validate() does not, so
+ * blocks produced before the hardfork still replay.
+ */
+void verify_blind_output_range_proofs( const vector<blind_output>& outputs );
+
 ///@} endgroup stealth
 
 } } // graphene::protocol

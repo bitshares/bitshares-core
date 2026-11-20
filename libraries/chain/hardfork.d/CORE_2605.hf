@@ -1,0 +1,6 @@
+// Verify range proofs on blind transfer outputs.
+// Placeholder activation time; schedule a final time before release.
+#ifndef HARDFORK_CORE_2605_TIME
+#define HARDFORK_CORE_2605_TIME (fc::time_point_sec( 4102444800 )) // Friday, January 1, 2100 00:00:00 UTC
+#define HARDFORK_CORE_2605_PASSED(head_block_time) (head_block_time >= HARDFORK_CORE_2605_TIME)
+#endif
