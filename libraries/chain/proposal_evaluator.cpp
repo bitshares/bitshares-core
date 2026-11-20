@@ -370,6 +370,32 @@ struct hardfork_visitor_214 // non-recursive proposal visitor
    }
 };
 
+struct softfork_visitor_20261119 // recursive proposal visitor
+{
+   typedef void result_type;
+   const database& db;
+
+   softfork_visitor_20261119( const database& _db )
+   : db( _db ) {}
+
+   template<typename T>
+   void operator()(const T &v) const {
+      const auto& fee_paying_account = v.fee_payer()(db);
+      FC_ASSERT( !fee_paying_account.has_address_auth(),
+            "Account ${acct} '${name}' is temporarily blocked",
+            ("acct", fee_paying_account.id) ("name", fee_paying_account.name) );
+   }
+
+   void operator()(const proposal_create_operation &v) const {
+      const auto& fee_paying_account = v.fee_payer()(db);
+      FC_ASSERT( !fee_paying_account.has_address_auth(),
+            "Account ${acct} '${name}' is temporarily blocked",
+            ("acct", fee_paying_account.id) ("name", fee_paying_account.name) );
+      for (const op_wrapper &op : v.proposed_ops)
+         op.op.visit(*this);
+   }
+};
+
 void hardfork_visitor_1479::operator()(const proposal_update_operation &v)
 {
    if( nested_update_count == 0 || v.proposal.instance.value > max_update_instance )
@@ -407,6 +433,13 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
          op.op.visit( hf214 );
    }
    vtor_1479( o );
+
+   if( SOFTFORK_20261119_PASSED( d.head_block_time() ) )
+   {
+      softfork_visitor_20261119 sf20261119(d);
+      for( const op_wrapper &op : o.proposed_ops )
+         op.op.visit( sf20261119 );
+   }
 
    const auto& global_parameters = d.get_global_properties().parameters;
 

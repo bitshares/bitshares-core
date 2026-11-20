@@ -293,6 +293,11 @@ namespace graphene { namespace chain {
                 || (!active_special_authority.is_type< no_special_authority >());
          }
 
+         bool has_address_auth()const
+         {
+            return !owner.address_auths.empty() || !active.address_auths.empty();
+         }
+
          template<typename DB>
          const vesting_balance_object& cashback_balance(const DB& db)const
          {
