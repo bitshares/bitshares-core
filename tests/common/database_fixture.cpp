@@ -41,6 +41,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/futures_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork_visitor.hpp>
 
@@ -668,6 +669,22 @@ void database_fixture_base::verify_asset_supplies( const database& db )
    for( const auto& item : total_debts )
    {
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
+   }
+
+   // futures: collateral removed from balances lives in positions, resting orders and the
+   // market's insurance fund. If any of it were ever dropped, the supply check below is what
+   // would catch it.
+   for( const futures_position_object& o : db.get_index_type<futures_position_index>().indices() )
+   {
+      total_balances[ o.market_id(db).collateral_asset ] += o.margin;
+   }
+   for( const futures_order_object& o : db.get_index_type<futures_order_index>().indices() )
+   {
+      total_balances[ o.market_id(db).collateral_asset ] += o.deferred_margin;
+   }
+   for( const futures_market_object& o : db.get_index_type<futures_market_index>().indices() )
+   {
+      total_balances[ o.collateral_asset ] += o.insurance_fund;
    }
 
    // htlc

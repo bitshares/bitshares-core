@@ -829,6 +829,41 @@ signed_transaction wallet_api::update_bitasset( const string& symbol,
    return my->update_bitasset(symbol, new_options, broadcast);
 }
 
+oracle_object wallet_api::get_oracle( const string& name_or_id )const
+{
+   return my->get_oracle( name_or_id );
+}
+
+signed_transaction wallet_api::create_oracle( const string& owner, const string& name,
+                                              const string& description, const string& base_symbol,
+                                              const string& quote_symbol,
+                                              const oracle_options& options, bool broadcast )
+{
+   return my->create_oracle( owner, name, description, base_symbol, quote_symbol,
+                             options, broadcast );
+}
+
+signed_transaction wallet_api::update_oracle( const string& owner, const string& name_or_id,
+                                              const optional<string>& new_description,
+                                              const optional<oracle_options>& new_options,
+                                              bool broadcast )
+{
+   return my->update_oracle( owner, name_or_id, new_description, new_options, broadcast );
+}
+
+signed_transaction wallet_api::delete_oracle( const string& owner, const string& name_or_id,
+                                              bool broadcast )
+{
+   return my->delete_oracle( owner, name_or_id, broadcast );
+}
+
+signed_transaction wallet_api::publish_oracle_value( const string& producer,
+                                                     const string& name_or_id,
+                                                     const price& value, bool broadcast )
+{
+   return my->publish_oracle_value( producer, name_or_id, value, broadcast );
+}
+
 signed_transaction wallet_api::update_asset_feed_producers( const string& symbol,
                                                             const flat_set<string>& new_feed_producers,
                                                             bool broadcast /* = false */ )const

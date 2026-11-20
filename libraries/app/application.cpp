@@ -470,6 +470,14 @@ void application_impl::set_api_limit() {
       _app_options.api_limit_get_credit_offers =
             _options->at("api-limit-get-credit-offers").as<uint32_t>();
    }
+   if(_options->count("api-limit-get-oracles") > 0) {
+      _app_options.api_limit_get_oracles =
+            _options->at("api-limit-get-oracles").as<uint32_t>();
+   }
+   if(_options->count("api-limit-get-futures") > 0) {
+      _app_options.api_limit_get_futures =
+            _options->at("api-limit-get-futures").as<uint32_t>();
+   }
    if(_options->count("api-limit-get-storage-info") > 0) {
       _app_options.api_limit_get_storage_info =
             _options->at("api-limit-get-storage-info").as<uint32_t>();
@@ -1334,6 +1342,13 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-limit-get-credit-offers",
           bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_credit_offers),
           "Set maximum limit value for database APIs which query for credit offers or credit deals")
+         ("api-limit-get-oracles",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_oracles),
+          "Set maximum limit value for database APIs which query for oracles")
+         ("api-limit-get-futures",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_futures),
+          "Set maximum limit value for database APIs which query for futures markets, "
+          "positions or orders")
          ("api-limit-get-storage-info",
           bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_storage_info),
           "Set maximum limit value for APIs which query for account storage info")

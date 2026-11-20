@@ -26,6 +26,8 @@ list(APPEND SOURCES account.cpp
                     custom.cpp
                     market.cpp
                     credit_offer.cpp
+                    oracle.cpp
+                    futures.cpp
                     liquidity_pool.cpp
                     samet_fund.cpp
                     ticket.cpp

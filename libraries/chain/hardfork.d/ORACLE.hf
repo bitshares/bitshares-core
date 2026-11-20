@@ -1,0 +1,11 @@
+// Oracles: first-class named price series, independent of any asset.
+// Enables oracle_create / oracle_update / oracle_delete / oracle_publish and the
+// price_oracle_id asset option.
+//
+// Placeholder date -- the real value is set by the committee when the feature is
+// scheduled for a particular network. Before it passes, all four operations are
+// rejected, so no node can produce a block a pre-fork node cannot validate.
+#ifndef HARDFORK_ORACLE_TIME
+#define HARDFORK_ORACLE_TIME (fc::time_point_sec( 1893456000 )) // 2030-01-01T00:00:00Z
+#define HARDFORK_ORACLE_PASSED(now) (now >= HARDFORK_ORACLE_TIME)
+#endif
