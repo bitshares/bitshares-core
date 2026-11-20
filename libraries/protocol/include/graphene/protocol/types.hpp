@@ -46,6 +46,7 @@
 #include <fc/crypto/sha256.hpp>
 #include <fc/crypto/hash160.hpp>
 #include <fc/crypto/elliptic.hpp>
+#include <fc/crypto/pqc.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
 #include <fc/optional.hpp>
@@ -336,12 +337,71 @@ public:
     }
 };
 
+/**
+ * Post-quantum public key (NIST FIPS 204 ML-DSA), optionally carrying a legacy
+ * secp256k1 component for hybrid authorities during migration. The primary
+ * `data` field holds the raw ML-DSA public key bytes for `algorithm`.
+ */
+struct pq_public_key_type {
+    fc::pq_algorithm algorithm = fc::pq_algorithm::none;
+    vector<char> data;
+    fc::optional<fc::ecc::public_key_data> legacy;
+
+    pq_public_key_type();
+    explicit pq_public_key_type( const fc::pq_public_key& k );
+    explicit pq_public_key_type( const std::string& base58str );
+
+    /// Immutable canonical string form (prefix encodes the algorithm).
+    std::string to_base58() const;
+    /// Parse the string form; throws on bad checksum or malformed data.
+    static pq_public_key_type from_base58( const std::string& str );
+
+    /// Builds the fc-level key usable for verification (drops `legacy` if set).
+    fc::pq_public_key to_pqc() const;
+
+    /// Throws unless `data`'s length matches what `algorithm` requires. Unlike the base58
+    /// string form (which validates this on parse), ordinary raw/variant deserialization of
+    /// this struct performs no validation at all, so callers that accept a pq_public_key_type
+    /// from an operation (e.g. an evaluator's do_evaluate) must call this explicitly before
+    /// committing it to chain state, rather than deferring the check to the first to_pqc().
+    void validate() const;
+
+    friend bool operator == ( const pq_public_key_type& p1, const pq_public_key_type& p2 )
+    { return (p1.algorithm == p2.algorithm) && (p1.data == p2.data) && (p1.legacy == p2.legacy); }
+    friend bool operator != ( const pq_public_key_type& p1, const pq_public_key_type& p2 )
+    { return !(p1 == p2); }
+    friend bool operator <  ( const pq_public_key_type& p1, const pq_public_key_type& p2 )
+    {
+        if( p1.algorithm != p2.algorithm ) return (int)p1.algorithm < (int)p2.algorithm;
+        if( p1.data != p2.data ) return p1.data < p2.data;
+        return p1.legacy < p2.legacy;
+    }
+};
+
+/**
+ * Post-quantum signature (NIST FIPS 204 ML-DSA). Self-describing: the key is
+ * embedded, because ML-DSA offers no public-key recovery. Verification is the
+ * pure function `key.verify(digest, signature)`.
+ */
+struct pq_signature {
+    pq_public_key_type key;
+    vector<char> signature;
+};
+
 struct fee_schedule;
 } }  // graphene::protocol
 
 namespace fc {
 void to_variant(const graphene::protocol::public_key_type& var,  fc::variant& vo, uint32_t max_depth = 2);
 void from_variant(const fc::variant& var,  graphene::protocol::public_key_type& vo, uint32_t max_depth = 2);
+
+// Render post-quantum keys as their canonical base58 string, exactly as public_key_type is
+// handled. Without these, pq_public_key_type falls back to reflected struct serialization
+// ({"algorithm":..,"data":..}) everywhere it appears in JSON -- which makes the witness
+// plugin's --pq-private-key option unable to parse the base58 form its own help text
+// documents, and prints raw structs from API calls such as dump_pq_private_keys.
+void to_variant(const graphene::protocol::pq_public_key_type& var, fc::variant& vo, uint32_t max_depth = 2);
+void from_variant(const fc::variant& var, graphene::protocol::pq_public_key_type& vo, uint32_t max_depth = 2);
 
 
 template<>
@@ -387,6 +447,8 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))
+FC_REFLECT(graphene::protocol::pq_public_key_type, (algorithm)(data)(legacy))
+FC_REFLECT(graphene::protocol::pq_signature, (key)(signature))
 
 FC_REFLECT_TYPENAME(graphene::protocol::share_type)
 FC_REFLECT(graphene::protocol::void_t,)

@@ -28,12 +28,14 @@
 
 #include <graphene/chain/db_with.hpp>
 #include <graphene/chain/genesis_state.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/protocol/types.hpp>
 
 #include <graphene/egenesis/egenesis.hpp>
 
 #include <graphene/net/core_messages.hpp>
+#include <graphene/net/stcp_socket.hpp>
 #include <graphene/net/exceptions.hpp>
 
 #include <graphene/utilities/key_conversion.hpp>
@@ -41,6 +43,7 @@
 
 #include <fc/asio.hpp>
 #include <fc/io/fstream.hpp>
+#include <fc/io/raw.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/crypto/base64.hpp>
@@ -121,6 +124,17 @@ application_impl::~application_impl()
 
 void application_impl::reset_p2p_node(const fc::path& data_dir)
 { try {
+   // Must be decided before any connection is made. Defaults to off so that this node
+   // stays wire-compatible with peers that do not implement the hybrid handshake; see
+   // stcp_socket.hpp for why this cannot simply follow the PQ hardfork.
+   bool enable_pq_p2p = false;
+   if( _options->count("enable-pq-p2p") > 0 )
+      enable_pq_p2p = _options->at("enable-pq-p2p").as<bool>();
+   net::stcp_socket::set_pq_handshake_enabled( enable_pq_p2p );
+   if( enable_pq_p2p )
+      wlog( "Post-quantum P2P handshake ENABLED -- this node can only connect to peers "
+            "that also have --enable-pq-p2p set." );
+
    _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
 
    _p2p_network->load_configuration(data_dir / "p2p");
@@ -743,6 +757,8 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
    }
 
    _chain_db->precompute_parallel( transaction_message.trx ).wait();
+   fc::raw::scoped_pq_format pq_fmt( is_pq_active() ? fc::raw::pq_format::current
+                                                    : fc::raw::pq_format::legacy );
    _chain_db->push_transaction( transaction_message.trx );
 } FC_CAPTURE_AND_RETHROW( (transaction_message) ) } // GCOVR_EXCL_LINE
 
@@ -826,10 +842,49 @@ message application_impl::get_item(const item_id& id)
    {
       auto opt_block = _chain_db->fetch_block_by_id(id.item_hash);
       if( !opt_block )
-         elog("Couldn't find block ${id} -- corresponding ID in our chain is ${id2}",
-              ("id", id.item_hash)("id2", _chain_db->get_block_id_for_num(block_header::num_from_id(id.item_hash))));
+      {
+         // Build this diagnostic defensively. It runs precisely when a peer has asked us
+         // for a block we cannot produce, and the id it asked for is therefore not to be
+         // trusted: get_block_id_for_num() has a hard assert(block_num != 0) and throws
+         // outright when the number is past the end of the block database. Evaluating it
+         // inline aborted the whole node -- before the log line was even emitted, which is
+         // why the crash left no trace of what had been requested.
+         const uint32_t requested_num = block_header::num_from_id( id.item_hash );
+         fc::optional<graphene::chain::block_id_type> our_id_at_that_height;
+         if( requested_num != 0 )
+         {
+            try
+            {
+               our_id_at_that_height = _chain_db->get_block_id_for_num( requested_num );
+            }
+            catch( const fc::exception& ) {}
+         }
+         elog("Couldn't find block ${id} (block number ${num}) -- corresponding ID in our chain is ${id2}",
+              ("id", id.item_hash)("num", requested_num)("id2", our_id_at_that_height));
+      }
       FC_ASSERT( opt_block.valid() );
       // ilog("Serving up block #${num}", ("num", opt_block->block_num()));
+
+      // Post-quantum: serve this block in the format that belongs to the block itself, not
+      // the one our current head implies.
+      //
+      // A block's format is decided by its predecessor's timestamp -- _push_block() and
+      // _apply_block() both read head_block_time() before applying, so for block N the
+      // deciding value is the timestamp of block N-1. Every node reaches the same answer,
+      // because a node processing block N has exactly block N-1 as its head.
+      //
+      // Here, though, we are serving an old block to a peer that is behind us, so our head
+      // is not block N-1 and reading chain state would give the wrong answer for every
+      // block except the newest. Look up the predecessor's timestamp instead. This also
+      // makes the block_id that block_message's constructor derives come out as the real
+      // consensus id, since it is computed under this same format.
+      const auto prev_block_time = get_block_time( opt_block->previous );
+      const auto& gpo = _chain_db->get_global_properties();
+      const bool pq_active = HARDFORK_PQ_0_PASSED( prev_block_time )
+                             && gpo.parameters.extensions.value.pq_serialization_active.valid()
+                             && *gpo.parameters.extensions.value.pq_serialization_active;
+      fc::raw::scoped_pq_format pq_fmt( pq_active ? fc::raw::pq_format::current
+                                                  : fc::raw::pq_format::legacy );
       return block_message(std::move(*opt_block));
    }
    return trx_message( _chain_db->get_recent_transaction( id.item_hash ) );
@@ -838,6 +893,12 @@ message application_impl::get_item(const item_id& id)
 chain_id_type application_impl::get_chain_id() const
 {
    return _chain_db->get_chain_id();
+}
+
+bool application_impl::is_pq_active() const
+{
+   if( !_chain_db ) return false;
+   return _chain_db->is_pq_serialization_active();
 }
 
 /*
@@ -1178,6 +1239,11 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
           "Whether to enable P2P network (default: true). Note: if delayed_node plugin is enabled, "
           "this option will be ignored and P2P network will always be disabled.")
+         ("enable-pq-p2p", bpo::value<bool>()->implicit_value(true),
+          "Use the hybrid ECDH + ML-KEM post-quantum handshake for P2P connections (default: false). "
+          "This is NOT wire-compatible with peers that do not use it -- such peers cannot decrypt this "
+          "node's traffic and will drop the connection, isolating this node from the network. Only "
+          "enable it when every peer is known to have it enabled as well.")
          ("p2p-accept-incoming-connections", bpo::value<bool>()->implicit_value(true),
           "Whether to accept incoming P2P connections (default: true)")
          ("p2p-endpoint", bpo::value<string>(),

@@ -58,6 +58,20 @@ namespace graphene { namespace protocol {
       flat_set<vote_id_type> votes;
       extensions_type        extensions;
 
+      /**
+       * ML-KEM (FIPS 203) public key that senders encapsulate to when writing a
+       * post-quantum memo to this account.
+       *
+       * Deliberately separate from @ref memo_key rather than a replacement for it: the memo
+       * construction is hybrid, so a sender uses both keys together, and an account that
+       * never sets this one keeps working exactly as it does today. Present on the wire only
+       * under the post-quantum serialization format.
+       *
+       * Without a published key here a sender has nowhere to encapsulate to, so this field
+       * is what actually makes post-quantum memos reachable rather than merely possible.
+       */
+      fc::pq_gated< optional< pq_public_key_type > > pq_memo_key;
+
       /// Whether this account is voting
       inline bool is_voting() const
       {
@@ -279,7 +293,13 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT(graphene::protocol::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
+// pq_memo_key is reflected so JSON and the API see it, but it is NOT part of the reflected
+// binary packing: fc::raw::pack/unpack for account_options are hand-written in account.cpp so
+// the field reaches the wire only under the post-quantum format. account_options is embedded in
+// account_create_operation and account_update_operation, both on chain since genesis; emitting a
+// new field unconditionally would make every historical account operation fail to deserialize.
+FC_REFLECT(graphene::protocol::account_options,
+           (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions)(pq_memo_key))
 FC_REFLECT_ENUM( graphene::protocol::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
 
@@ -309,6 +329,27 @@ FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_params_t, (member
 FC_REFLECT( graphene::protocol::account_transfer_operation::fee_params_t, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
+
+namespace fc { namespace raw {
+
+// Non-template pack/unpack (defined in account.cpp). Non-template wins over the generic
+// reflected template in overload resolution.
+void pack( datastream<size_t>& s, const graphene::protocol::account_options& v,
+           uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( sha256::encoder& s, const graphene::protocol::account_options& v,
+           uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void pack( datastream<char*>& s, const graphene::protocol::account_options& v,
+           uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+void unpack( datastream<const char*>& s, graphene::protocol::account_options& v,
+             uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+// Prevent implicit instantiation of 1-arg vector-returning pack/pack_size in other TUs --
+// the instantiation in account.cpp sees these declarations.
+extern template std::vector<char> pack( const graphene::protocol::account_options& v,
+                                        uint32_t _max_depth );
+extern template size_t pack_size( const graphene::protocol::account_options& v );
+
+} } // namespace fc::raw
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_params_t )

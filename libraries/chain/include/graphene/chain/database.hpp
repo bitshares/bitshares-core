@@ -188,6 +188,17 @@ namespace graphene { namespace chain {
          const witness_schedule_object&         get_witness_schedule_object()const;
 
          time_point_sec   head_block_time()const;
+
+         /**
+          * Whether transactions and blocks are serialized in the post-quantum format.
+          *
+          * Both halves of the activation must hold: the PQ_0 hardfork has passed AND the
+          * committee has set pq_serialization_active. The two answers differ by a few bytes
+          * per authority, which is enough to change a size-priced fee, a transaction hex and
+          * every signature digest -- so anything that packs a transaction outside of block
+          * application has to ask this and set fc::raw::scoped_pq_format accordingly.
+          */
+         bool             is_pq_serialization_active()const;
          uint32_t         head_block_num()const;
          block_id_type    head_block_id()const;
          witness_id_type  head_block_witness()const;
@@ -585,13 +596,15 @@ namespace graphene { namespace chain {
             const fc::time_point_sec when,
             witness_id_type witness_id,
             const fc::ecc::private_key& block_signing_private_key,
-            uint32_t skip
+            uint32_t skip,
+            const fc::optional<fc::pq_private_key>& block_pq_signing_private_key = fc::optional<fc::pq_private_key>()
             );
       private:
          signed_block _generate_block(
             const fc::time_point_sec when,
             witness_id_type witness_id,
-            const fc::ecc::private_key& block_signing_private_key
+            const fc::ecc::private_key& block_signing_private_key,
+            const fc::optional<fc::pq_private_key>& block_pq_signing_private_key = fc::optional<fc::pq_private_key>()
             );
 
       public:
@@ -684,7 +697,8 @@ namespace graphene { namespace chain {
          fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
       private:
          template<typename Trx>
-         void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
+         void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip,
+                                     fc::raw::pq_format fmt )const;
 
       protected:
          // Mark pop_undo() as protected -- we do not want outside calling pop_undo(),

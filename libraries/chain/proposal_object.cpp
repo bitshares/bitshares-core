@@ -47,6 +47,7 @@ bool proposal_object::is_authorized_to_execute( database& db ) const
                         MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ),
                         db.get_global_properties().parameters.max_authority_depth,
                         true, /* allow committee */
+                        true, /* allow_pq */
                         available_active_approvals,
                         available_owner_approvals );
    } 

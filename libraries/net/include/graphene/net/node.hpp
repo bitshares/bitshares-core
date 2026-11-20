@@ -113,6 +113,10 @@ namespace graphene { namespace net {
 
          virtual chain_id_type get_chain_id()const = 0;
 
+         // Post-quantum hardfork: returns true when pq_serialization_active committee
+         // parameter is set AND head_block_time >= HARDFORK_PQ_0_TIME
+         virtual bool is_pq_active() const = 0;
+
          /**
           * Returns a synopsis of the blockchain used for syncing.
           * This consists of a list of selected item hashes from our current preferred

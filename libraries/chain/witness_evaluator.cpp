@@ -26,6 +26,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace chain {
@@ -33,6 +34,20 @@ namespace graphene { namespace chain {
 void_result witness_create_evaluator::do_evaluate( const witness_create_operation& op )
 { try {
    FC_ASSERT(db().get(op.witness_account).is_lifetime_member());
+
+   // PQ gate: reject pq_signing_key before activation
+   if( op.block_pq_signing_key.valid() )
+   {
+      const auto& gpo_params = db().get_global_properties().parameters;
+      FC_ASSERT( HARDFORK_PQ_0_PASSED(db().head_block_time())
+                 && gpo_params.extensions.value.pq_serialization_active.valid()
+                 && *gpo_params.extensions.value.pq_serialization_active,
+                 "Post-quantum witness signing keys are not yet active" );
+      // Validate length/algorithm consistency at the input boundary rather than deferring to
+      // the first block-signature verification against this key.
+      op.block_pq_signing_key->validate();
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -47,6 +62,8 @@ object_id_type witness_create_evaluator::do_apply( const witness_create_operatio
    const auto& new_witness_object = _db.create<witness_object>( [&op,&vote_id]( witness_object& obj ){
          obj.witness_account  = op.witness_account;
          obj.signing_key      = op.block_signing_key;
+         if( op.block_pq_signing_key.valid() )
+            obj.pq_signing_key = *op.block_pq_signing_key;
          obj.vote_id          = vote_id;
          obj.url              = op.url;
    });
@@ -56,6 +73,19 @@ object_id_type witness_create_evaluator::do_apply( const witness_create_operatio
 void_result witness_update_evaluator::do_evaluate( const witness_update_operation& op )
 { try {
    FC_ASSERT(db().get(op.witness).witness_account == op.witness_account);
+
+   // PQ gate: reject new_pq_signing_key before activation
+   if( op.new_pq_signing_key.valid() )
+   {
+      const auto& gpo_params = db().get_global_properties().parameters;
+      FC_ASSERT( HARDFORK_PQ_0_PASSED(db().head_block_time())
+                 && gpo_params.extensions.value.pq_serialization_active.valid()
+                 && *gpo_params.extensions.value.pq_serialization_active,
+                 "Post-quantum witness signing keys are not yet active" );
+      // See witness_create_evaluator::do_evaluate for why this is validated here.
+      op.new_pq_signing_key->validate();
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -70,6 +100,8 @@ void_result witness_update_evaluator::do_apply( const witness_update_operation& 
             wit.url = *op.new_url;
          if( op.new_signing_key.valid() )
             wit.signing_key = *op.new_signing_key;
+         if( op.new_pq_signing_key.valid() )
+            wit.pq_signing_key = *op.new_pq_signing_key;
       });
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }

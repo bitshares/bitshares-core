@@ -84,6 +84,48 @@
 
 namespace graphene { namespace net { namespace detail {
 
+   /**
+    * Post-quantum: decode a block_message without having to know, up front, which
+    * serialization format its sender used.
+    *
+    * A block's format follows its predecessor's timestamp, so chain state answers correctly
+    * only while head is exactly that predecessor. That does not hold at several points on
+    * the p2p path: messages are decoded when they arrive but applied later, so around the
+    * activation boundary a block is routinely decoded while head is still short of it; and
+    * blocks we serve to a peer come back to us framed for that block, not for our head.
+    *
+    * Decoding a post-quantum block as legacy shifts every field after witness_signature by
+    * the one byte of the empty-optional marker, so the block_id read out the far end is a
+    * real id displaced by a byte. Nothing rejects it -- it is advertised to peers, who then
+    * request a block nobody has, and sync stops for good.
+    *
+    * The one thing the two formats cannot both do is account for the buffer exactly, since
+    * they differ in length by that marker. So try the caller's expectation first and fall
+    * back to the other, and require every byte to be consumed. This needs nothing beyond
+    * what the message already carries.
+    */
+   static graphene::net::block_message decode_block_message( const message& msg, bool prefer_pq )
+   {
+      const auto preferred = prefer_pq ? fc::raw::pq_format::current : fc::raw::pq_format::legacy;
+      const auto fallback  = prefer_pq ? fc::raw::pq_format::legacy  : fc::raw::pq_format::current;
+      for( const auto fmt : { preferred, fallback } )
+      {
+         try
+         {
+            fc::raw::scoped_pq_format scoped( fmt );
+            fc::datastream<const char*> ds( msg.data.data(), msg.data.size() );
+            graphene::net::block_message candidate;
+            fc::raw::unpack( ds, candidate );
+            if( ds.remaining() == 0 )
+               return candidate;
+         }
+         catch( const fc::exception& ) {}
+         catch( const std::exception& ) {}
+      }
+      FC_THROW_EXCEPTION( fc::parse_error_exception,
+                          "Unable to decode block message in either serialization format" );
+   }
+
    void blockchain_tied_message_cache::block_accepted()
    {
       ++block_clock;
@@ -2707,7 +2749,10 @@ namespace graphene { namespace net { namespace detail {
       // if we sent them a block, update our record of the last block they've seen accordingly
       if (last_block_message_sent)
       {
-        graphene::net::block_message block = last_block_message_sent->as<graphene::net::block_message>();
+        // Post-quantum: these came back from the delegate framed for the block itself, not
+        // for our head, so decode them the same way. See decode_block_message().
+        graphene::net::block_message block
+              = decode_block_message( *last_block_message_sent, _delegate->is_pq_active() );
         originating_peer->last_block_delegate_has_seen = block.block_id;
         originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(block.block_id);
       }
@@ -2715,7 +2760,8 @@ namespace graphene { namespace net { namespace detail {
       for (const message& reply : reply_messages)
       {
         if (reply.msg_type.value() == block_message_type)
-          originating_peer->send_item(item_id(block_message_type, reply.as<graphene::net::block_message>().block_id));
+          originating_peer->send_item(item_id(block_message_type,
+                decode_block_message( reply, _delegate->is_pq_active() ).block_id));
         else
           originating_peer->send_message(reply);
       }
@@ -3466,11 +3512,16 @@ namespace graphene { namespace net { namespace detail {
                                           const message_hash_type& message_hash)
     {
       VERIFY_CORRECT_THREAD();
+      // Post-quantum: decode the block (see decode_block_message), then hand everything
+      // downstream the chain-state format, as before.
+      graphene::net::block_message block_message_to_process
+            = decode_block_message( message_to_process, _delegate->is_pq_active() );
+      fc::raw::scoped_pq_format pq_fmt( _delegate->is_pq_active() ? fc::raw::pq_format::current
+                                                                  : fc::raw::pq_format::legacy );
       // find out whether we requested this item while we were synchronizing or during normal operation
       // (it's possible that we request an item during normal operation and then get kicked into sync
       // mode before we receive and process the item.  In that case, we should process the item as a normal
       // item to avoid confusing the sync code)
-      graphene::net::block_message block_message_to_process(message_to_process.as<graphene::net::block_message>());
       auto item_iter = originating_peer->items_requested_from_peer.find(
                              item_id(graphene::net::block_message_type, message_hash));
       if (item_iter != originating_peer->items_requested_from_peer.end())
@@ -3605,6 +3656,8 @@ namespace graphene { namespace net { namespace detail {
         {
           if (message_to_process.msg_type.value() == trx_message_type)
           {
+            fc::raw::scoped_pq_format pq_fmt( _delegate->is_pq_active() ? fc::raw::pq_format::current
+                                                                        : fc::raw::pq_format::legacy );
             trx_message transaction_message_to_process = message_to_process.as<trx_message>();
             dlog( "passing message containing transaction ${trx} to client",
                   ("trx", transaction_message_to_process.trx.id()) );
@@ -4860,7 +4913,10 @@ namespace graphene { namespace net { namespace detail {
       message_hash_type hash_of_message_contents;
       if( item_to_broadcast.msg_type.value() == graphene::net::block_message_type )
       {
-        graphene::net::block_message block_message_to_broadcast = item_to_broadcast.as<graphene::net::block_message>();
+        // Post-quantum: decode by what the bytes actually are. This runs on the p2p thread,
+        // where the producer's serialization scope does not reach. See decode_block_message().
+        graphene::net::block_message block_message_to_broadcast
+              = decode_block_message( item_to_broadcast, _delegate->is_pq_active() );
         hash_of_message_contents = block_message_to_broadcast.block_id; // for debugging
         _most_recent_blocks_accepted.push_back( block_message_to_broadcast.block_id );
       }
@@ -5151,7 +5207,28 @@ namespace graphene { namespace net { namespace detail {
 
   void node::broadcast( const message& msg ) const
   {
-    INVOKE_IN_IMPL(broadcast, msg);
+    // Post-quantum: fc::raw's serialization format is thread_local, and this call hops onto
+    // the p2p thread, so the format the caller established -- the block producer's, or the
+    // client's when broadcasting a transaction -- does not travel with the message.
+    //
+    // node_impl::broadcast() decodes the message again to pull out its content hash, and
+    // decoding a post-quantum-format block under the p2p thread's default legacy format
+    // yields a garbage block id. That id is what then gets advertised to peers, so peers
+    // request a block by an id that matches nothing; from the first block after activation
+    // onward the ids handed around the network are meaningless.
+    //
+    // Carry the format across the hop explicitly, the same way database::precompute_parallel()
+    // already has to for its worker threads.
+    const auto pq_fmt = fc::raw::get_pq_format();
+#ifdef P2P_IN_DEDICATED_THREAD
+    return my->_thread->async( [&](){
+                                  fc::raw::scoped_pq_format scoped( pq_fmt );
+                                  return my->broadcast( msg );
+                               }, "thread invoke for method broadcast" ).wait();
+#else
+    fc::raw::scoped_pq_format scoped( pq_fmt );
+    return my->broadcast( msg );
+#endif
   }
 
   void node::sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) const
@@ -5370,6 +5447,11 @@ namespace graphene { namespace net { namespace detail {
     chain_id_type statistics_gathering_node_delegate_wrapper::get_chain_id() const
     {
       INVOKE_AND_COLLECT_STATISTICS(get_chain_id);
+    }
+
+    bool statistics_gathering_node_delegate_wrapper::is_pq_active() const
+    {
+      INVOKE_AND_COLLECT_STATISTICS(is_pq_active);
     }
 
     std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_blockchain_synopsis(const item_hash_t& reference_point, uint32_t number_of_blocks_after_reference_point)

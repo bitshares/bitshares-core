@@ -39,6 +39,8 @@
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 
+#include <type_traits>
+
 #include <iostream>
 
 using namespace graphene::chain;
@@ -102,7 +104,22 @@ bool register_serializer( const string& name, std::function<void()> sr )
    return false;
 }
 
-template<typename T> struct js_name { static std::string name(){ return  remove_namespace(fc::get_typename<T>::name()); }; };
+template<typename T, typename Enable = void>
+struct js_name { static std::string name(){ return  remove_namespace(fc::get_typename<T>::name()); }; };
+
+/**
+ * Every FC_REFLECT_ENUM is packed by fc as a fixed 8-byte integer, whatever underlying type
+ * the enum declares -- `enum class x : uint8_t` still goes on the wire as eight bytes. So an
+ * enum is not a struct to be emitted, it is an int64 field.
+ *
+ * This matters more than it looks. A generated binding that wrote one byte here would build
+ * a transaction the chain re-serialises differently, and the only symptom is a signature
+ * that fails to verify, reported as "Missing Active Authority" -- an error that says nothing
+ * whatsoever about serialization.
+ */
+template<typename T>
+struct js_name<T, typename std::enable_if<std::is_enum<T>::value>::type>
+{ static std::string name(){ return "int64"; } };
 
 template<typename T, size_t N>
 struct js_name<std::array<T,N>>
@@ -214,6 +231,11 @@ class serialize_member_visitor
       void operator()( const char* name )const
       {
          std::cout << "    " << name <<": " << js_name<Member>::name() <<",\n";
+      }
+
+      void operator()( const char* name, int64_t )const
+      {
+         std::cout << "    " << name <<": \"int64\",\n";
       }
 };
 
@@ -336,18 +358,31 @@ class register_member_visitor
       {
          serializer<Member>::init();
       }
+
+      // FC_REFLECT_ENUM visits each enum value with (name, int64_t value)
+      void operator()( const char* name, int64_t )const
+      {
+      }
 };
 
 template<typename T, bool reflected>
 struct serializer
 {
    static_assert( fc::reflector<T>::is_defined::value, "invalid template arguments" );
-   static void init()
+
+   static void init() { init_impl( std::is_enum<T>() ); }
+
+   /// Enum: nothing to register. It renders as int64 wherever it is used as a member, and
+   /// there is no separate Serializer to emit for it.
+   static void init_impl( std::true_type ) {}
+
+   static void init_impl( std::false_type )
    {
       auto name = js_name<T>::name();
       if( st.find(name) == st.end() )
       {
-         fc::reflector<T>::visit( register_member_visitor() );
+         register_member_visitor vtor;
+         fc::reflector<T>::visit( vtor );
          register_serializer( name, [=](){ generate(); } );
       }
    }
@@ -359,7 +394,8 @@ struct serializer
       std::cout << "export const " << name
                 << " = new Serializer("
                 << "\"" + name + "\", {\n";
-      fc::reflector<T>::visit( serialize_member_visitor() );
+      serialize_member_visitor vtor2;
+      fc::reflector<T>::visit( vtor2 );
       std::cout <<"});\n\n";
    }
 };

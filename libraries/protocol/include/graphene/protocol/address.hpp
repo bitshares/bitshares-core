@@ -50,6 +50,14 @@ namespace graphene { namespace protocol {
        explicit address( const fc::ecc::public_key_data& pub ); ///< converts to address
        explicit address( const pts_address& pub );         ///< converts to address
        explicit address( const public_key_type& pubkey );  ///< converts to address
+       /**
+        * Derive an address from a post-quantum public key.
+        *
+        * Same construction as the classic form -- ripemd160(sha512(bytes)) -- so an address
+        * auth does not have to care which kind of key hashes to it: an authority listing this
+        * address is satisfied by a signature from the corresponding ML-DSA key.
+        */
+       explicit address( const pq_public_key_type& pub );
 
        static bool is_valid( const std::string& base58str, const std::string& prefix = GRAPHENE_ADDRESS_PREFIX );
 

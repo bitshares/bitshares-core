@@ -77,6 +77,25 @@ namespace graphene { namespace protocol {
        addr = fc::ripemd160::hash( (char*)&ptsaddr, sizeof( ptsaddr ) );
    }
 
+   address::address( const pq_public_key_type& pub )
+   {
+       // Hash the key's IDENTITY: the algorithm followed by the raw public key bytes.
+       //
+       // The algorithm is included so two parameter sets can never derive the same address --
+       // ML-DSA-44 and ML-DSA-65 keys are different keys and must live at different addresses,
+       // even though nothing about their bytes would otherwise say so.
+       //
+       // The optional legacy companion key is excluded on purpose. It is a migration
+       // convenience, and attaching or removing one must not move where the PQ key lives; an
+       // address that changed when a hybrid key was added would silently invalidate any
+       // authority naming it.
+       std::vector<char> buf;
+       buf.reserve( 1 + pub.data.size() );
+       buf.push_back( static_cast<char>( pub.algorithm ) );
+       buf.insert( buf.end(), pub.data.begin(), pub.data.end() );
+       addr = fc::ripemd160::hash( fc::sha512::hash( buf.data(), buf.size() ) );
+   }
+
    address::address( const fc::ecc::public_key_data& pub )
    {
        addr = fc::ripemd160::hash( fc::sha512::hash( (char*) pub.data(), pub.size() ) );

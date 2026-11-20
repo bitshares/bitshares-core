@@ -166,6 +166,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::witness_object, (graphene::db::
                     (witness_account)
                     (last_aslot)
                     (signing_key)
+                    (pq_signing_key)
                     (pay_vb)
                     (vote_id)
                     (total_votes)

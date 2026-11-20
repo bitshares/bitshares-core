@@ -190,6 +190,13 @@ namespace graphene { namespace wallet { namespace detail {
 
    void wallet_api_impl::set_operation_fees( signed_transaction& tx, const fee_schedule& s ) const
    {
+      // Fees with a price_per_kbyte component are derived from the packed size of the
+      // operation, which differs between pq_format::legacy and ::current (every authority
+      // gains a length byte for pq_key_auths under `current`). The node charges using the
+      // format derived from chain state, so the wallet must price the operation the same
+      // way -- otherwise it underpays by a few units per authority and the node rejects the
+      // transaction with insufficient_fee once PQ serialization is active.
+      fc::raw::scoped_pq_format pq_fmt( get_pq_format() );
       for( auto& op : tx.operations )
          s.set_fee(op);
    }

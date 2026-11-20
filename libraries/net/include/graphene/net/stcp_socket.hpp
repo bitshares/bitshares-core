@@ -25,18 +25,44 @@
 #include <fc/network/tcp_socket.hpp>
 #include <fc/crypto/aes.hpp>
 #include <fc/crypto/elliptic.hpp>
+#include <fc/crypto/pqc.hpp>
 
 namespace graphene { namespace net {
 
 /**
- *  Uses ECDH to negotiate a aes key for communicating
- *  with other nodes on the network.
+ *  Uses ECDH + ML-KEM (FIPS 203, hybrid) to negotiate an aes key for
+ *  communicating with other nodes on the network:
+ *
+ *    shared_secret = sha512( ECDH_secret || ML-KEM_shared_secret )
+ *
+ *  The ML-KEM part protects the channel against quantum attackers, while the
+ *  retained ECDH part keeps the classic forward-secrecy properties.
+ *
+ *  The ML-KEM exchange is DISABLED by default, because it is not
+ *  wire-compatible with peers that do not perform it: the extra key and
+ *  ciphertext bytes are read by such a peer as encrypted payload, and since
+ *  the two sides then derive different AES keys, every subsequent byte
+ *  decrypts to noise. In practice the peer reads a nonsense message length
+ *  and drops the connection, so an upgraded node is silently partitioned from
+ *  the rest of the network the moment it starts.
+ *
+ *  Enabling it therefore requires every peer to have it enabled too, which is
+ *  why it is an explicit operator decision (--enable-pq-p2p) rather than
+ *  something that switches on with the PQ hardfork. It deliberately cannot be
+ *  keyed off chain state: a node syncing from the genesis block would evaluate
+ *  "is PQ active" as false while its already-synced peers evaluated it as
+ *  true, so new nodes could never join an activated chain.
  */
 class stcp_socket : public virtual fc::iostream
 {
   public:
     stcp_socket();
     ~stcp_socket();
+
+    /// Enable the hybrid ML-KEM handshake process-wide. Off by default; only
+    /// turn it on when every peer this node talks to also has it on.
+    static void set_pq_handshake_enabled( bool enabled );
+    static bool pq_handshake_enabled();
     fc::tcp_socket&  get_socket() { return _sock; }
     void             accept();
 
@@ -58,8 +84,11 @@ class stcp_socket : public virtual fc::iostream
     fc::sha512       get_shared_secret() const { return _shared_secret; }
   private:
     void do_key_exchange();
+    void do_ecdh_key_exchange();
+    void do_mlkem_key_exchange();
 
     fc::sha512           _shared_secret;
+    fc::sha512           _ecdh_secret;
     fc::ecc::private_key _priv_key;
     fc::tcp_socket       _sock;
     fc::aes_encoder      _send_aes;

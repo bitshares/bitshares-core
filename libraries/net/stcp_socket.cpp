@@ -48,7 +48,41 @@ stcp_socket::~stcp_socket()
 {
 }
 
+namespace {
+   // Off by default: performing the ML-KEM exchange against a peer that does not
+   // expect it desynchronises the stream and partitions this node from the network.
+   bool g_pq_handshake_enabled = false;
+}
+
+void stcp_socket::set_pq_handshake_enabled( bool enabled )
+{
+   g_pq_handshake_enabled = enabled;
+}
+
+bool stcp_socket::pq_handshake_enabled()
+{
+   return g_pq_handshake_enabled;
+}
+
 void stcp_socket::do_key_exchange()
+{
+  do_ecdh_key_exchange();
+  if( g_pq_handshake_enabled )
+  {
+     do_mlkem_key_exchange();   // also derives _shared_secret and keys the ciphers
+     return;
+  }
+
+  // Legacy path: byte-for-byte identical to a node without the PQ feature --
+  // the ECDH secret is used directly, with no extra bytes on the wire.
+  _shared_secret = _ecdh_secret;
+  _send_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ),
+                  fc::city_hash_crc_128( (char*)&_shared_secret, sizeof(_shared_secret) ) );
+  _recv_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ),
+                  fc::city_hash_crc_128( (char*)&_shared_secret, sizeof(_shared_secret) ) );
+}
+
+void stcp_socket::do_ecdh_key_exchange()
 {
   _priv_key = fc::ecc::private_key::generate();
   fc::ecc::public_key pub = _priv_key.get_public_key();
@@ -60,11 +94,72 @@ void stcp_socket::do_key_exchange()
   fc::ecc::public_key_data rpub;
   memcpy((char*)&rpub, serialized_key_buffer.get(), sizeof(fc::ecc::public_key_data));
 
-  _shared_secret = _priv_key.get_shared_secret( rpub );
-//    ilog("shared secret ${s}", ("s", shared_secret) );
-  _send_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ), 
+  _ecdh_secret = _priv_key.get_shared_secret( rpub );
+}
+
+void stcp_socket::do_mlkem_key_exchange()
+{
+  // Post-quantum (FIPS 203 ML-KEM-768) key exchange on top of the ECDH part.
+  const fc::pq_algorithm alg = fc::pq_algorithm::ml_kem_768;
+  const uint16_t pk_size = fc::pqc_sizes::public_key_size( alg );
+  const uint16_t ct_size = fc::pqc_sizes::ciphertext_size( alg );
+
+  auto kp = fc::pq_kem_generate( alg );
+
+  std::shared_ptr<char> pk_buffer( new char[pk_size], [](char* p){ delete[] p; } );
+  memcpy( pk_buffer.get(), kp.pk.data(), kp.pk.size() );
+  _sock.write( pk_buffer, pk_size );
+  _sock.read( pk_buffer, pk_size );
+
+  std::vector<char> peer_pk( pk_buffer.get(), pk_buffer.get() + pk_size );
+
+  auto result = fc::pq_kem_encapsulate( alg, peer_pk );
+  FC_ASSERT( result.valid, "ML-KEM encapsulation failed" );
+
+  std::shared_ptr<char> ct( new char[ct_size], [](char* p){ delete[] p; } );
+  memcpy( ct.get(), result.ciphertext.data(), result.ciphertext.size() );
+  _sock.write( ct, ct_size );
+  _sock.read( ct, ct_size );
+
+  std::vector<char> peer_ct( ct.get(), ct.get() + ct_size );
+  std::vector<char> peer_ss = fc::pq_kem_decapsulate( alg, kp.sk, peer_ct );
+
+  // hybrid: shared_secret = sha512( ECDH || S(min pk) || S(max pk) )
+  //
+  // Unlike ECDH, ML-KEM encapsulate/decapsulate is NOT commutative: `result.shared_secret`
+  // is the secret *this* side derived by encapsulating to the *peer's* public key, while
+  // `peer_ss` is the secret this side recovered by decapsulating a ciphertext the peer
+  // encapsulated to *this side's own* public key -- two distinct values. do_key_exchange()
+  // runs identically on both connect_to() (client) and accept() (server), so concatenating
+  // "own-then-peer" in a fixed order made each side hash the same two secrets in opposite
+  // order, so the two sides never derived the same _shared_secret (every hybrid-KEM
+  // connection failed to decrypt). Fix: order the two secrets by comparing the two KEM
+  // public keys, which are already exchanged in the clear -- both sides compare the same
+  // bytes and therefore agree on the same order regardless of which side is client/server.
+  const bool own_pk_is_smaller = std::lexicographical_compare(
+        kp.pk.begin(), kp.pk.end(), peer_pk.begin(), peer_pk.end() );
+
+  fc::sha512::encoder enc;
+  enc.write( (const char*)&_ecdh_secret, sizeof(_ecdh_secret) );
+  if( own_pk_is_smaller )
+  {
+     // Our own pk is the smaller of the two, so the secret targeting it -- the one the peer
+     // encapsulated to us, which we decapsulated -- is canonically first.
+     enc.write( peer_ss.data(), peer_ss.size() );
+     enc.write( result.shared_secret.data(), result.shared_secret.size() );
+  }
+  else
+  {
+     // The peer's pk is the smaller one, so the secret we ourselves encapsulated to it is
+     // canonically first.
+     enc.write( result.shared_secret.data(), result.shared_secret.size() );
+     enc.write( peer_ss.data(), peer_ss.size() );
+  }
+  _shared_secret = enc.result();
+
+  _send_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ),
                   fc::city_hash_crc_128((char*)&_shared_secret,sizeof(_shared_secret) ) );
-  _recv_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ), 
+  _recv_aes.init( fc::sha256::hash( (char*)&_shared_secret, sizeof(_shared_secret) ),
                   fc::city_hash_crc_128((char*)&_shared_secret,sizeof(_shared_secret) ) );
 }
 

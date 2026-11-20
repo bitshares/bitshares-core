@@ -133,6 +133,31 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_create_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
 
+   // PQ gate: reject pq_key_auths and pq_memo_key before activation
+   {
+      const auto& gpo_params = d.get_global_properties().parameters;
+      if( !HARDFORK_PQ_0_PASSED(d.head_block_time())
+          || !gpo_params.extensions.value.pq_serialization_active.valid()
+          || !*gpo_params.extensions.value.pq_serialization_active )
+      {
+         FC_ASSERT( op.owner.pq_key_auths.empty(),
+                    "Post-quantum key authorities are not yet active" );
+         FC_ASSERT( op.active.pq_key_auths.empty(),
+                    "Post-quantum key authorities are not yet active" );
+         // Rejected rather than ignored: before activation the field does not reach the wire,
+         // so accepting the operation would confirm it while silently discarding the key, and
+         // the sender would believe post-quantum memos were reachable when they are not.
+         FC_ASSERT( !op.options.pq_memo_key.valid(),
+                    "Post-quantum memo keys are not yet active" );
+      }
+      // Validate each key's length/algorithm consistency at the input boundary, rather than
+      // deferring to the first to_pqc() call (at signature-verification time, an arbitrary
+      // block later, by which point a malformed key would already be committed to chain
+      // state). See pq_public_key_type::validate().
+      for( const auto& k : op.owner.pq_key_auths )  k.first.validate();
+      for( const auto& k : op.active.pq_key_auths ) k.first.validate();
+   }
+
    if( op.extensions.value.owner_special_authority.valid() )
       evaluate_special_authority( d, *op.extensions.value.owner_special_authority );
    if( op.extensions.value.active_special_authority.valid() )
@@ -266,6 +291,32 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_update_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_update_auth_account_not_found )
+
+   // PQ gate: reject pq_key_auths and pq_memo_key before activation
+   {
+      const auto& gpo_params = d.get_global_properties().parameters;
+      if( !HARDFORK_PQ_0_PASSED(d.head_block_time())
+          || !gpo_params.extensions.value.pq_serialization_active.valid()
+          || !*gpo_params.extensions.value.pq_serialization_active )
+      {
+         if( o.owner )
+            FC_ASSERT( o.owner->pq_key_auths.empty(),
+                       "Post-quantum key authorities are not yet active" );
+         if( o.active )
+            FC_ASSERT( o.active->pq_key_auths.empty(),
+                       "Post-quantum key authorities are not yet active" );
+         // See account_create_evaluator::do_evaluate for why this is rejected, not ignored.
+         if( o.new_options )
+            FC_ASSERT( !o.new_options->pq_memo_key.valid(),
+                       "Post-quantum memo keys are not yet active" );
+      }
+      // See account_create_evaluator::do_evaluate for why this is validated here rather than
+      // deferred to first use.
+      if( o.owner )
+         for( const auto& k : o.owner->pq_key_auths )  k.first.validate();
+      if( o.active )
+         for( const auto& k : o.active->pq_key_auths ) k.first.validate();
+   }
 
    if( o.extensions.value.owner_special_authority.valid() )
       evaluate_special_authority( d, *o.extensions.value.owner_special_authority );

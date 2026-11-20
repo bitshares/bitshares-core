@@ -1,0 +1,24 @@
+// Post-Quantum (ML-DSA) hardfork — enables pq_key_auths, pq_signatures,
+// witness_pq_signature, and pq_serialization_active committee param.
+// Placeholder date — the real value is set by the committee when the
+// feature is scheduled for a particular network.
+//
+// SIZING NOTE (verified on a devnet, see below for what does NOT apply):
+// An ML-DSA-65 public key is 1952 bytes and a signature is 3309 bytes.
+// PQ *signatures* do NOT count against `maximum_transaction_size`: that check
+// uses transaction::get_packed_size(), which packs only the transaction body
+// (ref_block_num, ref_block_prefix, expiration, operations, extensions) and
+// excludes both classical and PQ signatures. A PQ-signed transfer carrying a
+// 5261-byte signature was accepted on a devnet with maximum_transaction_size
+// set to 4096.
+// What DOES count is any operation that embeds a PQ public key: each key adds
+// 1952 bytes to the operation body. migrate_wallet installs one in both the
+// active and the owner authority, so an account_update from it runs ~3.9 KB
+// and does not fit the historical 2048 default -- which is why
+// libraries/egenesis/genesis-pq.json raises maximum_transaction_size to 4096.
+// A chain enabling pq_serialization_active should make sure its own
+// `maximum_transaction_size` leaves room for these key-bearing operations.
+#ifndef HARDFORK_PQ_0_TIME
+#define HARDFORK_PQ_0_TIME                        (fc::time_point_sec( 1893456000 ))
+#define HARDFORK_PQ_0_PASSED(head_block_time)     (head_block_time >= HARDFORK_PQ_0_TIME)
+#endif

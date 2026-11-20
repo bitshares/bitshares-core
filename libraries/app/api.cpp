@@ -29,6 +29,7 @@
 #include "database_api_helper.hxx"
 
 #include <fc/crypto/base64.hpp>
+#include <fc/io/raw.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
 
@@ -135,8 +136,28 @@ namespace graphene { namespace app {
                                          [this](const signed_block& b){ on_applied_block(b); });
     }
 
+
+namespace {
+/// Wie in database_api: das ambiente fc::raw::pq_format ist ein thread_local mit Vorgabe
+/// `legacy`, und der API-Faden durchlaeuft nichts, was es setzt. trx.id() haengt daran, und
+/// eine im falschen Format berechnete ID trifft nie die, unter der die Kette die Transaktion
+/// im Block fuehrt -- der Rueckruf von broadcast_transaction_with_callback bliebe aus und
+/// broadcast_transaction_synchronous wartete endlos.
+inline fc::raw::pq_format pq_api_format( graphene::app::application& app )
+{
+   const auto db = app.chain_database();
+   return ( db && db->is_pq_serialization_active() ) ? fc::raw::pq_format::current
+                                                     : fc::raw::pq_format::legacy;
+}
+} // namespace
+
     void network_broadcast_api::on_applied_block( const signed_block& b )
     {
+       // Dieser Aufruf kommt heute aus der Blockanwendung und traegt deren Format bereits.
+       // Ausdruecklich gesetzt, damit die ID auf beiden Seiten des Rueckrufs aus derselben
+       // Quelle stammt und nicht davon abhaengt, aus welchem Faden gerufen wird.
+       fc::raw::scoped_pq_format pq_fmt( pq_api_format( _app ) );
+
        if( _callbacks.size() )
        {
           /// we need to ensure the database_api is not deleted for the life of the async operation
@@ -162,6 +183,7 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_transaction(const precomputable_transaction& trx)
     {
+       fc::raw::scoped_pq_format pq_fmt( pq_api_format( _app ) );
        FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( trx ).wait();
        _app.chain_database()->push_transaction(trx);
@@ -180,6 +202,7 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
     {
+       fc::raw::scoped_pq_format pq_fmt( pq_api_format( _app ) );
        FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( b ).wait();
        _app.chain_database()->push_block(b);
@@ -188,6 +211,7 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const precomputable_transaction& trx)
     {
+       fc::raw::scoped_pq_format pq_fmt( pq_api_format( _app ) );
        FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( trx ).wait();
        _callbacks[trx.id()] = cb;

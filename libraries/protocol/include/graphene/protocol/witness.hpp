@@ -43,6 +43,8 @@ namespace graphene { namespace protocol {
       account_id_type   witness_account;
       string            url;
       public_key_type   block_signing_key;
+      /// optional post-quantum (NIST FIPS 204 ML-DSA) block signing key
+      fc::pq_gated< optional< pq_public_key_type > > block_pq_signing_key;
 
       account_id_type fee_payer()const { return witness_account; }
       void            validate()const;
@@ -68,6 +70,8 @@ namespace graphene { namespace protocol {
       optional< string > new_url;
       /// The new block signing key.
       optional< public_key_type > new_signing_key;
+      /// The new post-quantum (NIST FIPS 204 ML-DSA) block signing key.
+      fc::pq_gated< optional< pq_public_key_type > > new_pq_signing_key;
 
       account_id_type fee_payer()const { return witness_account; }
       void            validate()const;
@@ -77,11 +81,43 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
+// The post-quantum signing keys are reflected -- so JSON, the API and the operation's
+// field-name machinery all see them -- but they are NOT part of the reflected binary
+// packing: fc::raw::pack/unpack for these two operations is written out by hand in
+// witness.cpp so that the new field only appears on the wire under the post-quantum
+// format, the same way authority gates pq_key_auths.
+//
+// Reflecting them for binary packing instead appends a field to the wire format of an
+// operation that has existed since genesis, unconditionally. Every historical block
+// containing a witness_create or witness_update operation then fails to deserialize,
+// because the reader looks for an optional that was never written and consumes a byte
+// belonging to the next field. That is not a post-activation problem: it breaks replay of
+// the existing chain immediately, so a node could not sync mainnet from genesis at all.
 FC_REFLECT( graphene::protocol::witness_create_operation::fee_params_t, (fee) )
-FC_REFLECT( graphene::protocol::witness_create_operation, (fee)(witness_account)(url)(block_signing_key) )
+FC_REFLECT( graphene::protocol::witness_create_operation, (fee)(witness_account)(url)(block_signing_key)(block_pq_signing_key) )
 
 FC_REFLECT( graphene::protocol::witness_update_operation::fee_params_t, (fee) )
-FC_REFLECT( graphene::protocol::witness_update_operation, (fee)(witness)(witness_account)(new_url)(new_signing_key) )
+FC_REFLECT( graphene::protocol::witness_update_operation, (fee)(witness)(witness_account)(new_url)(new_signing_key)(new_pq_signing_key) )
+
+namespace fc { namespace raw {
+   void pack( datastream<size_t>& s, const graphene::protocol::witness_create_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( sha256::encoder& s, const graphene::protocol::witness_create_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( datastream<char*>& s, const graphene::protocol::witness_create_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void unpack( datastream<const char*>& s, graphene::protocol::witness_create_operation& v,
+                uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+
+   void pack( datastream<size_t>& s, const graphene::protocol::witness_update_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( sha256::encoder& s, const graphene::protocol::witness_update_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void pack( datastream<char*>& s, const graphene::protocol::witness_update_operation& v,
+              uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+   void unpack( datastream<const char*>& s, graphene::protocol::witness_update_operation& v,
+                uint32_t _max_depth = FC_PACK_MAX_DEPTH );
+} } // namespace fc::raw
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::witness_create_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::witness_update_operation::fee_params_t )

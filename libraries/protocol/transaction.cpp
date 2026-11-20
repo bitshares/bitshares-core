@@ -35,20 +35,23 @@ namespace graphene { namespace protocol {
 
 digest_type processed_transaction::merkle_digest()const
 {
+   // Deliberately no scoped_pq_format override here -- see declaration comment.
    digest_type::encoder enc;
    fc::raw::pack( enc, *this );
    return enc.result();
 }
 
-digest_type transaction::digest()const
+digest_type transaction::digest( fc::raw::pq_format fmt )const
 {
+   fc::raw::scoped_pq_format f( fmt );
    digest_type::encoder enc;
    fc::raw::pack( enc, *this );
    return enc.result();
 }
 
-digest_type transaction::sig_digest( const chain_id_type& chain_id )const
+digest_type transaction::sig_digest( const chain_id_type& chain_id, fc::raw::pq_format fmt )const
 {
+   fc::raw::scoped_pq_format f( fmt );
    digest_type::encoder enc;
    fc::raw::pack( enc, chain_id );
    fc::raw::pack( enc, *this );
@@ -69,24 +72,52 @@ uint64_t transaction::get_packed_size() const
 
 const transaction_id_type& transaction::id() const
 {
-   auto h = digest();
+   // Explicitly pass the ambient format rather than calling digest() with its own default:
+   // digest()'s default parameter value is a fixed compile-time constant, so calling it with
+   // no argument would silently ignore whatever fc::raw::scoped_pq_format the caller (e.g.
+   // database::_apply_transaction / _precompute_parallel) has already set up from chain
+   // state -- exactly the bug class described in transaction::sig_digest()'s callers. Without
+   // this, two transactions differing only in an embedded authority's pq_key_auths content
+   // could silently hash to the same id() once legacy format is in play, since legacy format
+   // omits pq_key_auths from the packed bytes entirely.
+   auto h = digest( fc::raw::get_pq_format() );
    memcpy(_tx_id_buffer._hash, h._hash, std::min(sizeof(_tx_id_buffer), sizeof(h)));
    return _tx_id_buffer;
 }
 
-const signature_type& graphene::protocol::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id)
+const signature_type& graphene::protocol::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id,
+                                                                      fc::raw::pq_format fmt)
 {
-   digest_type h = sig_digest( chain_id );
+   digest_type h = sig_digest( chain_id, fmt );
    signatures.push_back(key.sign_compact(h));
    return signatures.back();
 }
 
-signature_type graphene::protocol::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id)const
+signature_type graphene::protocol::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id,
+                                                              fc::raw::pq_format fmt)const
 {
+   fc::raw::scoped_pq_format f( fmt );
    digest_type::encoder enc;
    fc::raw::pack( enc, chain_id );
    fc::raw::pack( enc, *this );
    return key.sign_compact(enc.result());
+}
+
+
+const pq_signature& graphene::protocol::signed_transaction::sign_pq(const fc::pq_private_key& key, const chain_id_type& chain_id,
+                                                                      fc::raw::pq_format fmt)
+{
+   pq_signatures.push_back( static_cast<const signed_transaction&>(*this).sign_pq( key, chain_id, fmt ) );
+   return pq_signatures.back();
+}
+
+pq_signature graphene::protocol::signed_transaction::sign_pq(const fc::pq_private_key& key, const chain_id_type& chain_id,
+                                                               fc::raw::pq_format fmt)const
+{
+   pq_signature result;
+   result.key = pq_public_key_type( key.get_public_key() );
+   result.signature = key.sign( sig_digest( chain_id, fmt ) );
+   return result;
 }
 
 void transaction::set_expiration( fc::time_point_sec expiration_time )
@@ -113,6 +144,7 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active,
 
 
 const flat_set<public_key_type> empty_keyset;
+const flat_set<pq_public_key_type> empty_pq_keyset;
 
 struct sign_state
 {
@@ -132,7 +164,18 @@ struct sign_state
          return itr->second = true;
       }
 
+      bool signed_by( const pq_public_key_type& k )
+      {
+         auto itr = provided_pq_signatures.find(k);
+         if( itr == provided_pq_signatures.end() )
+            return false;
+         return itr->second = true;
+      }
+
       optional<map<address,public_key_type>> available_address_sigs;
+      /// Addresses of the PQ signatures actually provided. Only ever populated when PQ
+      /// signatures are allowed at all, which is what keeps pre-hardfork behaviour identical.
+      optional<map<address,pq_public_key_type>> provided_pq_address_sigs;
       optional<map<address,public_key_type>> provided_address_sigs;
 
       bool signed_by( const address& a ) {
@@ -153,7 +196,24 @@ struct sign_state
              (*provided_address_sigs)[ address(pts_address(item.first, true, 0) ) ] = item.first;
              (*provided_address_sigs)[ address(item.first) ] = item.first;
             }
+
+            // An address auth names a hash, not a key type. A PQ key hashing to that address
+            // satisfies it exactly as a classic key does -- otherwise an account protected by
+            // address_auths could never be moved to post-quantum keys at all, and would stay
+            // quantum-vulnerable no matter what else it did.
+            //
+            // Only the pts_address variants are omitted: those encode a secp256k1-specific
+            // legacy format from the PTS import and have no meaning for an ML-DSA key.
+            provided_pq_address_sigs = std::map<address,pq_public_key_type>();
+            for( auto& item : provided_pq_signatures )
+             (*provided_pq_address_sigs)[ address(item.first) ] = item.first;
          }
+         // A PQ signature satisfying this address counts before anything else is considered:
+         // it is a signature that was actually provided, which is the strongest evidence here.
+         auto pq_itr = provided_pq_address_sigs->find(a);
+         if( pq_itr != provided_pq_address_sigs->end() )
+            return provided_pq_signatures[pq_itr->second] = true;
+
          auto itr = provided_address_sigs->find(a);
          if( itr == provided_address_sigs->end() )
          {
@@ -164,6 +224,13 @@ struct sign_state
                   return provided_signatures[aitr->second] = true;
                return false;
             }
+            // Nothing provided and nothing available: the address is simply not signed for.
+            // Upstream falls through to the line below and dereferences an end() iterator,
+            // which is undefined behaviour that happens to yield `true` on libstdc++ -- i.e.
+            // it would report an unsigned address auth as satisfied. Unreachable today,
+            // because account_create/account_update::validate() reject address_auths outright
+            // so no account can carry one, but it is on the path this test exercises.
+            return false;
          }
          return provided_signatures[itr->second] = true;
       }
@@ -185,6 +252,14 @@ struct sign_state
 
          uint32_t total_weight = 0;
          for( const auto& k : auth.key_auths )
+            if( signed_by( k.first ) )
+            {
+               total_weight += k.second;
+               if( total_weight >= auth.weight_threshold )
+                  return true;
+            }
+
+         for( const auto& k : auth.pq_key_auths )
             if( signed_by( k.first ) )
             {
                total_weight += k.second;
@@ -234,7 +309,18 @@ struct sign_state
          for( auto& sig : remove_sigs )
             provided_signatures.erase(sig);
 
-         return remove_sigs.size() != 0;
+         // Mirror the same "unused signature is irrelevant" check for PQ signatures. Without
+         // this, a transaction could carry an extra PQ signature from a key not required by
+         // any authority and verify_authority() would never flag it via tx_irrelevant_sig,
+         // unlike the equivalent classical-key case just above.
+         vector<pq_public_key_type> remove_pq_sigs;
+         for( const auto& sig : provided_pq_signatures )
+            if( !sig.second ) remove_pq_sigs.push_back( sig.first );
+
+         for( auto& sig : remove_pq_sigs )
+            provided_pq_signatures.erase(sig);
+
+         return remove_sigs.size() != 0 || remove_pq_sigs.size() != 0;
       }
 
       sign_state( const flat_set<public_key_type>& sigs,
@@ -242,7 +328,8 @@ struct sign_state
                   const std::function<const authority*(account_id_type)>& owner,
                   bool allow_owner,
                   uint32_t max_recursion_depth = GRAPHENE_MAX_SIG_CHECK_DEPTH,
-                  const flat_set<public_key_type>& keys = empty_keyset )
+                  const flat_set<public_key_type>& keys = empty_keyset,
+                  const flat_set<pq_public_key_type>& pq_sigs = empty_pq_keyset )
       :  get_active(active),
          get_owner(owner),
          allow_non_immediate_owner(allow_owner),
@@ -251,6 +338,8 @@ struct sign_state
       {
          for( const auto& key : sigs )
             provided_signatures[ key ] = false;
+         for( const auto& key : pq_sigs )
+            provided_pq_signatures[ key ] = false;
          approved_by.insert( GRAPHENE_TEMP_ACCOUNT  );
       }
 
@@ -262,6 +351,7 @@ struct sign_state
       const flat_set<public_key_type>& available_keys;
 
       flat_map<public_key_type,bool>   provided_signatures;
+      flat_map<pq_public_key_type,bool> provided_pq_signatures;
       flat_set<account_id_type>        approved_by;
 };
 
@@ -274,8 +364,10 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
                        bool ignore_custom_operation_required_auths,
                        uint32_t max_recursion_depth,
                        bool  allow_committee,
+                       bool  allow_pq,
                        const flat_set<account_id_type>& active_aprovals,
-                       const flat_set<account_id_type>& owner_approvals )
+                       const flat_set<account_id_type>& owner_approvals,
+                       const flat_set<pq_public_key_type>& pq_sigs )
 {
    rejected_predicate_map rejected_custom_auths;
    try {
@@ -283,7 +375,9 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    flat_set<account_id_type> required_owner;
    vector<authority> other;
 
-   sign_state s( sigs, get_active, get_owner, allow_non_immediate_owner, max_recursion_depth );
+   const flat_set<pq_public_key_type>& effective_pq_sigs = allow_pq ? pq_sigs : empty_pq_keyset;
+
+   sign_state s( sigs, get_active, get_owner, allow_non_immediate_owner, max_recursion_depth, empty_keyset, effective_pq_sigs );
    for( auto& id : active_aprovals )
       s.approved_by.insert( id );
    for( auto& id : owner_approvals )
@@ -347,9 +441,10 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 } FC_CAPTURE_AND_RETHROW( (rejected_custom_auths)(ops)(sigs) ) }
 
 
-const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
+const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id,
+                                                                         fc::raw::pq_format fmt )const
 { try {
-   auto d = sig_digest( chain_id );
+   auto d = sig_digest( chain_id, fmt );
    flat_set<public_key_type> result;
    for( const auto&  sig : signatures )
    {
@@ -447,17 +542,39 @@ void precomputable_transaction::validate() const
 
 uint64_t precomputable_transaction::get_packed_size()const
 {
-   if( _packed_size == 0 )
+   // Post-quantum: the packed size counts the post-quantum fields only under the current
+   // format, so a size cached under one format is wrong under the other. That matters
+   // beyond bookkeeping -- this feeds fee calculation and the per-block size accounting, so
+   // a stale value makes nodes disagree about what a transaction costs and whether a block
+   // is over its limit. A transaction precomputed while it sat in the pending pool before
+   // activation, then re-applied after it, would hit exactly that.
+   const auto current_fmt = fc::raw::get_pq_format();
+   if( _packed_size == 0 || _packed_size_format != current_fmt )
+   {
+      _packed_size_format = current_fmt;
       _packed_size = transaction::get_packed_size();
+   }
    return _packed_size;
 }
 
-const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( const chain_id_type& chain_id )const
+const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( const chain_id_type& chain_id,
+                                                                                 fc::raw::pq_format fmt )const
 {
    // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
    // However, we don't pass in another chain ID so far, for better performance, we skip the check.
-   if( _signees.empty() )
-      signed_transaction::get_signature_keys( chain_id );
+   //
+   // Post-quantum: the format, unlike the chain id, genuinely does vary between calls, and
+   // it cannot be skipped. sig_digest() hashes different bytes under each format, so the
+   // public keys recovered from the signatures differ too. Caching on "empty?" alone would
+   // let a set recovered under the wrong format persist and be handed to the authority
+   // checks, which is a wrong answer about who signed a transaction rather than merely a
+   // stale one.
+   if( _signees.empty() || _signees_format != fmt )
+   {
+      _signees_format = fmt;
+      _signees.clear();
+      signed_transaction::get_signature_keys( chain_id, fmt );
+   }
    return _signees;
 }
 
@@ -469,12 +586,111 @@ void signed_transaction::verify_authority( const chain_id_type& chain_id,
                                            bool ignore_custom_operation_required_auths,
                                            uint32_t max_recursion )const
 { try {
-   graphene::protocol::verify_authority( operations, get_signature_keys( chain_id ), get_active, get_owner,
+   const auto fmt = fc::raw::get_pq_format();
+   const digest_type d = sig_digest( chain_id, fmt );
+   flat_set<pq_public_key_type> pq_keys;
+   for( const auto& sig : pq_signatures )
+   {
+      GRAPHENE_ASSERT(
+         sig.key.to_pqc().verify( d, sig.signature ),
+         tx_invalid_pq_signature,
+         "Invalid post-quantum signature" );
+      GRAPHENE_ASSERT(
+         pq_keys.insert( sig.key ).second,
+         tx_duplicate_sig,
+         "Duplicate post-quantum signature detected" );
+   }
+   graphene::protocol::verify_authority( operations, get_signature_keys( chain_id, fmt ), get_active, get_owner,
                                          get_custom, allow_non_immediate_owner,
-                                         ignore_custom_operation_required_auths, max_recursion );
+                                         ignore_custom_operation_required_auths, max_recursion,
+                                         false, true, flat_set<account_id_type>(), flat_set<account_id_type>(), pq_keys );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::protocol
+
+
+namespace fc { namespace raw {
+
+namespace detail {
+
+template<typename Stream>
+void pack_signed_transaction_impl( Stream& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::pack( s, static_cast<const graphene::protocol::transaction&>(v), _max_depth );
+   fc::raw::pack( s, v.signatures, _max_depth );
+   // No format check here any more: pq_signatures is an fc::pq_gated, which gates itself on
+   // every path. The check used to live here, and the reflected packer -- which knows nothing
+   // about it -- disagreed.
+   fc::raw::pack( s, v.pq_signatures, _max_depth );
+}
+
+template<typename Stream>
+void unpack_signed_transaction_impl( Stream& s, graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+{ try {
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::unpack( s, static_cast<graphene::protocol::transaction&>(v), _max_depth );
+   fc::raw::unpack( s, v.signatures, _max_depth );
+   fc::raw::unpack( s, v.pq_signatures, _max_depth );
+} FC_RETHROW_EXCEPTIONS( warn, "error unpacking signed_transaction" ) }
+
+template<typename Stream>
+void pack_processed_transaction_impl( Stream& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   detail::pack_signed_transaction_impl( s, static_cast<const graphene::protocol::signed_transaction&>(v), _max_depth );
+   fc::raw::pack( s, v.operation_results, _max_depth );
+}
+
+template<typename Stream>
+void unpack_processed_transaction_impl( Stream& s, graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+{ try {
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   detail::unpack_signed_transaction_impl( s, static_cast<graphene::protocol::signed_transaction&>(v), _max_depth );
+   fc::raw::unpack( s, v.operation_results, _max_depth );
+} FC_RETHROW_EXCEPTIONS( warn, "error unpacking processed_transaction" ) }
+
+} // namespace detail
+
+void pack( datastream<size_t>& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, v, _max_depth ); }
+void pack( sha256::encoder& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, v, _max_depth ); }
+void pack( datastream<char*>& s, const graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, v, _max_depth ); }
+void unpack( datastream<const char*>& s, graphene::protocol::signed_transaction& v, uint32_t _max_depth )
+   { detail::unpack_signed_transaction_impl( s, v, _max_depth ); }
+
+void pack( datastream<size_t>& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, static_cast<const graphene::protocol::signed_transaction&>(v), _max_depth ); }
+void pack( sha256::encoder& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, static_cast<const graphene::protocol::signed_transaction&>(v), _max_depth ); }
+void pack( datastream<char*>& s, const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth )
+   { detail::pack_signed_transaction_impl( s, static_cast<const graphene::protocol::signed_transaction&>(v), _max_depth ); }
+void unpack( datastream<const char*>& s, graphene::protocol::precomputable_transaction& v, uint32_t _max_depth )
+   { detail::unpack_signed_transaction_impl( s, static_cast<graphene::protocol::signed_transaction&>(v), _max_depth ); }
+
+void pack( datastream<size_t>& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+   { detail::pack_processed_transaction_impl( s, v, _max_depth ); }
+void pack( sha256::encoder& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+   { detail::pack_processed_transaction_impl( s, v, _max_depth ); }
+void pack( datastream<char*>& s, const graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+   { detail::pack_processed_transaction_impl( s, v, _max_depth ); }
+void unpack( datastream<const char*>& s, graphene::protocol::processed_transaction& v, uint32_t _max_depth )
+   { detail::unpack_processed_transaction_impl( s, v, _max_depth ); }
+
+template std::vector<char> pack( const graphene::protocol::signed_transaction& v, uint32_t _max_depth );
+template std::vector<char> pack( const graphene::protocol::precomputable_transaction& v, uint32_t _max_depth );
+template std::vector<char> pack( const graphene::protocol::processed_transaction& v, uint32_t _max_depth );
+template size_t pack_size( const graphene::protocol::signed_transaction& v );
+template size_t pack_size( const graphene::protocol::precomputable_transaction& v );
+template size_t pack_size( const graphene::protocol::processed_transaction& v );
+
+} } // namespace fc::raw
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transaction)
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::signed_transaction)

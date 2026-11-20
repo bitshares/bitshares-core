@@ -54,6 +54,12 @@ void custom_authority_create_operation::validate()const {
    FC_ASSERT(auth.address_auths.size() == 0, "Address authorities are not supported");
    FC_ASSERT(!auth.is_impossible(), "Cannot use an imposible authority threshold");
 
+   // Same reason the account evaluators validate their pq_key_auths: raw deserialization of a
+   // pq_public_key_type checks nothing, so without this a key of the wrong length would be
+   // committed to chain state and only fail at the first to_pqc(), an arbitrary block later.
+   // A custom authority carries an ordinary `authority`, so it inherits the same obligation.
+   for( const auto& k : auth.pq_key_auths ) k.first.validate();
+
    // Validate restrictions by constructing a predicate for them; this throws if restrictions aren't valid
    get_restriction_predicate(restrictions, operation_type);
 }
@@ -81,6 +87,7 @@ void custom_authority_update_operation::validate()const {
    if (new_auth) {
       FC_ASSERT(!new_auth->is_impossible(), "Cannot use an impossible authority threshold");
       FC_ASSERT(new_auth->address_auths.size() == 0, "Address auth is not supported");
+      for( const auto& k : new_auth->pq_key_auths ) k.first.validate();
    }
    FC_ASSERT( new_enabled.valid() || new_valid_from.valid() || new_valid_to.valid() || new_auth.valid()
               || !restrictions_to_remove.empty() || !restrictions_to_add.empty(),

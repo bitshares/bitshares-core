@@ -206,6 +206,7 @@ public:
       ilog("${name} get_chain_id was called", ("name",node_name));
       return chain_id;
    }
+   bool is_pq_active() const { return false; }
    std::vector<graphene::net::item_hash_t> get_blockchain_synopsis(
          const graphene::net::item_hash_t& reference_point,
          uint32_t number_of_blocks_after_reference_point)

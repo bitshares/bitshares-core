@@ -2502,8 +2502,24 @@ std::string database_api::get_transaction_hex(const signed_transaction& trx)cons
    return my->get_transaction_hex( trx );
 }
 
+
+namespace {
+/// Das Serialisierungsformat, in dem die verbundene Kette gerade arbeitet.
+inline fc::raw::pq_format pq_api_format( const graphene::chain::database& db )
+{
+   return db.is_pq_serialization_active() ? fc::raw::pq_format::current
+                                          : fc::raw::pq_format::legacy;
+}
+} // namespace
+
 std::string database_api_impl::get_transaction_hex(const signed_transaction& trx)const
 {
+   // Alles, was eine Transaktion ausserhalb der Blockanwendung packt, muss das
+   // Serialisierungsformat der Kette selbst setzen: das ambiente fc::raw::pq_format ist
+   // ein thread_local mit Vorgabe `legacy`, und der API-Faden durchlaeuft nichts, was es
+   // setzt. Ohne diese Zeile misst und rechnet die API im alten Format, waehrend die
+   // Kette im neuen abrechnet.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    return fc::to_hex(fc::raw::pack(trx));
 }
 
@@ -2516,6 +2532,12 @@ std::string database_api::get_transaction_hex_without_sig(
 std::string database_api_impl::get_transaction_hex_without_sig(
    const transaction &trx) const
 {
+   // Alles, was eine Transaktion ausserhalb der Blockanwendung packt, muss das
+   // Serialisierungsformat der Kette selbst setzen: das ambiente fc::raw::pq_format ist
+   // ein thread_local mit Vorgabe `legacy`, und der API-Faden durchlaeuft nichts, was es
+   // setzt. Ohne diese Zeile misst und rechnet die API im alten Format, waehrend die
+   // Kette im neuen abrechnet.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    return fc::to_hex(fc::raw::pack(trx));
 }
 
@@ -2528,6 +2550,12 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx,
                                                             const flat_set<public_key_type>& available_keys )const
 {
+   // Alles, was eine Transaktion ausserhalb der Blockanwendung packt, muss das
+   // Serialisierungsformat der Kette selbst setzen: das ambiente fc::raw::pq_format ist
+   // ein thread_local mit Vorgabe `legacy`, und der API-Faden durchlaeuft nichts, was es
+   // setzt. Ohne diese Zeile misst und rechnet die API im alten Format, waehrend die
+   // Kette im neuen abrechnet.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    auto chain_time = _db.head_block_time();
    bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
    bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
@@ -2552,6 +2580,12 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
+   // Alles, was eine Transaktion ausserhalb der Blockanwendung packt, muss das
+   // Serialisierungsformat der Kette selbst setzen: das ambiente fc::raw::pq_format ist
+   // ein thread_local mit Vorgabe `legacy`, und der API-Faden durchlaeuft nichts, was es
+   // setzt. Ohne diese Zeile misst und rechnet die API im alten Format, waehrend die
+   // Kette im neuen abrechnet.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    auto chain_time = _db.head_block_time();
    bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
    bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
@@ -2625,6 +2659,12 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
+   // Alles, was eine Transaktion ausserhalb der Blockanwendung packt, muss das
+   // Serialisierungsformat der Kette selbst setzen: das ambiente fc::raw::pq_format ist
+   // ein thread_local mit Vorgabe `legacy`, und der API-Faden durchlaeuft nichts, was es
+   // setzt. Ohne diese Zeile misst und rechnet die API im alten Format, waehrend die
+   // Kette im neuen abrechnet.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
@@ -2645,6 +2685,8 @@ bool database_api::verify_account_authority( const string& account_name_or_id,
 bool database_api_impl::verify_account_authority( const string& account_name_or_id,
       const flat_set<public_key_type>& keys )const
 {
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
+
    // create a dummy transfer
    transfer_operation op;
    op.from = get_account_from_string(account_name_or_id)->get_id();
@@ -2743,6 +2785,10 @@ struct get_required_fees_helper
 vector< fc::variant > database_api_impl::get_required_fees( const vector<operation>& ops,
                                                             const std::string& asset_id_or_symbol )const
 {
+   // Siehe get_transaction_hex: das ambiente Format ist thread_local und steht im
+   // API-Faden auf `legacy`. Die Gebuehr groessenbepreister Operationen faellt sonst zu
+   // niedrig aus, und die Kette lehnt die Transaktion mit "insufficient fee" ab.
+   fc::raw::scoped_pq_format pq_fmt( pq_api_format( _db ) );
    vector< operation > _ops = ops;
    //
    // we copy the ops because we need to mutate an operation to reliably

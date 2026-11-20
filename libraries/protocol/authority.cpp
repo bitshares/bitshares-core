@@ -39,4 +39,55 @@ void add_authority_accounts(
 
 } } // graphene::protocol
 
+
+namespace fc { namespace raw {
+
+namespace detail {
+
+template<typename Stream>
+void pack_authority_impl( Stream& s, const graphene::protocol::authority& v, uint32_t _max_depth )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::pack( s, v.weight_threshold, _max_depth );
+   fc::raw::pack( s, v.account_auths, _max_depth );
+   fc::raw::pack( s, v.key_auths, _max_depth );
+   if( fc::raw::get_pq_format() == fc::raw::pq_format::current )
+      fc::raw::pack( s, v.pq_key_auths, _max_depth );
+   fc::raw::pack( s, v.address_auths, _max_depth );
+}
+
+template<typename Stream>
+void unpack_authority_impl( Stream& s, graphene::protocol::authority& v, uint32_t _max_depth )
+{ try {
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   fc::raw::unpack( s, v.weight_threshold, _max_depth );
+   fc::raw::unpack( s, v.account_auths, _max_depth );
+   fc::raw::unpack( s, v.key_auths, _max_depth );
+   if( fc::raw::get_pq_format() == fc::raw::pq_format::current )
+      fc::raw::unpack( s, v.pq_key_auths, _max_depth );
+   else
+      v.pq_key_auths.clear();
+   fc::raw::unpack( s, v.address_auths, _max_depth );
+} FC_RETHROW_EXCEPTIONS( warn, "error unpacking authority" ) }
+
+} // namespace detail
+
+void pack( datastream<size_t>& s, const graphene::protocol::authority& v, uint32_t _max_depth )
+   { detail::pack_authority_impl( s, v, _max_depth ); }
+void pack( sha256::encoder& s, const graphene::protocol::authority& v, uint32_t _max_depth )
+   { detail::pack_authority_impl( s, v, _max_depth ); }
+void pack( datastream<char*>& s, const graphene::protocol::authority& v, uint32_t _max_depth )
+   { detail::pack_authority_impl( s, v, _max_depth ); }
+void unpack( datastream<const char*>& s, graphene::protocol::authority& v, uint32_t _max_depth )
+   { detail::unpack_authority_impl( s, v, _max_depth ); }
+
+// Explicitly instantiate the 1-arg vector pack + pack_size so the extern
+// template in other TUs resolve here.
+template std::vector<char> pack( const graphene::protocol::authority& v, uint32_t _max_depth );
+template size_t pack_size( const graphene::protocol::authority& v );
+
+} } // namespace fc::raw
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::authority )

@@ -78,6 +78,12 @@ struct member_visitor
       proc->process_class( (const Member*) nullptr );
    }
 
+   // FC_REFLECT_ENUM visits each enum value with (name, int64_t value)
+   void operator()( const char* name, int64_t )const
+   {
+      members.emplace_back( name );
+   }
+
    class_processor* proc;
    mutable std::vector< std::string > members;
 };
