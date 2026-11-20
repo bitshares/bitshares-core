@@ -78,6 +78,19 @@ struct member_visitor
       proc->process_class( (const Member*) nullptr );
    }
 
+   /// The enum form. FC_REFLECT_ENUM's visitor passes a name and the enumerator's value,
+   /// while FC_REFLECT passes only a name -- so a reflected enum used directly as a struct
+   /// member instantiates a two-argument call that the one-argument overload above cannot
+   /// satisfy, and the build helper stops compiling. No struct in this tree had such a
+   /// member until oracle_options::aggregation, which is why the gap went unnoticed.
+   ///
+   /// Recording the enumerator name and stopping there is deliberate: an enum value is not
+   /// a class, so there is nothing further to descend into.
+   void operator()( const char* name, int64_t )const
+   {
+      members.emplace_back( name );
+   }
+
    class_processor* proc;
    mutable std::vector< std::string > members;
 };

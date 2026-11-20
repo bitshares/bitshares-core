@@ -413,6 +413,27 @@ namespace graphene { namespace chain {
           * @note Called by @ref database::update_bitasset_current_feed() which updates @ref current_feed afterwards.
           */
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
+
+         /**
+          * Replaces @ref median_feed from a bound oracle instead of from @ref feeds.
+          *
+          * @param current_time the head block time
+          * @param oracle_value the oracle's current value, or absent when it has none
+          *
+          * An oracle supplies only a settlement price. MCR, MSSR and ICR come from this
+          * asset's own options (BSIP-75/77 already let the owner set them directly), and the
+          * core exchange rate is left null so that the issuer's own
+          * `asset_options::core_exchange_rate` continues to apply -- an oracle publishes a
+          * market price, not a fee-conversion rate, and inventing one from the settlement
+          * price would silently change how fees are charged.
+          *
+          * An absent @p oracle_value produces the same null feed the legacy path produces
+          * when too few feeds are live, so every downstream consumer already handles it.
+          */
+         /// @param value_time when the oracle's aggregate was formed -- NOT the current time.
+         ///        See the definition: stamping "now" makes the feed unexpirable.
+         void update_feed_from_oracle( time_point_sec value_time,
+                                       const optional<price>& oracle_value );
       private:
          /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
          /// other member variables.

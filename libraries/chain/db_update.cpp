@@ -29,6 +29,7 @@
 #include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/oracle_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -301,14 +302,44 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
 
    const auto& head_time = head_block_time();
 
+   // Resolve a bound oracle before entering modify(), which cannot look objects up. The field
+   // can only be set after HARDFORK_ORACLE (see the asset_update_bitasset evaluator), so for
+   // every asset on chain today this stays absent and the legacy path below is unchanged.
+   const auto& bound_oracle = bitasset.options.extensions.value.price_oracle_id;
+   const bool oracle_bound = bound_oracle.valid();
+   optional<price> oracle_value;
+   // Defaults to head time so an absent value still produces a feed stamped "now", which is
+   // the same unusable-but-current state the legacy path reaches with too few publishers.
+   time_point_sec oracle_value_time = head_time;
+   if( oracle_bound )
+   {
+      const oracle_object* o = find( *bound_oracle );
+      // A bound oracle cannot be deleted (oracle_delete refuses while subscribers remain), but
+      // read defensively: a missing oracle means "no value", never a stale or invented one.
+      //
+      // Freshness is checked HERE rather than trusted from current_value, because that field
+      // is only recomputed when a producer publishes. An oracle whose producers all stopped
+      // keeps its last aggregate for ever, so asking is_value_live is the only thing that
+      // distinguishes a current price from one that expired months ago.
+      if( nullptr != o && o->is_value_live( head_time ) )
+      {
+         oracle_value = o->current_value;
+         oracle_value_time = o->current_value_time;
+      }
+   }
+
    // We need to update the database
-   modify( bitasset, [this, skip_median_update, &head_time, &new_current_feed_price, &bsrm]
+   modify( bitasset, [this, skip_median_update, &head_time, &new_current_feed_price, &bsrm,
+                      oracle_bound, &oracle_value, oracle_value_time]
                      ( asset_bitasset_data_object& abdo )
    {
       if( !skip_median_update )
       {
          const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
-         abdo.update_median_feeds( head_time, maint_time );
+         if( oracle_bound )
+            abdo.update_feed_from_oracle( oracle_value_time, oracle_value );
+         else
+            abdo.update_median_feeds( head_time, maint_time );
          abdo.current_feed = abdo.median_feed;
          if( bsrm_type::no_settlement == bsrm || bsrm_type::individual_settlement_to_fund == bsrm )
             new_current_feed_price = get_derived_current_feed_price( *this, abdo );

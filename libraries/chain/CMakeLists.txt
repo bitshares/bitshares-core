@@ -40,6 +40,8 @@ add_library( graphene_chain
              liquidity_pool_evaluator.cpp
              samet_fund_evaluator.cpp
              credit_offer_evaluator.cpp
+             oracle_evaluator.cpp
+             oracle_object.cpp
              balance_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp

@@ -30,6 +30,7 @@
 #include <graphene/protocol/committee_member.hpp>
 #include <graphene/protocol/confidential.hpp>
 #include <graphene/protocol/credit_offer.hpp>
+#include <graphene/protocol/oracle.hpp>
 #include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
@@ -130,7 +131,11 @@ namespace graphene { namespace protocol {
             /* 74 */ credit_deal_expired_operation,   // VIRTUAL
             /* 75 */ liquidity_pool_update_operation,
             /* 76 */ credit_deal_update_operation,
-            /* 77 */ limit_order_update_operation
+            /* 77 */ limit_order_update_operation,
+            /* 78 */ oracle_create_operation,
+            /* 79 */ oracle_update_operation,
+            /* 80 */ oracle_delete_operation,
+            /* 81 */ oracle_publish_operation
          >;
 
    /**

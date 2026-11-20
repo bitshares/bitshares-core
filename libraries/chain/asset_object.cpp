@@ -30,6 +30,49 @@
 
 namespace graphene { namespace chain {
 
+void asset_bitasset_data_object::update_feed_from_oracle( time_point_sec value_time,
+                                                         const optional<price>& oracle_value )
+{
+   // Stamp the feed with when the ORACLE VALUE was formed, not with the current time.
+   //
+   // Stamping it "now" on every maintenance cycle made the feed permanently unexpirable:
+   // feed_expiration_time() is current_feed_publication_time + feed_lifetime_sec, so a feed
+   // re-stamped every cycle can never age out. That removed, for oracle-bound assets only,
+   // the protection every other bitasset has -- a dead price feed expiring and taking margin
+   // calls with it. An asset whose oracle stopped publishing a year ago went on force-settling
+   // against the frozen price while reporting a perfectly current feed.
+   //
+   // With the real value time, an oracle that goes quiet lets the feed expire exactly as a
+   // silent set of feed producers would.
+   current_feed_publication_time = value_time;
+
+   // An oracle publishes a market price, not a fee-conversion rate. Leaving the feed's CER
+   // null keeps need_to_update_cer() false, so the issuer's own
+   // asset_options::core_exchange_rate keeps applying instead of being overwritten.
+   feed_cer_updated = false;
+
+   price_feed_with_icr new_feed;
+   if( oracle_value.valid() )
+   {
+      new_feed.settlement_price = *oracle_value;
+      // BSIP-75/77 already let the owner set these directly; an oracle does not supply them.
+      const auto& exts = options.extensions.value;
+      if( exts.maintenance_collateral_ratio.valid() )
+         new_feed.maintenance_collateral_ratio = *exts.maintenance_collateral_ratio;
+      if( exts.maximum_short_squeeze_ratio.valid() )
+         new_feed.maximum_short_squeeze_ratio = *exts.maximum_short_squeeze_ratio;
+      new_feed.initial_collateral_ratio = exts.initial_collateral_ratio.valid()
+                                        ? *exts.initial_collateral_ratio
+                                        : new_feed.maintenance_collateral_ratio;
+   }
+   // else: a default-constructed feed, with a null settlement price. Exactly the state the
+   // legacy path produces when fewer than minimum_feeds are live, so nothing downstream needs
+   // a new case for "the oracle has no value".
+
+   median_feed = new_feed;
+   refresh_cache();
+}
+
 share_type asset_bitasset_data_object::max_force_settlement_volume(share_type current_supply) const
 {
    if( 0 == options.maximum_force_settlement_volume )
