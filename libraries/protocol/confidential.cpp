@@ -29,6 +29,21 @@
 
 namespace graphene { namespace protocol {
 
+void verify_blind_output_range_proofs( const vector<blind_output>& outputs )
+{
+   for( const auto& out : outputs )
+   {
+      uint64_t min_val = 0;
+      uint64_t max_val = 0;
+      FC_ASSERT( fc::ecc::verify_range( min_val, max_val, out.commitment, out.range_proof ),
+                 "Blind output range proof failed verification",
+                 ("commitment", out.commitment) );
+      FC_ASSERT( max_val <= static_cast<uint64_t>( GRAPHENE_MAX_SHARE_SUPPLY ),
+                 "Blind output range exceeds maximum share supply",
+                 ("max_val", max_val)("commitment", out.commitment) );
+   }
+}
+
 void transfer_to_blind_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );

@@ -45,6 +45,8 @@ void_result transfer_to_blind_evaluator::do_evaluate( const transfer_to_blind_op
       for( const auto& a : out.owner.account_auths )
          a.first(d); // verify all accounts exist and are valid
    }
+   if( SOFTFORK_20261119_PASSED( d.head_block_time() ) )
+      verify_blind_output_range_proofs( o.outputs );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
@@ -139,6 +141,8 @@ void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operatio
       FC_ASSERT( itr->asset_id == o.fee.asset_id );
       FC_ASSERT( itr->owner == in.owner );
    }
+   if( SOFTFORK_20261119_PASSED( d.head_block_time() ) )
+      verify_blind_output_range_proofs( o.outputs );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

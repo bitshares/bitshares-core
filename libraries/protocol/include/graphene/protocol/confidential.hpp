@@ -258,6 +258,8 @@ struct blind_transfer_operation : public base_operation
    }
 };
 
+void verify_blind_output_range_proofs( const vector<blind_output>& outputs );
+
 ///@} endgroup stealth
 
 } } // graphene::protocol
