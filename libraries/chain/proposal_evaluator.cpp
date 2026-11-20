@@ -339,6 +339,10 @@ struct proposal_operation_hardfork_visitor
       if( SOFTFORK_20261119_PASSED(block_time) )
          verify_blind_output_range_proofs( op.outputs );
    }
+   void operator()(const graphene::chain::transfer_from_blind_operation& op) const {
+      if( SOFTFORK_20261119_PASSED(block_time) )
+         op.to(db);
+   }
 
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
