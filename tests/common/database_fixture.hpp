@@ -460,6 +460,12 @@ struct database_fixture_base {
    liquidity_pool_create_operation make_liquidity_pool_create_op( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent )const;
+
+   /// Creates a StableSwap pool with the given amplification coefficient.
+   const liquidity_pool_object& create_stable_liquidity_pool( account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent,
+                                                  uint64_t amplification );
    const liquidity_pool_object& create_liquidity_pool( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent );

@@ -38,6 +38,7 @@ add_library( graphene_chain
 
              evaluator.cpp
              liquidity_pool_evaluator.cpp
+             stableswap.cpp
              samet_fund_evaluator.cpp
              credit_offer_evaluator.cpp
              balance_evaluator.cpp
