@@ -27,8 +27,6 @@
 #include <graphene/net/node.hpp>
 #include <graphene/chain/database.hpp>
 
-#include <fc/network/http/websocket.hpp>
-
 #include <boost/program_options.hpp>
 
 namespace graphene { namespace app {
@@ -142,7 +140,7 @@ namespace graphene { namespace app {
 
          net::node_ptr                    p2p_node();
          std::shared_ptr<chain::database> chain_database()const;
-         std::shared_ptr<fc::http::websocket_server> websocket_server();
+         uint32_t                         get_websocket_port();
          void set_api_limit();
          void set_block_production(bool producing_blocks);
          fc::optional< api_access_info > get_api_access_info( const string& username )const;

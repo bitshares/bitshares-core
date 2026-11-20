@@ -486,9 +486,9 @@ BOOST_AUTO_TEST_CASE( five_node_network )
       BOOST_TEST_MESSAGE( "Scheduling app2 to shutdown" );
       auto node_shutdown_delay = fc::seconds(20);
       auto app2_shutdown_schedule = fc::schedule( [&p_app2,&app5,&port5]() {
+                 BOOST_TEST_MESSAGE( "Check if app5 is still waiting" );
                  port5 = app5.p2p_node()->network_get_info()["listening_on"].as<fc::ip::endpoint>( 5 ).port();
                  BOOST_CHECK_EQUAL( port5, 0 );
-                 BOOST_TEST_MESSAGE( "app5 is still waiting" );
                  BOOST_TEST_MESSAGE( "Shutting down app2" );
                  p_app2 = nullptr;
               },

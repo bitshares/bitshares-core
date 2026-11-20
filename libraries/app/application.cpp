@@ -1401,9 +1401,9 @@ net::node_ptr application::p2p_node()
    return my->_p2p_network;
 }
 
-std::shared_ptr<fc::http::websocket_server> application::websocket_server()
+uint32_t application::get_websocket_port()
 {
-   return my->_websocket_server;
+   return my->_websocket_server->get_listening_port();
 }
 
 std::shared_ptr<chain::database> application::chain_database() const
