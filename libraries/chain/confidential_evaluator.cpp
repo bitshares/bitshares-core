@@ -85,6 +85,8 @@ void_result transfer_from_blind_evaluator::do_evaluate( const transfer_from_blin
 { try {
    const auto& d = db();
    o.fee.asset_id(d);  // verify fee is a legit asset 
+   if( HARDFORK_CORE_2605_PASSED( d.head_block_time() ) )
+      o.to(d); // verify the destination account exists
    const auto& bbi = d.get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )

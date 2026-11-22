@@ -1,4 +1,5 @@
-// Verify range proofs on blind transfer outputs.
+// Verify range proofs on blind transfer outputs, and check that the
+// destination account of transfer_from_blind exists.
 // Placeholder activation time; schedule a final time before release.
 #ifndef HARDFORK_CORE_2605_TIME
 #define HARDFORK_CORE_2605_TIME (fc::time_point_sec( 4102444800 )) // Friday, January 1, 2100 00:00:00 UTC

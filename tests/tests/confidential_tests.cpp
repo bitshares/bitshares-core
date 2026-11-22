@@ -356,4 +356,95 @@ BOOST_AUTO_TEST_CASE( range_proofs_verified_after_hardfork )
 
 } FC_LOG_AND_RETHROW() }
 
+
+/**
+ * After HARDFORK_CORE_2605, transfer_from_blind checks that the destination
+ * account exists, both when pushed directly and when proposed.
+ */
+BOOST_AUTO_TEST_CASE( transfer_from_blind_destination_checked_after_hardfork )
+{ try {
+   ACTORS( (alice)(bob) );
+   const asset_object& core = asset_id_type()(db);
+   transfer( account_id_type(), alice_id, core.amount( 100000 ) );
+   const authority own = authority( 1, alice_public_key, 1 );
+
+   generate_blocks( HARDFORK_CORE_2605_TIME );
+   test::set_expiration( db, trx );
+   BOOST_REQUIRE( db.head_block_time() >= HARDFORK_CORE_2605_TIME );
+
+   // Fund a single blinded balance (a single output needs no range proof).
+   const auto blind = fc::sha256::hash( "from-blind-dest" );
+   blind_output out;
+   out.owner = own;
+   out.commitment = fc::ecc::blind( blind, 500 );
+   transfer_to_blind_operation to_blind;
+   to_blind.from = alice_id;
+   to_blind.amount = core.amount( 500 );
+   to_blind.blinding_factor = blind;
+   to_blind.outputs = { out };
+   to_blind.validate();
+   trx.clear();
+   trx.operations = { to_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 500 );
+
+   const account_id_type missing( 1000000 );
+   BOOST_REQUIRE( db.find( missing ) == nullptr );
+
+   transfer_from_blind_operation from_blind;
+   from_blind.fee = core.amount( 0 );
+   from_blind.amount = core.amount( 500 );
+   from_blind.to = missing;
+   from_blind.blinding_factor = blind;
+   from_blind.inputs.push_back( { out.commitment, out.owner } );
+   from_blind.validate();
+
+   // Rejected when pushed directly.
+   trx.clear();
+   trx.operations = { from_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 500 );
+
+   // Rejected when proposed. Proposals that need non-account authorities are
+   // refused later in proposal_create evaluation anyway; the destination check
+   // runs first, so the error must come from it.
+   const auto push_proposal_error = [&]( const transfer_from_blind_operation& op ) {
+      proposal_create_operation proposal;
+      proposal.fee_paying_account = alice_id;
+      proposal.expiration_time = db.head_block_time() + 100;
+      proposal.proposed_ops.emplace_back( op );
+      trx.clear();
+      trx.operations = { proposal };
+      test::set_expiration( db, trx );
+      sign( trx, alice_private_key );
+      try {
+         PUSH_TX( db, trx );
+      } catch( const fc::exception& e ) {
+         return e.to_detail_string();
+      }
+      BOOST_FAIL( "proposal unexpectedly accepted" );
+      return std::string();
+   };
+   const std::string non_account_auths = "non-account authorities";
+   BOOST_CHECK( push_proposal_error( from_blind ).find( non_account_auths ) == std::string::npos );
+
+   // With an existing destination the check passes and only the pre-existing rule rejects it.
+   from_blind.to = bob_id;
+   BOOST_CHECK( push_proposal_error( from_blind ).find( non_account_auths ) != std::string::npos );
+
+   // The same operation to an existing account is still accepted when pushed directly.
+   trx.clear();
+   trx.operations = { from_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 0 );
+   BOOST_REQUIRE_EQUAL( get_balance( bob_id, asset_id_type() ), 500 );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
