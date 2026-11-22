@@ -26,6 +26,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -33,11 +34,48 @@
 #include <graphene/chain/proposal_object.hpp>
 
 #include <graphene/db/simple_index.hpp>
+#include <graphene/protocol/confidential.hpp>
 
 #include <fc/crypto/digest.hpp>
 #include "../common/database_fixture.hpp"
 
+#include <algorithm>
+
 using namespace graphene::chain;
+
+namespace {
+
+void sort_outputs( vector<blind_output>& outputs )
+{
+   std::sort( outputs.begin(), outputs.end(),
+              []( const blind_output& a, const blind_output& b ) { return a.commitment < b.commitment; } );
+}
+
+/// A proof bound to a different commitment. The header still parses.
+range_proof_type mismatched_range_proof( const fc::sha256& blind, const fc::sha256& nonce, uint64_t value )
+{
+   const auto other_blind = fc::sha256::hash( blind );
+   const auto other_commitment = fc::ecc::blind( other_blind, value );
+   return fc::ecc::range_proof_sign( 0, other_commitment, other_blind, nonce, 0, 0, value );
+}
+
+void set_blind_output( blind_output& out, const authority& owner, const fc::sha256& blind,
+                       const fc::sha256& nonce, uint64_t value, bool real_proof )
+{
+   out.owner = owner;
+   out.commitment = fc::ecc::blind( blind, value );
+   if( real_proof )
+      out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind, nonce, 0, 0, value );
+   else
+      out.range_proof = mismatched_range_proof( blind, nonce, value );
+}
+
+int64_t confidential_supply( const database& db )
+{
+   return asset_id_type()(db).dynamic_asset_data_id(db).confidential_supply.value;
+}
+
+} // namespace
 
 BOOST_FIXTURE_TEST_SUITE( confidential_tests, database_fixture )
 BOOST_AUTO_TEST_CASE( confidential_test )
@@ -128,6 +166,285 @@ BOOST_AUTO_TEST_CASE( confidential_test )
 
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * After HARDFORK_CORE_2605, multi-output blind operations verify range proofs.
+ * Proofs that only satisfy the header check are rejected. Legitimate transfers
+ * still apply. validate() is unchanged, so the same operation is accepted before
+ * the hardfork.
+ */
+BOOST_AUTO_TEST_CASE( range_proofs_verified_after_hardfork )
+{ try {
+   ACTORS( (alice) );
+   const asset_object& core = asset_id_type()(db);
+   transfer( account_id_type(), alice_id, core.amount( 100000 ) );
+   const authority own = authority( 1, alice_public_key, 1 );
 
+   BOOST_REQUIRE( db.head_block_time() < HARDFORK_CORE_2605_TIME );
+
+   const auto b1 = fc::sha256::hash( "pre-1" );
+   const auto b2 = fc::sha256::hash( "pre-2" );
+   const auto n1 = fc::sha256::hash( "pre-n1" );
+   const auto n2 = fc::sha256::hash( "pre-n2" );
+   blind_output pre_out1, pre_out2;
+   set_blind_output( pre_out1, own, b1, n1, 400, false );
+   set_blind_output( pre_out2, own, b2, n2, 600, false );
+
+   transfer_to_blind_operation pre;
+   pre.from = alice_id;
+   pre.amount = core.amount( 1000 );
+   pre.blinding_factor = fc::ecc::blind_sum( { b1, b2 }, 2 );
+   pre.outputs = { pre_out1, pre_out2 };
+   sort_outputs( pre.outputs );
+   pre.validate();
+   BOOST_REQUIRE_THROW( verify_blind_output_range_proofs( pre.outputs ), fc::exception );
+
+   trx.clear();
+   trx.operations = { pre };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1000 );
+
+   transfer_to_blind_operation pre_proposed = pre;
+   pre_proposed.amount = core.amount( 300 );
+   const auto pb1 = fc::sha256::hash( "pre-prop-1" );
+   const auto pb2 = fc::sha256::hash( "pre-prop-2" );
+   blind_output pp1, pp2;
+   set_blind_output( pp1, own, pb1, n1, 100, false );
+   set_blind_output( pp2, own, pb2, n2, 200, false );
+   pre_proposed.blinding_factor = fc::ecc::blind_sum( { pb1, pb2 }, 2 );
+   pre_proposed.outputs = { pp1, pp2 };
+   sort_outputs( pre_proposed.outputs );
+   pre_proposed.validate();
+
+   proposal_create_operation proposal;
+   proposal.fee_paying_account = alice_id;
+   proposal.expiration_time = db.head_block_time() + 100;
+   proposal.proposed_ops.emplace_back( pre_proposed );
+   trx.clear();
+   trx.operations = { proposal };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+
+   generate_blocks( HARDFORK_CORE_2605_TIME );
+   test::set_expiration( db, trx );
+   BOOST_REQUIRE( db.head_block_time() >= HARDFORK_CORE_2605_TIME );
+
+   const auto hb1 = fc::sha256::hash( "post-bad-1" );
+   const auto hb2 = fc::sha256::hash( "post-bad-2" );
+   blind_output bad1, bad2;
+   set_blind_output( bad1, own, hb1, n1, 100, false );
+   set_blind_output( bad2, own, hb2, n2, 200, false );
+   transfer_to_blind_operation bad;
+   bad.from = alice_id;
+   bad.amount = core.amount( 300 );
+   bad.blinding_factor = fc::ecc::blind_sum( { hb1, hb2 }, 2 );
+   bad.outputs = { bad1, bad2 };
+   sort_outputs( bad.outputs );
+   bad.validate();
+   BOOST_REQUIRE_THROW( verify_blind_output_range_proofs( bad.outputs ), fc::exception );
+
+   trx.clear();
+   trx.operations = { bad };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1000 );
+
+   proposal.expiration_time = db.head_block_time() + 100;
+   proposal.proposed_ops.clear();
+   proposal.proposed_ops.emplace_back( bad );
+   trx.clear();
+   trx.operations = { proposal };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1000 );
+
+   const auto g1 = fc::sha256::hash( "legit-1" );
+   const auto g2 = fc::sha256::hash( "legit-2" );
+   const auto gn1 = fc::sha256::hash( "legit-n1" );
+   const auto gn2 = fc::sha256::hash( "legit-n2" );
+   blind_output out1, out2;
+   set_blind_output( out1, own, g1, gn1, 250, true );
+   set_blind_output( out2, own, g2, gn2, 750, true );
+   verify_blind_output_range_proofs( { out1, out2 } );
+
+   transfer_to_blind_operation legit;
+   legit.from = alice_id;
+   legit.amount = core.amount( 1000 );
+   legit.blinding_factor = fc::ecc::blind_sum( { g1, g2 }, 2 );
+   legit.outputs = { out1, out2 };
+   sort_outputs( legit.outputs );
+   legit.validate();
+   trx.clear();
+   trx.operations = { legit };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 2000 );
+
+   const auto g3 = fc::sha256::hash( "legit-3" );
+   const auto gn3 = fc::sha256::hash( "legit-n3" );
+   const auto g4 = fc::ecc::blind_sum( { g2, g3 }, 1 );
+   blind_output out3, out4;
+   set_blind_output( out3, own, g3, gn3, 300, true );
+   set_blind_output( out4, own, g4, gn2, 440, true );
+
+   blind_output bad3, bad4;
+   set_blind_output( bad3, own, g3, gn3, 300, false );
+   bad4 = out4;
+   bad4.range_proof = mismatched_range_proof( g4, gn2, 440 );
+   blind_transfer_operation bad_split;
+   bad_split.fee = core.amount( 10 );
+   bad_split.inputs.push_back( { out2.commitment, out2.owner } );
+   bad_split.outputs = { bad3, bad4 };
+   sort_outputs( bad_split.outputs );
+   bad_split.validate();
+   trx.clear();
+   trx.operations = { bad_split };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 2000 );
+
+   blind_transfer_operation blind_tr;
+   blind_tr.fee = core.amount( 10 );
+   blind_tr.inputs.push_back( { out2.commitment, out2.owner } );
+   blind_tr.outputs = { out3, out4 };
+   sort_outputs( blind_tr.outputs );
+   blind_tr.validate();
+   verify_blind_output_range_proofs( blind_tr.outputs );
+   trx.clear();
+   trx.operations = { blind_tr };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1990 );
+
+   transfer_from_blind_operation back;
+   back.fee = core.amount( 0 );
+   back.amount = core.amount( 440 );
+   back.to = alice_id;
+   back.blinding_factor = g4;
+   back.inputs.push_back( { out4.commitment, out4.owner } );
+   trx.clear();
+   trx.operations = { back };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1550 );
+
+   const auto single_blind = fc::sha256::hash( "single" );
+   blind_output single;
+   single.owner = own;
+   single.commitment = fc::ecc::blind( single_blind, 100 );
+   transfer_to_blind_operation one;
+   one.from = alice_id;
+   one.amount = core.amount( 100 );
+   one.blinding_factor = single_blind;
+   one.outputs = { single };
+   one.validate();
+   verify_blind_output_range_proofs( one.outputs );
+   trx.clear();
+   trx.operations = { one };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 1650 );
+
+} FC_LOG_AND_RETHROW() }
+
+
+/**
+ * After HARDFORK_CORE_2605, transfer_from_blind checks that the destination
+ * account exists, both when pushed directly and when proposed.
+ */
+BOOST_AUTO_TEST_CASE( transfer_from_blind_destination_checked_after_hardfork )
+{ try {
+   ACTORS( (alice)(bob) );
+   const asset_object& core = asset_id_type()(db);
+   transfer( account_id_type(), alice_id, core.amount( 100000 ) );
+   const authority own = authority( 1, alice_public_key, 1 );
+
+   generate_blocks( HARDFORK_CORE_2605_TIME );
+   test::set_expiration( db, trx );
+   BOOST_REQUIRE( db.head_block_time() >= HARDFORK_CORE_2605_TIME );
+
+   // Fund a single blinded balance (a single output needs no range proof).
+   const auto blind = fc::sha256::hash( "from-blind-dest" );
+   blind_output out;
+   out.owner = own;
+   out.commitment = fc::ecc::blind( blind, 500 );
+   transfer_to_blind_operation to_blind;
+   to_blind.from = alice_id;
+   to_blind.amount = core.amount( 500 );
+   to_blind.blinding_factor = blind;
+   to_blind.outputs = { out };
+   to_blind.validate();
+   trx.clear();
+   trx.operations = { to_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 500 );
+
+   const account_id_type missing( 1000000 );
+   BOOST_REQUIRE( db.find( missing ) == nullptr );
+
+   transfer_from_blind_operation from_blind;
+   from_blind.fee = core.amount( 0 );
+   from_blind.amount = core.amount( 500 );
+   from_blind.to = missing;
+   from_blind.blinding_factor = blind;
+   from_blind.inputs.push_back( { out.commitment, out.owner } );
+   from_blind.validate();
+
+   // Rejected when pushed directly.
+   trx.clear();
+   trx.operations = { from_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 500 );
+
+   // Rejected when proposed. Proposals that need non-account authorities are
+   // refused later in proposal_create evaluation anyway; the destination check
+   // runs first, so the error must come from it.
+   const auto push_proposal_error = [&]( const transfer_from_blind_operation& op ) {
+      proposal_create_operation proposal;
+      proposal.fee_paying_account = alice_id;
+      proposal.expiration_time = db.head_block_time() + 100;
+      proposal.proposed_ops.emplace_back( op );
+      trx.clear();
+      trx.operations = { proposal };
+      test::set_expiration( db, trx );
+      sign( trx, alice_private_key );
+      try {
+         PUSH_TX( db, trx );
+      } catch( const fc::exception& e ) {
+         return e.to_detail_string();
+      }
+      BOOST_FAIL( "proposal unexpectedly accepted" );
+      return std::string();
+   };
+   const std::string non_account_auths = "non-account authorities";
+   BOOST_CHECK( push_proposal_error( from_blind ).find( non_account_auths ) == std::string::npos );
+
+   // With an existing destination the check passes and only the pre-existing rule rejects it.
+   from_blind.to = bob_id;
+   BOOST_CHECK( push_proposal_error( from_blind ).find( non_account_auths ) != std::string::npos );
+
+   // The same operation to an existing account is still accepted when pushed directly.
+   trx.clear();
+   trx.operations = { from_blind };
+   test::set_expiration( db, trx );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   BOOST_REQUIRE_EQUAL( confidential_supply( db ), 0 );
+   BOOST_REQUIRE_EQUAL( get_balance( bob_id, asset_id_type() ), 500 );
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
