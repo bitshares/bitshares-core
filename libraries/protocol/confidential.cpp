@@ -35,6 +35,7 @@ void verify_blind_output_range_proofs( const vector<blind_output>& outputs )
    {
       uint64_t min_val = 0;
       uint64_t max_val = 0;
+      FC_ASSERT( !out.range_proof.empty(), "Range proof is required" );
       FC_ASSERT( fc::ecc::verify_range( min_val, max_val, out.commitment, out.range_proof ),
                  "Blind output range proof failed verification",
                  ("commitment", out.commitment) );
