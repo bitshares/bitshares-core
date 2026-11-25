@@ -25,8 +25,11 @@
 
 #include <graphene/protocol/authority.hpp>
 #include <graphene/protocol/types.hpp>
+#include <graphene/chain/types.hpp>
 
 #include <graphene/db/generic_index.hpp>
+
+#include <boost/multi_index/composite_key.hpp>
 
 #include <fc/crypto/elliptic.hpp>
 
@@ -48,6 +51,7 @@ class blinded_balance_object : public graphene::db::abstract_object<blinded_bala
 };
 
 struct by_commitment;
+struct by_asset_commitment;
 
 /**
  * @ingroup object_index
@@ -57,15 +61,48 @@ using blinded_balance_obj_multi_idx = multi_index_container<
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_commitment>,
-         member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >
+         member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >,
+      ordered_unique< tag<by_asset_commitment>,
+         composite_key< blinded_balance_object,
+            member< blinded_balance_object, asset_id_type, &blinded_balance_object::asset_id >,
+            member< blinded_balance_object, commitment_type, &blinded_balance_object::commitment >
+         >
+      >
    >
 >;
 using blinded_balance_index = generic_index<blinded_balance_object, blinded_balance_obj_multi_idx>;
 
+/**
+ * A key image that has already been published by a ring spend.
+ * The commitment itself stays in blinded_balance_index so it can be a decoy.
+ */
+class key_image_object : public graphene::db::abstract_object<key_image_object,
+                                    implementation_ids, impl_key_image_object_type>
+{
+   public:
+      fc::ecc::commitment_type   key_image;
+      asset_id_type              asset_id;
+};
+
+struct by_key_image;
+
+using key_image_multi_index_type = multi_index_container<
+   key_image_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_key_image>,
+         member< key_image_object, commitment_type, &key_image_object::key_image > >
+   >
+>;
+using key_image_index = generic_index<key_image_object, key_image_multi_index_type>;
+
 } } // graphene::chain
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::blinded_balance_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::key_image_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::blinded_balance_object )
+FC_REFLECT_TYPENAME( graphene::chain::key_image_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::blinded_balance_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::key_image_object )

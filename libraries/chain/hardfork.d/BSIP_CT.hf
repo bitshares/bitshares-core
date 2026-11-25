@@ -1,0 +1,24 @@
+// Confidential transfer upgrades. PLACEHOLDER times — do not activate on mainnet.
+// CT1 stealth memo, CT2 Bulletproofs+, CT3 ring spends. See libraries/ctcrypto/doc/bsip-ct*.md.
+// GRAPHENE_PRIVATE_CT_HF_IN_PAST is a compile flag for a private testnet
+// binary only. It moves the three forks to 2015-05-14, before both the
+// in-process test genesis and genesis-dev.json. Never ship a binary built
+// with this flag, and never let it dial public seeds.
+#ifdef GRAPHENE_PRIVATE_CT_HF_IN_PAST
+#define HARDFORK_BSIP_CT1_TIME (fc::time_point_sec( 1431600000 ))
+#define HARDFORK_BSIP_CT2_TIME (fc::time_point_sec( 1431603600 ))
+#define HARDFORK_BSIP_CT3_TIME (fc::time_point_sec( 1431607200 ))
+#else
+#ifndef HARDFORK_BSIP_CT1_TIME
+#define HARDFORK_BSIP_CT1_TIME (fc::time_point_sec( 1893456000 )) // 2030-01-01T00:00:00Z placeholder
+#endif
+#ifndef HARDFORK_BSIP_CT2_TIME
+#define HARDFORK_BSIP_CT2_TIME (fc::time_point_sec( 1893459600 )) // 2030-01-01T01:00:00Z placeholder
+#endif
+#ifndef HARDFORK_BSIP_CT3_TIME
+#define HARDFORK_BSIP_CT3_TIME (fc::time_point_sec( 1893463200 )) // 2030-01-01T02:00:00Z placeholder
+#endif
+#endif
+#define HARDFORK_BSIP_CT1_PASSED(head_block_time) (head_block_time >= HARDFORK_BSIP_CT1_TIME)
+#define HARDFORK_BSIP_CT2_PASSED(head_block_time) (head_block_time >= HARDFORK_BSIP_CT2_TIME)
+#define HARDFORK_BSIP_CT3_PASSED(head_block_time) (head_block_time >= HARDFORK_BSIP_CT3_TIME)

@@ -2825,6 +2825,29 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances(
    return result;
 }
 
+vector<blinded_balance_object> database_api::list_blinded_balances( asset_id_type asset,
+                                                                   commitment_type start,
+                                                                   uint32_t limit )const
+{
+   return my->list_blinded_balances( asset, start, limit );
+}
+
+vector<blinded_balance_object> database_api_impl::list_blinded_balances( asset_id_type asset,
+                                                                        commitment_type start,
+                                                                        uint32_t limit )const
+{
+   if( limit > 100 )
+      limit = 100;
+   vector<blinded_balance_object> result;
+   const auto& idx = _db.get_index_type<blinded_balance_index>().indices().get<by_asset_commitment>();
+   auto itr = idx.lower_bound( boost::make_tuple( asset, start ) );
+   if( itr != idx.end() && itr->asset_id == asset && itr->commitment == start )
+      ++itr;
+   for( ; itr != idx.end() && itr->asset_id == asset && result.size() < limit; ++itr )
+      result.push_back( *itr );
+   return result;
+}
+
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
 //  Withdrawals                                                     //

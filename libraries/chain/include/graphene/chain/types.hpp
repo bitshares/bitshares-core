@@ -48,4 +48,5 @@ GRAPHENE_DEFINE_IDS(chain, implementation_ids, impl_,
                     /* 2.16.x */ (fba_accumulator)
                     /* 2.17.x */ (collateral_bid)
                     /* 2.18.x */ (credit_deal_summary)
+                    /* 2.19.x */ (key_image)
                    )

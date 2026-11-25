@@ -232,6 +232,18 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_update_operation>(),
                    "Unable to define fees for liquidity pool update operation prior to the core-2604 hardfork");
       }
+      if (!HARDFORK_BSIP_CT3_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<ring_blind_transfer_operation>(),
+                   "Cannot set ring confidential fees before HARDFORK_BSIP_CT3");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<ring_transfer_from_blind_operation>(),
+                   "Cannot set ring confidential fees before HARDFORK_BSIP_CT3");
+      }
+   }
+   void operator()(const graphene::chain::ring_blind_transfer_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_CT3_PASSED(block_time), "Ring confidential transfers are not enabled yet" );
+   }
+   void operator()(const graphene::chain::ring_transfer_from_blind_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_CT3_PASSED(block_time), "Ring confidential transfers are not enabled yet" );
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );

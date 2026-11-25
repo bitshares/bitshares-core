@@ -117,6 +117,8 @@ namespace graphene { namespace wallet { namespace detail {
 
       m["transfer_to_blind"] = format_blind_transfers;
       m["blind_transfer"] = format_blind_transfers;
+      m["ring_blind_transfer"] = format_blind_transfers;
+      m["ring_transfer_from_blind"] = format_blind_transfers;
 
       m["receive_blind_transfer"] = [this](const variant& result, const fc::variants&)
       {

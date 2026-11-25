@@ -61,6 +61,10 @@
 #include <fc/crypto/base58.hpp>
 #include <fc/crypto/aes.hpp>
 
+#include <bts_ct/bulletproofs_plus.hpp>
+
+#include <map>
+
 #include <graphene/app/api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -1492,6 +1496,60 @@ vector<asset>   wallet_api::get_blind_balances( const string& key_or_label )cons
    return result;
 }
 
+namespace {
+
+fc::time_point_sec wallet_head_time( const graphene::wallet::detail::wallet_api_impl& impl )
+{
+   return impl._remote_db->get_dynamic_global_properties().time;
+}
+
+void attach_stealth_memo( vector<graphene::protocol::blind_output>& outputs,
+                          const fc::ecc::commitment_type& commitment,
+                          const graphene::protocol::stealth_confirmation& memo )
+{
+   for( auto& out : outputs )
+      if( out.commitment == commitment )
+         out.stealth_memo = memo;
+}
+
+void finalize_blind_outputs( fc::time_point_sec now,
+                             vector<graphene::protocol::blind_output>& outputs,
+                             const std::map<fc::ecc::commitment_type, std::pair<fc::sha256, uint64_t>>& openings )
+{
+   if( HARDFORK_BSIP_CT1_PASSED( now ) )
+   {
+      for( auto& out : outputs )
+      {
+         FC_ASSERT( out.stealth_memo.valid(), "missing stealth_memo" );
+         out.stealth_memo->to.reset();
+      }
+   }
+   if( HARDFORK_BSIP_CT2_PASSED( now ) )
+   {
+      std::vector<uint64_t> values;
+      std::vector<btsct::Scalar> blinds;
+      for( const auto& out : outputs )
+      {
+         auto it = openings.find( out.commitment );
+         FC_ASSERT( it != openings.end(), "missing opening for Bulletproofs+" );
+         values.push_back( it->second.second );
+         btsct::Scalar blind;
+         FC_ASSERT( btsct::Scalar::from_bytes( reinterpret_cast<const uint8_t*>( it->second.first.data() ),
+                                               32, blind ),
+                    "blinding factor is not a canonical scalar" );
+         blinds.push_back( blind );
+      }
+      auto proof = btsct::bulletproof_plus_prove( values, blinds );
+      auto bytes = btsct::bulletproof_plus_serialize( proof );
+      for( auto& out : outputs )
+         out.range_proof.clear();
+      outputs.front().range_proof.assign( reinterpret_cast<const char*>( bytes.data() ),
+                                          reinterpret_cast<const char*>( bytes.data() ) + bytes.size() );
+   }
+}
+
+} // namespace
+
 blind_confirmation wallet_api::transfer_from_blind( const string& from_blind_account_key_or_label,
                                                     const string& to_account_id_or_name,
                                                     const string& amount_in,
@@ -1579,6 +1637,7 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
    FC_ASSERT(asset_obj.valid(), "Could not find asset matching ${asset}", ("asset", symbol));
 
    blind_transfer_operation blind_tr;
+   std::map<fc::ecc::commitment_type, std::pair<fc::sha256, uint64_t>> openings;
    blind_tr.outputs.resize(2);
 
    auto fees  = my->_remote_db->get_global_properties().parameters.get_current_fees();
@@ -1660,6 +1719,7 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
    blind_output to_out;
    to_out.owner       = to_temp ? authority() : authority( 1, public_key_type( to_pub_key.child( child ) ), 1 );
    to_out.commitment  = fc::ecc::blind( blind_factor, amount.amount.value );
+   openings[to_out.commitment] = std::make_pair( blind_factor, static_cast<uint64_t>( amount.amount.value ) );
    idump(("to_out.blind")(blind_factor)(to_out.commitment) );
 
 
@@ -1671,6 +1731,8 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
       blind_output change_out;
       change_out.owner       = authority( 1, public_key_type( from_pub_key.child( from_child ) ), 1 );
       change_out.commitment  = fc::ecc::blind( change_blind_factor, change.amount.value );
+      openings[change_out.commitment] = std::make_pair( change_blind_factor,
+                                                       static_cast<uint64_t>( change.amount.value ) );
       change_out.range_proof = fc::ecc::range_proof_sign( 0, change_out.commitment, change_blind_factor, from_nonce,
                                                           0, RANGE_PROOF_MANTISSA, change.amount.value );
       blind_tr.outputs[1] = change_out;
@@ -1690,6 +1752,8 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
             fc::aes_encrypt( from_secret, fc::raw::pack( conf_output.decrypted_memo ) );
       conf_output.auth = change_out.owner;
       conf_output.confirmation_receipt = conf_output.confirmation;
+      change_out.stealth_memo = conf_output.confirmation;
+      blind_tr.outputs[1] = change_out;
 
       confirm.outputs.push_back( conf_output );
    }
@@ -1708,6 +1772,8 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
    conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
    conf_output.auth = to_out.owner;
    conf_output.confirmation_receipt = conf_output.confirmation;
+   to_out.stealth_memo = conf_output.confirmation;
+   blind_tr.outputs[0] = to_out;
 
    confirm.outputs.push_back( conf_output );
 
@@ -1716,6 +1782,7 @@ blind_confirmation wallet_api::blind_transfer_help( const string& from_key_or_la
               [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
    std::sort( blind_tr.inputs.begin(), blind_tr.inputs.end(),
               [&]( const blind_input& a, const blind_input& b ){ return a.commitment < b.commitment; } );
+   finalize_blind_outputs( wallet_head_time( *my ), blind_tr.outputs, openings );
 
    confirm.trx.operations.emplace_back( std::move(blind_tr) );
    ilog( "validate before" );
@@ -1758,6 +1825,8 @@ blind_confirmation wallet_api::transfer_to_blind( const string& from_account_id_
    bop.from   = from_account.id;
 
    vector<fc::sha256> blinding_factors;
+   std::map<fc::ecc::commitment_type, std::pair<fc::sha256, uint64_t>> to_blind_openings;
+   const auto head_time = wallet_head_time( *my );
 
    asset total_amount = asset_obj->amount(0);
 
@@ -1780,7 +1849,9 @@ blind_confirmation wallet_api::transfer_to_blind( const string& from_account_id_
       blind_output out;
       out.owner       = authority( 1, public_key_type( to_pub_key.child( child ) ), 1 );
       out.commitment  = fc::ecc::blind( blind_factor, amount.amount.value );
-      if( to_amounts.size() > 1 )
+      to_blind_openings[out.commitment] = std::make_pair( blind_factor,
+                                                         static_cast<uint64_t>( amount.amount.value ) );
+      if( !HARDFORK_BSIP_CT2_PASSED( head_time ) )
          out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind_factor, nonce,
                                                       0, RANGE_PROOF_MANTISSA, amount.amount.value );
 
@@ -1796,6 +1867,7 @@ blind_confirmation wallet_api::transfer_to_blind( const string& from_account_id_
       conf_output.confirmation.encrypted_memo =
             fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
       conf_output.confirmation_receipt = conf_output.confirmation;
+      out.stealth_memo = conf_output.confirmation;
 
       confirm.outputs.push_back( conf_output );
 
@@ -1807,6 +1879,7 @@ blind_confirmation wallet_api::transfer_to_blind( const string& from_account_id_
    /** commitments must be in sorted order */
    std::sort( bop.outputs.begin(), bop.outputs.end(),
               [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
+   finalize_blind_outputs( head_time, bop.outputs, to_blind_openings );
 
    confirm.trx.operations.push_back( bop );
    my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.get_current_fees());
@@ -1831,17 +1904,44 @@ blind_receipt wallet_api::receive_blind_transfer( const string& confirmation_rec
 {
    FC_ASSERT( !is_locked() );
    stealth_confirmation conf(confirmation_receipt);
-   FC_ASSERT( conf.to );
 
    blind_receipt result;
    result.conf = conf;
 
-   auto to_priv_key_itr = my->_keys.find( *conf.to );
-   FC_ASSERT( to_priv_key_itr != my->_keys.end(), "No private key for receiver", ("conf",conf) );
-
-
-   auto to_priv_key = wif_to_key( to_priv_key_itr->second );
-   FC_ASSERT( to_priv_key );
+   fc::optional<fc::ecc::private_key> to_priv_key;
+   public_key_type receiver_pub;
+   if( conf.to )
+   {
+      auto to_priv_key_itr = my->_keys.find( *conf.to );
+      FC_ASSERT( to_priv_key_itr != my->_keys.end(), "No private key for receiver", ("conf",conf) );
+      to_priv_key = wif_to_key( to_priv_key_itr->second );
+      receiver_pub = *conf.to;
+   }
+   else
+   {
+      // BSIP-CT1 omits `to`. Try every local key; the memo checksum rejects the wrong ones.
+      for( const auto& item : my->_keys )
+      {
+         auto candidate_pub = public_key_type( item.first );
+         auto candidate = wif_to_key( item.second );
+         if( !candidate )
+            continue;
+         try
+         {
+            auto trial = candidate->get_shared_secret( conf.one_time_key );
+            auto plain = fc::aes_decrypt( trial, conf.encrypted_memo );
+            auto trial_memo = fc::raw::unpack<stealth_confirmation::memo_data>( plain );
+            if( trial_memo.check == trial._hash[0].value() )
+            {
+               to_priv_key = candidate;
+               receiver_pub = candidate_pub;
+               break;
+            }
+         }
+         catch( ... ) {}
+      }
+   }
+   FC_ASSERT( to_priv_key, "No private key could decrypt the stealth memo" );
 
    auto secret       = to_priv_key->get_shared_secret( conf.one_time_key );
    auto child        = fc::sha256::hash( secret );
@@ -1852,7 +1952,7 @@ blind_receipt wallet_api::receive_blind_transfer( const string& confirmation_rec
    auto plain_memo = fc::aes_decrypt( secret, conf.encrypted_memo );
    auto memo = fc::raw::unpack<stealth_confirmation::memo_data>( plain_memo );
 
-   result.to_key   = *conf.to;
+   result.to_key   = receiver_pub;
    result.to_label = get_key_label( result.to_key );
    if( memo.from )
    {
@@ -1877,7 +1977,7 @@ blind_receipt wallet_api::receive_blind_transfer( const string& confirmation_rec
 
    blind_balance bal;
    bal.amount = memo.amount;
-   bal.to     = *conf.to;
+   bal.to     = conf.to.valid() ? *conf.to : receiver_pub;
    if( memo.from ) bal.from   = *memo.from;
    bal.one_time_key = conf.one_time_key;
    bal.blinding_factor = memo.blinding_factor;

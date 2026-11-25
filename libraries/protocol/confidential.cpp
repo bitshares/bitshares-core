@@ -24,10 +24,73 @@
 
 #include <graphene/protocol/confidential.hpp>
 
+#include <bts_ct/bulletproofs_plus.hpp>
+
 #include <fc/crypto/base58.hpp>
 #include <fc/io/raw.hpp>
 
 namespace graphene { namespace protocol {
+
+static bool is_bulletproof_plus_blob( const range_proof_type& proof )
+{
+   return proof.size() >= 4
+       && proof[0] == 'B' && proof[1] == 'P' && proof[2] == '+' && proof[3] == 0x01;
+}
+
+static btsct::Point commitment_point( const commitment_type& c )
+{
+   btsct::Point p;
+   FC_ASSERT( btsct::Point::from_compressed( c.data(), c.size(), p ),
+              "commitment is not a valid secp256k1 point" );
+   return p;
+}
+
+void check_required_stealth_memo( const optional<stealth_confirmation>& memo )
+{
+   FC_ASSERT( memo.valid(), "stealth_memo is required" );
+   FC_ASSERT( !memo->to.valid(), "stealth_memo.to is forbidden; it links the recipient" );
+   const size_t n = memo->encrypted_memo.size();
+   FC_ASSERT( n >= GRAPHENE_STEALTH_MEMO_MIN_SIZE && n <= GRAPHENE_STEALTH_MEMO_MAX_SIZE,
+              "encrypted_memo size ${n} is outside [${lo}, ${hi}]",
+              ("n", n)("lo", GRAPHENE_STEALTH_MEMO_MIN_SIZE)("hi", GRAPHENE_STEALTH_MEMO_MAX_SIZE) );
+   btsct::Point one_time;
+   FC_ASSERT( btsct::Point::from_compressed( memo->one_time_key.key_data.data(),
+                                             memo->one_time_key.key_data.size(), one_time ),
+              "one_time_key is not a valid secp256k1 point" );
+}
+
+void verify_bulletproof_plus_commitments( const vector<char>& proof,
+                                          const vector<commitment_type>& commitments )
+{
+   FC_ASSERT( !commitments.empty(), "Bulletproofs+ requires at least one commitment" );
+   FC_ASSERT( commitments.size() <= btsct::BP_PLUS_MAX_OUTPUTS, "too many outputs for one aggregated proof" );
+   FC_ASSERT( proof.size() <= 1024, "Bulletproofs+ proof exceeds the size cap" );
+   btsct::BulletproofPlus parsed;
+   FC_ASSERT( btsct::bulletproof_plus_parse( reinterpret_cast<const uint8_t*>( proof.data() ),
+                                             proof.size(), parsed ),
+              "Bulletproofs+ proof did not parse" );
+   vector<btsct::Point> points;
+   points.reserve( commitments.size() );
+   for( const auto& c : commitments )
+      points.push_back( commitment_point( c ) );
+   FC_ASSERT( btsct::bulletproof_plus_verify( parsed, points ),
+              "Bulletproofs+ verification failed" );
+}
+
+void verify_bulletproof_plus_outputs( const vector<blind_output>& outputs )
+{
+   FC_ASSERT( !outputs.empty() );
+   FC_ASSERT( outputs.size() <= btsct::BP_PLUS_MAX_OUTPUTS );
+   FC_ASSERT( !outputs[0].range_proof.empty(), "aggregated Bulletproofs+ is required on the first output" );
+   for( size_t i = 1; i < outputs.size(); ++i )
+      FC_ASSERT( outputs[i].range_proof.empty(),
+                 "only the first output carries the aggregated Bulletproofs+" );
+   vector<commitment_type> commitments;
+   commitments.reserve( outputs.size() );
+   for( const auto& out : outputs )
+      commitments.push_back( out.commitment );
+   verify_bulletproof_plus_commitments( outputs[0].range_proof, commitments );
+}
 
 void verify_blind_output_range_proofs( const vector<blind_output>& outputs )
 {
@@ -67,10 +130,12 @@ void transfer_to_blind_operation::validate()const
 
    FC_ASSERT( fc::ecc::verify_sum( {public_c}, out, 0 ), "", ("net_public",net_public) );
 
-   if( outputs.size() > 1 )
+   if( outputs.size() > 1 && !is_bulletproof_plus_blob( outputs[0].range_proof ) )
    {
-      for( auto out : outputs )
+      for( const auto& out : outputs )
       {
+         if( out.range_proof.empty() )
+            continue;
          auto info = fc::ecc::range_get_info( out.range_proof );
          FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
       }
@@ -139,10 +204,12 @@ void blind_transfer_operation::validate()const
    FC_ASSERT( in.size(), "there must be at least one input" );
    FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );
 
-   if( outputs.size() > 1 )
+   if( outputs.size() > 1 && !is_bulletproof_plus_blob( outputs[0].range_proof ) )
    {
-      for( auto out : outputs )
+      for( const auto& out : outputs )
       {
+         if( out.range_proof.empty() )
+            continue;
          auto info = fc::ecc::range_get_info( out.range_proof );
          FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
       }
@@ -178,3 +245,7 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_op
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ring_blind_transfer_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ring_transfer_from_blind_operation::fee_params_t )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ring_blind_transfer_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::ring_transfer_from_blind_operation )

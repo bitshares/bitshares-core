@@ -39,6 +39,7 @@ set( SOURCES
      wallet_builder.cpp
      wallet_debug.cpp
      wallet_network.cpp
+     wallet_ring.cpp
      wallet_results.cpp
      wallet_sign.cpp
      wallet_transfer.cpp
@@ -46,7 +47,7 @@ set( SOURCES
    )
 
 add_library( graphene_wallet ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/api_documentation.cpp ${HEADERS} )
-target_link_libraries( graphene_wallet PRIVATE graphene_app graphene_chain graphene_utilities fc
+target_link_libraries( graphene_wallet PRIVATE graphene_app graphene_chain graphene_utilities fc bts_ctcrypto
                        ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 target_include_directories( graphene_db PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
