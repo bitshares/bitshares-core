@@ -1,2 +1,3 @@
 "bts-testnet-seed1.abit-more.com:1779", // Abit
 "testnet-seed.xbts.io:1778",            // xbts.io
+"43.167.238.79:1779",                   // clone
