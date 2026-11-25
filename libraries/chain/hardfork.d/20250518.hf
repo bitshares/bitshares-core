@@ -1,0 +1,5 @@
+// Ticket issues
+#ifndef SOFTFORK_20250518_TIME
+#define SOFTFORK_20250518_TIME (fc::time_point_sec( 1747555200 )) // Sunday, May 18, 2025 8:00:00 UTC
+#define SOFTFORK_20250518_PASSED(head_block_time) (head_block_time >= SOFTFORK_20250518_TIME)
+#endif

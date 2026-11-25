@@ -68,6 +68,8 @@ struct hardfork_visitor {
                                                 protocol::credit_deal_repay_operation,
                                                 protocol::credit_deal_expired_operation >;
    using credit_deal_update_op = fc::typelist::list< protocol::credit_deal_update_operation >;
+   using ring_confidential_ops = fc::typelist::list< protocol::ring_blind_transfer_operation,
+                                                     protocol::ring_transfer_from_blind_operation >;
 
    fc::time_point_sec now;
 
@@ -103,6 +105,9 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<fc::typelist::contains<liquidity_pool_update_op, Op>(), bool>
    visit() { return HARDFORK_CORE_2604_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<ring_confidential_ops, Op>(), bool>
+   visit() { return HARDFORK_BSIP_CT3_PASSED(now); }
    /// @}
 
    /// typelist::runtime::dispatch adaptor

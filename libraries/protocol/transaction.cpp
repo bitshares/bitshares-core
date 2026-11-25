@@ -164,6 +164,8 @@ struct sign_state
                   return provided_signatures[aitr->second] = true;
                return false;
             }
+            // TODO should return false here, probably with a hardfork guard like "allow_non_immediate_owner"
+            // return false;
          }
          return provided_signatures[itr->second] = true;
       }

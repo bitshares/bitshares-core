@@ -979,6 +979,26 @@ class wallet_api
                                          const string& symbol_or_id,
                                          bool broadcast = false )const;
 
+      /**
+       * Ring spend of one blinded balance owned by \c from_key_or_label.
+       * The ring is 16 commitments of the same asset, taken from the chain.
+       * Enabled only after BSIP-CT3.
+       */
+      blind_confirmation ring_blind_transfer( const string& from_key_or_label,
+                                              const string& to_key_or_label,
+                                              const string& amount,
+                                              const string& symbol_or_id,
+                                              bool broadcast = false )const;
+
+      /**
+       * Ring spend that pays a public account. Optional change stays confidential.
+       */
+      blind_confirmation ring_transfer_from_blind( const string& from_key_or_label,
+                                                   const string& to_account_id_or_name,
+                                                   const string& amount,
+                                                   const string& symbol_or_id,
+                                                   bool broadcast = false )const;
+
       /** Place a limit order attempting to sell one asset for another.
        *
        * Buying and selling are the same operation on BitShares. If you want to buy BTS
@@ -1966,6 +1986,8 @@ FC_API( graphene::wallet::wallet_api,
         (transfer_to_blind)
         (transfer_from_blind)
         (blind_transfer)
+        (ring_blind_transfer)
+        (ring_transfer_from_blind)
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)

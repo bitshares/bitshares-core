@@ -61,6 +61,11 @@ constexpr int64_t GRAPHENE_MAX_SHARE_SUPPLY (1000000000000000LL); // 10 ^ 15
 
 #define GRAPHENE_DEFAULT_BLOCK_INTERVAL  5 /* seconds */
 #define GRAPHENE_DEFAULT_MAX_TRANSACTION_SIZE 2048
+/** After BSIP-CT2, a transaction whose operations are all confidential may be
+ *  this large even when maximum_transaction_size is still 2048. It must also
+ *  fit in maximum_block_size. 16 KiB covers a 16-output Bulletproofs+ deposit
+ *  and one ring input of 16 members. */
+#define GRAPHENE_CONFIDENTIAL_TX_SIZE_ALLOWANCE 16384
 #define GRAPHENE_DEFAULT_MAX_BLOCK_SIZE  (2*1000*1000) /* < 2 MiB (less than MAX_MESSAGE_SIZE in graphene/net/config.hpp) */
 #define GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION (60*60*24) // seconds,  aka: 1 day
 #define GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL  (60*60*24) // seconds, aka: 1 day

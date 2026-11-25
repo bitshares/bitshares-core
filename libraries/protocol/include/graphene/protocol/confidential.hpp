@@ -32,6 +32,18 @@ namespace graphene { namespace protocol {
 using fc::ecc::blind_factor_type;
 
 /**
+ * Consensus constants for the confidential-transfer hardforks.
+ * Ring size and memo bounds are not chain parameters: changing them is a hardfork.
+ * See libraries/ctcrypto/doc/bsip-ct*.md. Hardfork times are placeholders and must not be treated
+ * as a mainnet activation.
+ */
+static constexpr uint32_t GRAPHENE_STEALTH_MEMO_MIN_SIZE = 32;
+static constexpr uint32_t GRAPHENE_STEALTH_MEMO_MAX_SIZE = 1024;
+static constexpr uint32_t GRAPHENE_RING_SIZE = 16;
+static constexpr uint32_t GRAPHENE_RING_MAX_INPUTS = 8;
+static constexpr uint32_t GRAPHENE_RING_MAX_OUTPUTS = 16;
+
+/**
  * @defgroup stealth Stealth Transfer
  * @brief Operations related to stealth transfer of value
  *
@@ -258,6 +270,124 @@ struct blind_transfer_operation : public base_operation
    }
 };
 
+/**
+ * One member of a ring. The spend key is the single-key owner stored on the
+ * blinded balance with this commitment; it is not repeated here.
+ */
+struct ring_member
+{
+   fc::ecc::commitment_type commitment;
+};
+
+/**
+ * A ring spend. `clsag` is a btsct::ClsagSignature. `key_image` must equal the
+ * image inside that signature. Members are strictly sorted by commitment and
+ * the real spend is not identified.
+ */
+struct ring_input
+{
+   vector<commitment_type>   members;
+   commitment_type           pseudo_commitment;
+   commitment_type           key_image;
+   vector<char>              clsag;
+};
+
+/**
+ * A new confidential output created by a ring operation. The aggregated
+ * Bulletproofs+ proof lives on the operation, not on each output.
+ */
+struct ring_output
+{
+   fc::ecc::commitment_type       commitment;
+   authority                      owner;
+   optional<stealth_confirmation> stealth_memo;
+};
+
+/**
+ * @ingroup stealth
+ * Blind-to-blind transfer that hides which input was spent.
+ * Commitments are not deleted. The key image is.
+ * Enabled at HARDFORK_BSIP_CT3_TIME. After that hardfork the legacy
+ * blind_transfer and transfer_from_blind operations can no longer spend.
+ */
+struct ring_blind_transfer_operation : public base_operation
+{
+   struct fee_params_t {
+      uint64_t fee             = 10 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      uint32_t price_per_input = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   };
+
+   asset                  fee;
+   vector<ring_input>     inputs;
+   vector<ring_output>    outputs;
+   /** Aggregated Bulletproofs+ over outputs, in output order. */
+   vector<char>           range_proof;
+
+   account_id_type fee_payer()const { return GRAPHENE_TEMP_ACCOUNT; }
+   void            validate()const;
+   share_type      calculate_fee( const fee_params_t& k )const;
+};
+
+/**
+ * @ingroup stealth
+ * Ring spend that pays a public account. Optional change outputs stay confidential.
+ */
+struct ring_transfer_from_blind_operation : public base_operation
+{
+   struct fee_params_t {
+      uint64_t fee             = 10 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      uint32_t price_per_input = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   };
+
+   asset                  fee;
+   asset                  amount;
+   account_id_type        to;
+   blind_factor_type      blinding_factor;
+   vector<ring_input>     inputs;
+   vector<ring_output>    changes;
+   /** Present iff changes is non-empty. Proves the change outputs. */
+   vector<char>           range_proof;
+
+   account_id_type fee_payer()const { return GRAPHENE_TEMP_ACCOUNT; }
+   void            validate()const;
+   share_type      calculate_fee( const fee_params_t& k )const;
+};
+
+void verify_blind_output_range_proofs( const vector<blind_output>& outputs );
+
+/** BSIP-CT1. `to` must be unset. Memo ciphertext is size-bounded. */
+void check_required_stealth_memo( const optional<stealth_confirmation>& memo );
+
+/** BSIP-CT2. One aggregated Bulletproofs+ on the first output; later proofs empty. */
+void verify_bulletproof_plus_outputs( const vector<blind_output>& outputs );
+
+/** Same proof, carried once on a ring operation. */
+void verify_bulletproof_plus_commitments( const vector<char>& proof,
+                                          const vector<commitment_type>& commitments );
+
+/**
+ * Domain-separated message signed by every CLSAG in a ring operation.
+ * public_amount/public_blind/to are zero/empty for ring_blind_transfer.
+ * spend_keys is row-major, one compressed key per ring member, looked up
+ * from the blinded-balance owner by the evaluator.
+ */
+fc::sha256 ring_signature_message( const asset& fee,
+                                   const asset& public_amount,
+                                   account_id_type to,
+                                   const blind_factor_type& public_blind,
+                                   const vector<ring_input>& inputs,
+                                   const vector<commitment_type>& outputs,
+                                   const vector<char>& range_proof );
+
+void verify_ring_signatures( const fc::sha256& message,
+                             const vector<ring_input>& inputs,
+                             const vector<fc::ecc::public_key_data>& spend_keys );
+
+/** Structural checks shared by both ring operations. Does not touch the database. */
+void validate_ring_inputs( const vector<ring_input>& inputs );
+
 ///@} endgroup stealth
 
 } } // graphene::protocol
@@ -283,6 +413,16 @@ FC_REFLECT( graphene::protocol::blind_transfer_operation,
 FC_REFLECT( graphene::protocol::transfer_to_blind_operation::fee_params_t, (fee)(price_per_output) )
 FC_REFLECT( graphene::protocol::transfer_from_blind_operation::fee_params_t, (fee) )
 FC_REFLECT( graphene::protocol::blind_transfer_operation::fee_params_t, (fee)(price_per_output) )
+FC_REFLECT( graphene::protocol::ring_member, (commitment) )
+FC_REFLECT( graphene::protocol::ring_input, (members)(pseudo_commitment)(key_image)(clsag) )
+FC_REFLECT( graphene::protocol::ring_output, (commitment)(owner)(stealth_memo) )
+FC_REFLECT( graphene::protocol::ring_blind_transfer_operation, (fee)(inputs)(outputs)(range_proof) )
+FC_REFLECT( graphene::protocol::ring_transfer_from_blind_operation,
+            (fee)(amount)(to)(blinding_factor)(inputs)(changes)(range_proof) )
+FC_REFLECT( graphene::protocol::ring_blind_transfer_operation::fee_params_t,
+            (fee)(price_per_kbyte)(price_per_input) )
+FC_REFLECT( graphene::protocol::ring_transfer_from_blind_operation::fee_params_t,
+            (fee)(price_per_kbyte)(price_per_input) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_params_t )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_params_t )
@@ -290,3 +430,7 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_oper
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ring_blind_transfer_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ring_transfer_from_blind_operation::fee_params_t )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ring_blind_transfer_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::ring_transfer_from_blind_operation )

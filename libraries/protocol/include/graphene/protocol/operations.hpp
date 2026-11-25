@@ -130,7 +130,9 @@ namespace graphene { namespace protocol {
             /* 74 */ credit_deal_expired_operation,   // VIRTUAL
             /* 75 */ liquidity_pool_update_operation,
             /* 76 */ credit_deal_update_operation,
-            /* 77 */ limit_order_update_operation
+            /* 77 */ limit_order_update_operation,
+            /* 78 */ ring_blind_transfer_operation,
+            /* 79 */ ring_transfer_from_blind_operation
          >;
 
    /**

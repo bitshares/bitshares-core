@@ -1,0 +1,5 @@
+// Blind-transfer issues
+#ifndef SOFTFORK_20261119_TIME
+#define SOFTFORK_20261119_TIME (fc::time_point_sec( 1795165200)) // Friday, November 20, 2026 at 9:00:00 AM UTC
+#define SOFTFORK_20261119_PASSED(head_block_time) (head_block_time >= SOFTFORK_20261119_TIME)
+#endif

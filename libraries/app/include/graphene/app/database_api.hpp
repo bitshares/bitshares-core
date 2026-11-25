@@ -1336,6 +1336,17 @@ class database_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      /**
+       * List blinded balances of one asset, in commitment order, for decoy selection.
+       * Spent commitments stay in this list; wallets must not spend a key image twice.
+       * @param asset the asset pool
+       * @param start start listing strictly after this commitment; zero starts at the beginning
+       * @param limit maximum rows, capped at 100
+       */
+      vector<blinded_balance_object> list_blinded_balances( asset_id_type asset,
+                                                            commitment_type start,
+                                                            uint32_t limit )const;
+
       /////////////////
       // Withdrawals //
       /////////////////
@@ -1602,6 +1613,7 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+   (list_blinded_balances)
 
    // Withdrawals
    (get_withdraw_permissions_by_giver)

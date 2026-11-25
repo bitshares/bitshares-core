@@ -60,4 +60,26 @@ class blind_transfer_evaluator : public evaluator<blind_transfer_evaluator>
       virtual void pay_fee() override;
 };
 
+class ring_blind_transfer_evaluator : public evaluator<ring_blind_transfer_evaluator>
+{
+   public:
+      typedef ring_blind_transfer_operation operation_type;
+
+      void_result do_evaluate( const ring_blind_transfer_operation& o );
+      void_result do_apply( const ring_blind_transfer_operation& o );
+
+      virtual void pay_fee() override;
+};
+
+class ring_transfer_from_blind_evaluator : public evaluator<ring_transfer_from_blind_evaluator>
+{
+   public:
+      typedef ring_transfer_from_blind_operation operation_type;
+
+      void_result do_evaluate( const ring_transfer_from_blind_operation& o );
+      void_result do_apply( const ring_transfer_from_blind_operation& o );
+
+      virtual void pay_fee() override;
+};
+
 } } // namespace graphene::chain

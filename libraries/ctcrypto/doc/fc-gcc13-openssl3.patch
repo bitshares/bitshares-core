@@ -1,0 +1,29 @@
+# Build fixes for bitshares-fc fe9f7e1 (GCC 13 / OpenSSL 3). Not part of this PR's consensus code.
+# Apply inside libraries/fc with: git apply ../ctcrypto/doc/fc-gcc13-openssl3.patch
+diff --git a/include/fc/string.hpp b/include/fc/string.hpp
+index 8f269f0..f2e2a1f 100644
+--- a/include/fc/string.hpp
++++ b/include/fc/string.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ #include <fc/fwd.hpp>
+ #include <fc/optional.hpp>
++#include <cstdint>
+ #include <string>
+ 
+ namespace fc
+diff --git a/src/crypto/openssl.cpp b/src/crypto/openssl.cpp
+index 3ae7875..cd1e851 100644
+--- a/src/crypto/openssl.cpp
++++ b/src/crypto/openssl.cpp
+@@ -43,8 +43,8 @@ namespace  fc
+ 
+        ~openssl_scope()
+        {
+-#if not defined(LIBRESSL_VERSION_NUMBER)
+-          // No FIPS in LibreSSL.
++#if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x30000000L
++          // No FIPS in LibreSSL. OpenSSL 3 removed FIPS_mode_set.
+           // https://marc.info/?l=openbsd-misc&m=139819485423701&w=2
+           FIPS_mode_set(0);
+ #endif

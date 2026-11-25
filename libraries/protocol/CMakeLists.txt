@@ -5,6 +5,7 @@ list(APPEND SOURCES account.cpp
                     asset_ops.cpp
                     block.cpp
                     confidential.cpp
+                    confidential_ring.cpp
                     chain_parameters.cpp
                     fee_schedule.cpp
                     fee_schedule_calc.cpp
@@ -68,7 +69,7 @@ else( MSVC )
 endif( MSVC )
 
 add_library( graphene_protocol ${SOURCES} ${HEADERS} )
-target_link_libraries( graphene_protocol fc graphene_protocol_custom_auths )
+target_link_libraries( graphene_protocol fc graphene_protocol_custom_auths bts_ctcrypto )
 target_include_directories( graphene_protocol PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 install( TARGETS

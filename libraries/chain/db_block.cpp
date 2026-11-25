@@ -746,9 +746,36 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
                  ("trx.expiration",trx.expiration)("now",now)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       FC_ASSERT( now <= trx.expiration, "", ("now",now)("trx.exp",trx.expiration) );
       if ( 0 == (skip & skip_block_size_check ) ) // don't waste time on replay
+      {
+         const auto packed = trx.get_packed_size();
+         bool confidential_allowance = false;
+         if( HARDFORK_BSIP_CT2_PASSED( head_block_time() )
+             && packed <= GRAPHENE_CONFIDENTIAL_TX_SIZE_ALLOWANCE
+             && packed <= chain_parameters.maximum_block_size
+             && !trx.operations.empty() )
+         {
+            confidential_allowance = true;
+            for( const auto& op : trx.operations )
+            {
+               const auto which = op.which();
+               const bool confidential =
+                  which == operation::tag<transfer_to_blind_operation>::value
+                  || which == operation::tag<blind_transfer_operation>::value
+                  || which == operation::tag<transfer_from_blind_operation>::value
+                  || which == operation::tag<ring_blind_transfer_operation>::value
+                  || which == operation::tag<ring_transfer_from_blind_operation>::value;
+               if( !confidential )
+               {
+                  confidential_allowance = false;
+                  break;
+               }
+            }
+         }
          FC_ASSERT( head_block_time() <= HARDFORK_CORE_1573_TIME
-               || trx.get_packed_size() <= chain_parameters.maximum_transaction_size,
+               || packed <= chain_parameters.maximum_transaction_size
+               || confidential_allowance,
                "Transaction exceeds maximum transaction size." );
+      }
    }
 
    //Insert transaction into unique transactions database.

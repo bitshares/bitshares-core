@@ -25,6 +25,7 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/protocol/confidential.hpp>
 
 namespace graphene { namespace chain {
 
@@ -231,6 +232,18 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_update_operation>(),
                    "Unable to define fees for liquidity pool update operation prior to the core-2604 hardfork");
       }
+      if (!HARDFORK_BSIP_CT3_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<ring_blind_transfer_operation>(),
+                   "Cannot set ring confidential fees before HARDFORK_BSIP_CT3");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<ring_transfer_from_blind_operation>(),
+                   "Cannot set ring confidential fees before HARDFORK_BSIP_CT3");
+      }
+   }
+   void operator()(const graphene::chain::ring_blind_transfer_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_CT3_PASSED(block_time), "Ring confidential transfers are not enabled yet" );
+   }
+   void operator()(const graphene::chain::ring_transfer_from_blind_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_CT3_PASSED(block_time), "Ring confidential transfers are not enabled yet" );
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -262,9 +275,16 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::ticket_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+      if( SOFTFORK_20250518_PASSED(block_time) ) {
+         FC_ASSERT( false, "Temporarily disabled" );
+      }
    }
-   void operator()(const graphene::chain::ticket_update_operation&) const {
+   void operator()(const graphene::chain::ticket_update_operation& op) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+      if( SOFTFORK_20250518_PASSED(block_time)
+          && op.target_type == static_cast<uint64_t>(ticket_type::lock_forever) ) {
+         FC_ASSERT( false, "Temporarily disabled" );
+      }
    }
    void operator()(const graphene::chain::liquidity_pool_create_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
@@ -323,6 +343,19 @@ struct proposal_operation_hardfork_visitor
       FC_ASSERT( HARDFORK_CORE_2595_PASSED(block_time), "Not allowed until the core-2595 hardfork" );
    }
 
+   void operator()(const graphene::chain::transfer_to_blind_operation& op) const {
+      if( SOFTFORK_20261119_PASSED(block_time) )
+         verify_blind_output_range_proofs( op.outputs );
+   }
+   void operator()(const graphene::chain::blind_transfer_operation& op) const {
+      if( SOFTFORK_20261119_PASSED(block_time) )
+         verify_blind_output_range_proofs( op.outputs );
+   }
+   void operator()(const graphene::chain::transfer_from_blind_operation& op) const {
+      if( SOFTFORK_20261119_PASSED(block_time) )
+         op.to(db);
+   }
+
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       bool already_contains_proposal_update = false;
@@ -350,6 +383,32 @@ struct hardfork_visitor_214 // non-recursive proposal visitor
 
    void operator()(const proposal_update_operation &v) const {
       FC_ASSERT(false, "Not allowed until hardfork 214");
+   }
+};
+
+struct softfork_visitor_20261119 // recursive proposal visitor
+{
+   typedef void result_type;
+   const database& db;
+
+   softfork_visitor_20261119( const database& _db )
+   : db( _db ) {}
+
+   template<typename T>
+   void operator()(const T &v) const {
+      const auto& fee_paying_account = v.fee_payer()(db);
+      FC_ASSERT( !fee_paying_account.has_address_auth(),
+            "Account ${acct} '${name}' is temporarily blocked",
+            ("acct", fee_paying_account.id) ("name", fee_paying_account.name) );
+   }
+
+   void operator()(const proposal_create_operation &v) const {
+      const auto& fee_paying_account = v.fee_payer()(db);
+      FC_ASSERT( !fee_paying_account.has_address_auth(),
+            "Account ${acct} '${name}' is temporarily blocked",
+            ("acct", fee_paying_account.id) ("name", fee_paying_account.name) );
+      for (const op_wrapper &op : v.proposed_ops)
+         op.op.visit(*this);
    }
 };
 
@@ -390,6 +449,13 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
          op.op.visit( hf214 );
    }
    vtor_1479( o );
+
+   if( SOFTFORK_20261119_PASSED( d.head_block_time() ) )
+   {
+      softfork_visitor_20261119 sf20261119(d);
+      for( const op_wrapper &op : o.proposed_ops )
+         op.op.visit( sf20261119 );
+   }
 
    const auto& global_parameters = d.get_global_properties().parameters;
 

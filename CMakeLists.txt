@@ -322,6 +322,13 @@ if(ENABLE_COVERAGE_TESTING)
     SET(CMAKE_CXX_FLAGS "--coverage ${CMAKE_CXX_FLAGS}")
 endif()
 
+# Private testnet binaries only. Off by default. Do not ship a node built with this ON.
+option(GRAPHENE_PRIVATE_CT_HF_IN_PAST
+       "Move the BSIP-CT hardfork times to 2015 for a private testnet binary" OFF)
+if(GRAPHENE_PRIVATE_CT_HF_IN_PAST)
+  add_compile_definitions(GRAPHENE_PRIVATE_CT_HF_IN_PAST)
+endif()
+
 add_subdirectory( libraries )
 add_subdirectory( programs )
 add_subdirectory( tests )

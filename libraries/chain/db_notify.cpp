@@ -395,6 +395,15 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const ring_blind_transfer_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+   }
+   void operator()( const ring_transfer_from_blind_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( op.to );
+   }
 };
 
 } // namespace detail
@@ -546,7 +555,9 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               for( const auto& a : aobj->owner.account_auths )
                 accounts.insert( a.first );
               break;
-           } case impl_block_summary_object_type:
+           } case impl_key_image_object_type:
+              break;
+             case impl_block_summary_object_type:
               break;
              case impl_account_history_object_type: {
               const auto* aobj = dynamic_cast<const account_history_object*>(obj);
